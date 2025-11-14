@@ -16,6 +16,13 @@
     // CabbyCodes namespace
     window.CabbyCodes = window.CabbyCodes || {};
     
+    /**
+     * Current CabbyCodes version. This value is kept in sync with the root
+     * VERSION file so it can be displayed inside the game.
+     * @type {string}
+     */
+    CabbyCodes.version = '0.0.1';
+    
     // Settings storage key
     const SETTINGS_KEY = 'CabbyCodes_Settings';
     

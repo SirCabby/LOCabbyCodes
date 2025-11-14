@@ -1,5 +1,7 @@
 # CabbyCodes Mod Installation Guide
 
+Current Version: **0.0.1** (tracked in the root `VERSION` file)
+
 This guide will walk you through installing the CabbyCodes mod for "Look Outside". The installation process involves copying files and adding one entry to the game's plugin configuration.
 
 ## Prerequisites
@@ -16,6 +18,13 @@ C:\Program Files (x86)\Steam\steamapps\common\Look Outside
 ```
 
 **Note:** If you installed Steam in a different location, navigate to your Steam installation folder and find `steamapps\common\Look Outside`.
+
+## Developer Automation
+
+- `make deploy` – replace the installed CabbyCodes files inside the Look Outside installation (defaults to `C:\Program Files (x86)\Steam\steamapps\common\Look Outside`). Existing files are removed and re-verified before copying new ones.
+- `make package` – build `dist/LOCabbyCodes.v#.#.#.zip` containing only the files players need (no standalone `VERSION` file is included).
+- `make rev X.Y.Z` – bump the project version everywhere (`VERSION`, runtime constant, README). Always run this before packaging a release.
+- `make run` – run `make deploy`, stop any running game process, and launch the Steam build via `steam://rungameid/3373660`.
 
 ## Step-by-Step Installation
 
