@@ -1,0 +1,219 @@
+# CabbyCodes Mod Installation Guide
+
+This guide will walk you through installing the CabbyCodes mod for "Look Outside". The installation process involves copying files and adding one entry to the game's plugin configuration.
+
+## Prerequisites
+
+- A copy of "Look Outside" installed via Steam
+- Basic file navigation skills
+- A text editor (Notepad, Notepad++, VS Code, etc.)
+
+## Installation Location
+
+The game is typically installed at:
+```
+C:\Program Files (x86)\Steam\steamapps\common\Look Outside
+```
+
+**Note:** If you installed Steam in a different location, navigate to your Steam installation folder and find `steamapps\common\Look Outside`.
+
+## Step-by-Step Installation
+
+### Step 1: Locate the Game's Plugin Folder
+
+1. Navigate to your game installation folder (see Installation Location above)
+2. Open the `js` folder
+3. Open the `plugins` folder inside `js`
+
+You should now be at:
+```
+C:\Program Files (x86)\Steam\steamapps\common\Look Outside\js\plugins
+```
+
+### Step 2: Copy the CabbyCodes Loader Plugin
+
+1. Copy the file `CabbyCodes.js` from this repository
+2. Paste it into the `js\plugins` folder
+
+The file should now be at:
+```
+C:\Program Files (x86)\Steam\steamapps\common\Look Outside\js\plugins\CabbyCodes.js
+```
+
+### Step 3: Copy the CabbyCodes Mod Folder
+
+1. Copy the entire `CabbyCodes` folder from this repository (the folder containing `cabbycodes-core.js`, `cabbycodes-patches.js`, and `cabbycodes-settings.js`)
+2. Paste it into the `js\plugins` folder
+
+The folder structure should now look like:
+```
+C:\Program Files (x86)\Steam\steamapps\common\Look Outside\js\plugins\
+├── CabbyCodes.js
+├── CabbyCodes\
+│   ├── cabbycodes-core.js
+│   ├── cabbycodes-patches.js
+│   └── cabbycodes-settings.js
+├── (other plugin files...)
+```
+
+### Step 4: Register the Plugin in plugins.js
+
+This is the most important step. You need to add the CabbyCodes plugin to the game's plugin list.
+
+1. Navigate to:
+   ```
+   C:\Program Files (x86)\Steam\steamapps\common\Look Outside\js\plugins.js
+   ```
+
+2. **IMPORTANT:** Make a backup copy of `plugins.js` before editing (right-click → Copy, then Paste in the same folder)
+
+3. Open `plugins.js` in a text editor (Notepad works, but Notepad++ or VS Code is recommended)
+
+4. Find the `$plugins` array. It should look like this at the top:
+   ```javascript
+   var $plugins =
+   [
+       {
+           "name": "MUSH_Audio_Engine",
+           "status": true,
+           ...
+       },
+       ...
+   ];
+   ```
+
+5. You need to add a new entry to this array. Find the closing bracket `];` at the very end of the array (it should be near the end of the file, after all the plugin entries).
+
+6. **BEFORE** the closing `];`, add a comma after the last plugin entry, then add this new entry:
+
+   ```javascript
+   {
+       "name": "CabbyCodes",
+       "status": true,
+       "description": "CabbyCodes Mod Loader",
+       "parameters": {}
+   }
+   ```
+
+7. The end of your `$plugins` array should now look something like this:
+   ```javascript
+       {
+           "name": "TunicateScripts",
+           "status": true,
+           "description": "",
+           "parameters": {}
+       },
+       {
+           "name": "CabbyCodes",
+           "status": true,
+           "description": "CabbyCodes Mod Loader",
+           "parameters": {}
+       }
+   ];
+   ```
+
+   **Important Notes:**
+   - Make sure there's a comma after the previous plugin entry
+   - Make sure the JSON syntax is correct (quotes around keys, proper brackets)
+   - The `"status": true` means the plugin is enabled
+
+8. Save the file
+
+### Step 5: Verify Installation
+
+1. Launch "Look Outside"
+2. The mod should load automatically when the game starts
+3. You can verify it's working by:
+   - Opening the game's Options menu
+   - Looking for a "--- CabbyCodes ---" section (if any settings have been registered)
+   - Checking the browser console (F12) for `[CabbyCodes]` messages (if you know how to access it)
+
+## Troubleshooting
+
+### The mod doesn't appear to be working
+
+1. **Check file locations:**
+   - Verify `CabbyCodes.js` is in `js\plugins\`
+   - Verify the `CabbyCodes` folder is in `js\plugins\CabbyCodes\`
+   - Verify all three files are inside the `CabbyCodes` folder
+
+2. **Check plugins.js:**
+   - Open `plugins.js` and search for "CabbyCodes"
+   - Verify the entry is correctly formatted (proper JSON syntax)
+   - Verify `"status": true` (not `false`)
+   - Make sure there are no syntax errors (missing commas, brackets, etc.)
+
+3. **Check for errors:**
+   - If you know how to access the browser console (F12 in most browsers), check for any error messages
+   - Look for messages starting with `[CabbyCodes]`
+
+### Game won't start after installation
+
+1. **Restore from backup:**
+   - If you made a backup of `plugins.js`, restore it
+   - If not, you may need to verify game files through Steam (right-click game → Properties → Local Files → Verify integrity of game files)
+
+2. **Check JSON syntax:**
+   - The `plugins.js` file uses JSON format
+   - Common errors:
+     - Missing commas between entries
+     - Missing quotes around keys
+     - Extra commas at the end of arrays/objects
+     - Mismatched brackets
+
+3. **Use a JSON validator:**
+   - Copy the contents of `plugins.js` (just the `$plugins` array part)
+   - Paste it into an online JSON validator to check for syntax errors
+
+### Settings don't appear in Options menu
+
+- The settings menu will only show options if settings have been registered by mod features
+- If no features are active yet, the menu section may not appear
+- This is normal - the mod framework is still loaded and ready for features to be added
+
+## Uninstallation
+
+To remove the mod:
+
+1. Delete `CabbyCodes.js` from `js\plugins\`
+2. Delete the `CabbyCodes` folder from `js\plugins\`
+3. Open `plugins.js` and remove the CabbyCodes entry from the `$plugins` array
+4. Save the file
+
+## File Structure Reference
+
+After installation, your file structure should match this:
+
+```
+C:\Program Files (x86)\Steam\steamapps\common\Look Outside\
+├── js\
+│   ├── plugins\
+│   │   ├── CabbyCodes.js          ← Loader plugin (you added this)
+│   │   ├── CabbyCodes\            ← Mod folder (you added this)
+│   │   │   ├── cabbycodes-core.js
+│   │   │   ├── cabbycodes-patches.js
+│   │   │   └── cabbycodes-settings.js
+│   │   ├── plugins.js              ← You modified this file
+│   │   └── (other existing plugins...)
+│   └── (other game files...)
+└── (other game folders...)
+```
+
+## Support
+
+If you encounter issues not covered in this guide:
+
+1. Double-check all file locations match the guide exactly
+2. Verify the JSON syntax in `plugins.js` is correct
+3. Make sure all files were copied completely (not corrupted)
+4. Try removing and reinstalling following the steps again
+
+## Technical Details
+
+For developers or advanced users:
+
+- The mod uses the standard RPG Maker MZ plugin system
+- Settings are stored in browser localStorage under the key `CabbyCodes_Settings`
+- The loader plugin dynamically loads scripts from the `CabbyCodes` folder
+- All mod functionality is contained within the `CabbyCodes` folder - no game files are permanently modified
+
