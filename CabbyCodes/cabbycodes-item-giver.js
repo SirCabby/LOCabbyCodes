@@ -111,6 +111,8 @@
         return filters;
     }, new Set(['all']));
 
+    let itemGiverPersistedFilters = null;
+
     function sanitizeDatabaseName(name) {
         return typeof name === 'string' ? name.trim() : '';
     }
@@ -542,6 +544,9 @@
         this._subSectionKey = normalizedSubKey;
         this.refresh();
         this.resetScrollPosition();
+        if (this._scene && typeof this._scene.persistCurrentFilters === 'function') {
+            this._scene.persistCurrentFilters();
+        }
     };
 
     Window_CabbyCodesItemGiverList.prototype.maxCols = function() {
@@ -566,6 +571,10 @@
 
     Window_CabbyCodesItemGiverList.prototype.currentSubSectionKey = function() {
         return this._subSectionKey || 'all';
+    };
+
+    Window_CabbyCodesItemGiverList.prototype.currentSearchText = function() {
+        return this._searchText || '';
     };
 
     Window_CabbyCodesItemGiverList.prototype.setSubSectionFilter = function(subSectionKey) {
@@ -744,16 +753,13 @@
     Window_CabbyCodesItemGiverList.prototype.updateHelp = function() {
         try {
             const itemData = this.item();
-            CabbyCodes.log('[CabbyCodes] Item Giver: updateHelp called, itemData: ' + (itemData ? itemData.name : 'null'));
             // Update description window (not header window)
             if (this._scene) {
                 if (isValidItemEntry(itemData)) {
                     const description = itemData.item.description || '';
-                    CabbyCodes.log('[CabbyCodes] Item Giver: Item description: ' + (description ? description.substring(0, 50) + '...' : 'empty'));
                     // Use scene's update method to resize window dynamically
                     this._scene.updateDescriptionWindow(description);
                 } else {
-                    CabbyCodes.log('[CabbyCodes] Item Giver: No item data, clearing description');
                     this._scene.updateDescriptionWindow('');
                 }
             } else {
@@ -1024,11 +1030,6 @@
         this.contents.fontSize = this.contents.fontSize || 28;
         this.drawText(displayText || '', x, y, drawWidth, 'right');
         
-        // Debug: Log if text should be visible
-        if (displayText && displayText !== '1') {
-            CabbyCodes.log('[CabbyCodes] Item Giver: Drawing value "' + displayText + '" at x=' + x + ', y=' + y + ', width=' + drawWidth);
-        }
-        
         // Draw cursor (flashing)
         this._cursorCount = (this._cursorCount || 0) + 1;
         const cursorVisible = Math.floor(this._cursorCount / 30) % 2 === 0; // Blink every 30 frames
@@ -1052,7 +1053,10 @@
             const cursorY = y;
             const cursorHeight = this.lineHeight() - 4;
             this.changePaintOpacity(true);
-            this.contents.fillRect(cursorX, cursorY + 2, 2, cursorHeight, this.textColor(0));
+            const cursorColor = (typeof ColorManager !== 'undefined' && typeof ColorManager.textColor === 'function')
+                ? ColorManager.textColor(0)
+                : (typeof this.normalColor === 'function' ? this.normalColor() : '#ffffff');
+            this.contents.fillRect(cursorX, cursorY + 2, 2, cursorHeight, cursorColor);
             this.changePaintOpacity(false);
         }
         
@@ -1360,28 +1364,24 @@
     Scene_CabbyCodesItemGiver.prototype = Object.create(Scene_MenuBase.prototype);
     Scene_CabbyCodesItemGiver.prototype.constructor = Scene_CabbyCodesItemGiver;
 
+    Scene_CabbyCodesItemGiver.prototype.initialize = function() {
+        Scene_MenuBase.prototype.initialize.call(this);
+        this._initialFiltersApplied = false;
+        this._suspendFilterPersistence = false;
+    };
+
     Scene_CabbyCodesItemGiver.prototype.create = function() {
         try {
-            CabbyCodes.log('[CabbyCodes] Item Giver: Creating scene');
             Scene_MenuBase.prototype.create.call(this);
-            CabbyCodes.log('[CabbyCodes] Item Giver: Base scene created');
             // Create in order: header at top, selectors, description, hidden search window, then item list
             this.createHelpWindow();
-            CabbyCodes.log('[CabbyCodes] Item Giver: Help window created');
             this.createSelectorPanelWindow();
-            CabbyCodes.log('[CabbyCodes] Item Giver: Selector panel created');
             this.createTypeDropdownButton();
-            CabbyCodes.log('[CabbyCodes] Item Giver: Type dropdown created');
             this.createSubtypeDropdownButton();
-            CabbyCodes.log('[CabbyCodes] Item Giver: Subtype dropdown created');
             this.createDescriptionWindow();
-            CabbyCodes.log('[CabbyCodes] Item Giver: Description window created');
             this.createSearchWindow();
-            CabbyCodes.log('[CabbyCodes] Item Giver: Search window created (hidden)');
             this.createItemWindow();
-            CabbyCodes.log('[CabbyCodes] Item Giver: Item window created');
             this.createDropdownListWindow();
-            CabbyCodes.log('[CabbyCodes] Item Giver: Dropdown list window created');
         } catch (e) {
             CabbyCodes.error('[CabbyCodes] Item Giver: Error in scene create:', e?.message || e, e?.stack);
             throw e;
@@ -1466,7 +1466,6 @@
                 this._descriptionWindow.setText(text);
                 // Force refresh and redraw
                 this._descriptionWindow.refresh();
-                CabbyCodes.log('[CabbyCodes] Item Giver: Updated description window with text: ' + (text ? text.substring(0, 50) + '...' : 'empty'));
             } else {
                 // Show minimal window with empty text
                 const minHeight = this.calcWindowHeight(1, false);
@@ -1524,15 +1523,12 @@
 
     Scene_CabbyCodesItemGiver.prototype.createItemWindow = function() {
         try {
-            CabbyCodes.log('[CabbyCodes] Item Giver: Creating item window');
             const rect = this.itemWindowRect();
             this._itemWindow = new Window_CabbyCodesItemGiverList(rect);
-            CabbyCodes.log('[CabbyCodes] Item Giver: Item window instance created');
             
             if (this._descriptionWindow) {
                 this._itemWindow.setDescriptionWindow(this._descriptionWindow);
                 this._itemWindow.setScene(this); // Pass scene reference for dynamic resizing
-                CabbyCodes.log('[CabbyCodes] Item Giver: Description window set');
             } else {
                 CabbyCodes.warn('[CabbyCodes] Item Giver: Description window is undefined');
             }
@@ -1544,7 +1540,6 @@
                 if (typeof this._searchWindow.setItemWindow === 'function') {
                     this._searchWindow.setItemWindow(this._itemWindow);
                 }
-                CabbyCodes.log('[CabbyCodes] Item Giver: Search window linked to item window');
             } else {
                 CabbyCodes.warn('[CabbyCodes] Item Giver: Search window is undefined');
             }
@@ -1557,10 +1552,11 @@
                 this._itemWindow.ensureValidSelection(0);
             }
             
-            this.refreshSubtypeDropdownState();
-
-            this._itemWindow.activate();
-            CabbyCodes.log('[CabbyCodes] Item Giver: Item window setup complete');
+            this._suspendFilterPersistence = true;
+            this.refreshSubtypeDropdownState({ skipPersist: true });
+            this.applyInitialFilterState();
+            this._suspendFilterPersistence = false;
+            this.persistCurrentFilters();
         } catch (e) {
             CabbyCodes.error('[CabbyCodes] Item Giver: Error creating item window:', e?.message || e, e?.stack);
             throw e;
@@ -1574,7 +1570,6 @@
         this._searchWindow.opacity = 0;
         this._searchWindow.deactivate();
         this.addWindow(this._searchWindow);
-        CabbyCodes.log('[CabbyCodes] Item Giver: Hidden search window created for keyboard input');
     };
 
     Scene_CabbyCodesItemGiver.prototype.searchWindowRect = function() {
@@ -1753,30 +1748,52 @@
         this._activeDropdownTarget = null;
     };
 
-    Scene_CabbyCodesItemGiver.prototype.refreshSubtypeDropdownState = function() {
+    Scene_CabbyCodesItemGiver.prototype.refreshSubtypeDropdownState = function(options = {}) {
         if (!this._subtypeDropdown) {
             return;
         }
         const data = this.subtypeOptionsData();
+        const skipPersist = !!options.skipPersist;
+        const preserveSelection = !!options.preserveSelection;
+        let desiredKey = options.desiredKey;
         this._currentSubtypeOptions = data;
         if (!data.length) {
             this._subtypeDropdown.setDisabled(true);
             this._subtypeDropdown.setValue('All');
             this._subtypeDropdown.setKey('all');
+            if (!skipPersist) {
+                this.persistCurrentFilters();
+            }
             return;
         }
         this._subtypeDropdown.setDisabled(false);
-        this._subtypeDropdown.setValue('All');
-        this._subtypeDropdown.setKey('all');
+        if (preserveSelection) {
+            if (desiredKey && desiredKey !== 'all') {
+                const exists = data.some(option => option.key === desiredKey);
+                desiredKey = exists ? desiredKey : 'all';
+            } else if (desiredKey !== 'all') {
+                desiredKey = this._subtypeDropdown.currentKey() || 'all';
+            }
+            this.syncSubFilterSelection(desiredKey || 'all', { skipPersist });
+        } else {
+            this._subtypeDropdown.setValue('All');
+            this._subtypeDropdown.setKey('all');
+            if (!skipPersist) {
+                this.persistCurrentFilters();
+            }
+        }
     };
 
-    Scene_CabbyCodesItemGiver.prototype.syncSubFilterSelection = function(key) {
+    Scene_CabbyCodesItemGiver.prototype.syncSubFilterSelection = function(key, options = {}) {
         if (!this._subtypeDropdown) {
             return;
         }
         const label = this.subtypeLabelForKey(key);
         this._subtypeDropdown.setValue(label);
         this._subtypeDropdown.setKey(key || 'all');
+        if (!options.skipPersist) {
+            this.persistCurrentFilters();
+        }
     };
 
     Scene_CabbyCodesItemGiver.prototype.resetItemListPosition = function() {
@@ -1797,6 +1814,116 @@
             this._itemWindow.ensureValidSelection(0);
         } else if (typeof this._itemWindow.select === 'function') {
             this._itemWindow.select(0);
+        }
+    };
+
+    Scene_CabbyCodesItemGiver.prototype.captureFilterState = function() {
+        const typeKey = this._itemWindow && typeof this._itemWindow.currentCategory === 'function'
+            ? this._itemWindow.currentCategory()
+            : 'all';
+        const subKey = this._itemWindow && typeof this._itemWindow.currentSubSectionKey === 'function'
+            ? this._itemWindow.currentSubSectionKey()
+            : 'all';
+        const searchText = this._searchWindow && typeof this._searchWindow.searchText === 'function'
+            ? this._searchWindow.searchText()
+            : '';
+        return {
+            type: normalizeCategory(typeKey),
+            subtype: typeof subKey === 'string' ? subKey : 'all',
+            searchText
+        };
+    };
+
+    Scene_CabbyCodesItemGiver.prototype.persistCurrentFilters = function() {
+        if (this._suspendFilterPersistence || !this._itemWindow) {
+            return;
+        }
+        const state = this.captureFilterState();
+        if (state) {
+            itemGiverPersistedFilters = state;
+        }
+    };
+
+    Scene_CabbyCodesItemGiver.prototype.clearPersistedFilters = function() {
+        itemGiverPersistedFilters = null;
+    };
+
+    Scene_CabbyCodesItemGiver.prototype.applyInitialFilterState = function() {
+        if (this._initialFiltersApplied || !this._itemWindow) {
+            return;
+        }
+        this._initialFiltersApplied = true;
+        const state = itemGiverPersistedFilters;
+        if (state) {
+            this.restoreFilterState(state, {
+                forceFilters: true,
+                skipActivation: true,
+                skipPersist: true,
+                searchTextOverride: state.searchText
+            });
+        }
+        if (this._itemWindow && typeof this._itemWindow.activate === 'function') {
+            this._itemWindow.activate();
+        }
+    };
+
+    Scene_CabbyCodesItemGiver.prototype.restoreFilterState = function(state, options = {}) {
+        if (!state) {
+            return;
+        }
+        const typeKey = normalizeCategory(state.type || 'all');
+        const subtypeKey = typeof state.subtype === 'string' ? state.subtype : 'all';
+        const forceFilters = !!options.forceFilters;
+        const skipActivation = !!options.skipActivation;
+        const skipPersist = !!options.skipPersist;
+        const searchTextOverride = Object.prototype.hasOwnProperty.call(options, 'searchTextOverride')
+            ? options.searchTextOverride
+            : undefined;
+        const searchText = typeof searchTextOverride === 'string'
+            ? searchTextOverride
+            : (typeof state.searchText === 'string'
+                ? state.searchText
+                : (this._searchWindow && typeof this._searchWindow.searchText === 'function'
+                    ? this._searchWindow.searchText()
+                    : ''));
+
+        if (this._itemWindow && typeof this._itemWindow.setFilters === 'function') {
+            const currentType = this._itemWindow.currentCategory
+                ? this._itemWindow.currentCategory()
+                : 'all';
+            const currentSub = this._itemWindow.currentSubSectionKey
+                ? this._itemWindow.currentSubSectionKey()
+                : 'all';
+            const currentSearch = this._itemWindow.currentSearchText
+                ? this._itemWindow.currentSearchText()
+                : (this._itemWindow._searchText || '');
+            const searchChanged = (searchText || '') !== (currentSearch || '');
+            if (forceFilters || currentType !== typeKey || currentSub !== subtypeKey || searchChanged) {
+                this._itemWindow.setFilters(typeKey, searchText, subtypeKey);
+            }
+        }
+
+        if (this._typeDropdown) {
+            this._typeDropdown.setValue(this.typeLabelForKey(typeKey));
+            this._typeDropdown.setKey(typeKey);
+        }
+
+        this.refreshSubtypeDropdownState({
+            desiredKey: subtypeKey,
+            preserveSelection: true,
+            skipPersist: true
+        });
+
+        if (this._searchWindow && typeof this._searchWindow.setSearchText === 'function') {
+            this._searchWindow.setSearchText(searchText || '');
+        }
+
+        if (!skipPersist) {
+            this.persistCurrentFilters();
+        }
+
+        if (!skipActivation && this._itemWindow && typeof this._itemWindow.activate === 'function') {
+            this._itemWindow.activate();
         }
     };
 
@@ -1854,6 +1981,7 @@
         this.refreshSubtypeDropdownState();
         this._subtypeDropdown.setValue('All');
         this._subtypeDropdown.setKey('all');
+        this.persistCurrentFilters();
         this.closeDropdownList();
         if (this._itemWindow) {
             this._itemWindow.activate();
@@ -1873,6 +2001,7 @@
         this._subtypeDropdown.setKey(key || 'all');
         this._itemWindow.setSubSectionFilter(key || 'all');
         this.resetItemListPosition();
+        this.persistCurrentFilters();
         this.closeDropdownList();
         this._itemWindow.activate();
     };
@@ -1887,9 +2016,7 @@
 
     Scene_CabbyCodesItemGiver.prototype.onItemOk = function() {
         try {
-            CabbyCodes.log('[CabbyCodes] Item Giver: onItemOk called');
             const itemData = this._itemWindow.item();
-            CabbyCodes.log('[CabbyCodes] Item Giver: itemData = ' + (itemData ? itemData.name : 'null'));
             if (isValidItemEntry(itemData)) {
                 this.openQuantityWindow(itemData);
             } else {
@@ -1904,13 +2031,13 @@
     };
 
     Scene_CabbyCodesItemGiver.prototype.onItemCancel = function() {
+        this.clearPersistedFilters();
         this.popScene();
     };
 
     Scene_CabbyCodesItemGiver.prototype.start = function() {
         try {
             Scene_MenuBase.prototype.start.call(this);
-            CabbyCodes.log('[CabbyCodes] Item Giver: Scene started');
         } catch (e) {
             CabbyCodes.error('[CabbyCodes] Item Giver: Error in scene start:', e?.message || e, e?.stack);
             throw e;
@@ -1966,6 +2093,7 @@
             CabbyCodes.error('[CabbyCodes] Item Giver: Stack: ' + (e?.stack || 'No stack trace'));
             // Don't throw - try to continue
         }
+
     };
 
     Scene_CabbyCodesItemGiver.prototype.openQuantityWindow = function(itemData) {
@@ -1975,21 +2103,17 @@
                 SoundManager.playBuzzer();
                 return;
             }
-            CabbyCodes.log('[CabbyCodes] Item Giver: Opening quantity window for item: ' + (itemData?.name || 'unknown'));
             const callbacks = {
                 onApply: (quantity) => {
-                    CabbyCodes.log('[CabbyCodes] Item Giver: Quantity callback onApply called with quantity: ' + quantity);
                     this.addItemToInventory(itemData, quantity);
                 },
                 onCancel: () => {
-                    CabbyCodes.log('[CabbyCodes] Item Giver: Quantity callback onCancel called');
-                    // Return to item selection
+                    // Scene will restore filters when it becomes active again.
                 }
             };
             // Push first to create the scene instance, then prepare it
             SceneManager.push(Scene_CabbyCodesItemQuantity);
             SceneManager.prepareNextScene(itemData, 1, callbacks);
-            CabbyCodes.log('[CabbyCodes] Item Giver: Quantity window pushed and prepared');
         } catch (e) {
             CabbyCodes.error('[CabbyCodes] Item Giver: Error opening quantity window: ' + (e?.message || e));
             CabbyCodes.error('[CabbyCodes] Item Giver: Stack: ' + (e?.stack || 'No stack trace'));
@@ -2007,9 +2131,7 @@
             if (quantity > 0) {
                 $gameParty.gainItem(itemData.item, quantity);
                 SoundManager.playShop();
-                CabbyCodes.log(`[CabbyCodes] Added ${quantity}x ${itemData.name} to inventory`);
             } else {
-                CabbyCodes.log(`[CabbyCodes] Quantity is 0, not adding item (player may already have max)`);
                 SoundManager.playBuzzer();
             }
             // Refresh item window if it exists
@@ -2038,10 +2160,6 @@
     Scene_CabbyCodesItemQuantity.prototype.constructor = Scene_CabbyCodesItemQuantity;
 
     Scene_CabbyCodesItemQuantity.prototype.prepare = function(itemData, initialValue, callbacks = {}) {
-        CabbyCodes.log('[CabbyCodes] Item Giver: Quantity scene prepare called');
-        CabbyCodes.log('[CabbyCodes] Item Giver: itemData = ' + (itemData ? itemData.name : 'null'));
-        CabbyCodes.log('[CabbyCodes] Item Giver: initialValue = ' + initialValue);
-        CabbyCodes.log('[CabbyCodes] Item Giver: callbacks = ' + (callbacks ? 'present' : 'null'));
         this._itemData = itemData;
         this._initialValue = initialValue || 1;
         this._callbacks = callbacks;
@@ -2162,12 +2280,8 @@
         this._processingOk = true;
         
         try {
-            CabbyCodes.log('[CabbyCodes] Item Giver: onQuantityOk called');
             const quantity = this._quantityWindow.value();
-            CabbyCodes.log('[CabbyCodes] Item Giver: quantity = ' + quantity);
-            CabbyCodes.log('[CabbyCodes] Item Giver: _callbacks = ' + (this._callbacks ? 'present' : 'null'));
             if (this._callbacks && typeof this._callbacks.onApply === 'function') {
-                CabbyCodes.log('[CabbyCodes] Item Giver: Calling onApply callback with quantity: ' + quantity);
                 this._callbacks.onApply(quantity);
             } else {
                 CabbyCodes.warn('[CabbyCodes] Item Giver: onApply callback is not available');
