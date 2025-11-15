@@ -27,7 +27,8 @@
             'cabbycodes-logger.js',
             'cabbycodes-patches.js',
             'cabbycodes-settings.js',
-            'cabbycodes-invincibility.js'
+            'cabbycodes-invincibility.js',
+            'cabbycodes-stamina.js'
         ];
         
         scripts.forEach((scriptName) => {
