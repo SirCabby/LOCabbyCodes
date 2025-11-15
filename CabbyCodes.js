@@ -34,7 +34,8 @@
             'cabbycodes-infinite-consumables.js',
             'cabbycodes-unbreakable-items.js',
             'cabbycodes-friendly-door-visitors.js',
-            'cabbycodes-free-vending.js'
+            'cabbycodes-free-vending.js',
+            'cabbycodes-doorbell.js'
         ];
         
         scripts.forEach((scriptName) => {
