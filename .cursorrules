@@ -219,6 +219,7 @@ if (CabbyCodes.getSetting('myFeatureEnabled', false)) {
 ### Files We Can Reference
 - All files in `js/` for understanding game structure
 - Use these to understand how to hook into game systems
+- Full game data/resources in the current local installation at `C:\Program Files (x86)\Steam\steamapps\common\Look Outside\www\` (e.g., JSON databases, maps, events) for read-only inspection when answering questions or building patches
 
 ## Installation Instructions
 

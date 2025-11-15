@@ -37,7 +37,8 @@
             'cabbycodes-friendly-door-visitors.js',
             'cabbycodes-free-vending.js',
             'cabbycodes-doorbell.js',
-            'cabbycodes-freeze-time.js'
+            'cabbycodes-freeze-time.js',
+            'cabbycodes-freeze-hygiene.js'
         ];
         
         scripts.forEach((scriptName) => {
