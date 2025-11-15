@@ -33,6 +33,17 @@
     CabbyCodes.error = CabbyCodes.error || function(message) {
         console.error(message);
     };
+    CabbyCodes.debugEnabled = CabbyCodes.debugEnabled ?? false;
+    CabbyCodes.debug = CabbyCodes.debug || function(...args) {
+        if (!CabbyCodes.debugEnabled) {
+            return;
+        }
+        if (typeof console !== 'undefined' && typeof console.debug === 'function') {
+            console.debug(...args);
+        } else if (typeof console !== 'undefined' && typeof console.log === 'function') {
+            console.log(...args);
+        }
+    };
     
     // Settings storage key
     const SETTINGS_KEY = 'CabbyCodes_Settings';

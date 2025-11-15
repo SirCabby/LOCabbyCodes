@@ -18,6 +18,12 @@
         window.CabbyCodes = {};
     }
 
+    const itemGiverDebugLog = function(...args) {
+        if (typeof CabbyCodes.debug === 'function') {
+            CabbyCodes.debug(...args);
+        }
+    };
+
     function getNormalColor(instance) {
         if (typeof ColorManager !== 'undefined' && typeof ColorManager.normalColor === 'function') {
             return ColorManager.normalColor();
@@ -2513,30 +2519,30 @@
     function setupProcessOkHook() {
         try {
             if (typeof Window_Options === 'undefined') {
-                CabbyCodes.log('[CabbyCodes] Item Giver: Window_Options is undefined');
+                itemGiverDebugLog('[CabbyCodes] Item Giver: Window_Options is undefined');
                 return false;
             }
             if (!Window_Options.prototype.processOk) {
-                CabbyCodes.log('[CabbyCodes] Item Giver: Window_Options.prototype.processOk is undefined');
+                itemGiverDebugLog('[CabbyCodes] Item Giver: Window_Options.prototype.processOk is undefined');
                 return false;
             }
             const _Window_Options_processOk_itemGiver = Window_Options.prototype.processOk;
             const hookType = typeof _Window_Options_processOk_itemGiver;
-            CabbyCodes.log('[CabbyCodes] Item Giver: Stored processOk hook, type: ' + hookType);
+            itemGiverDebugLog('[CabbyCodes] Item Giver: Stored processOk hook, type: ' + hookType);
             if (hookType !== 'function' && hookType !== 'undefined') {
                 CabbyCodes.warn('[CabbyCodes] Item Giver: processOk is not a function, type:', hookType);
             }
             
             Window_Options.prototype.processOk = function() {
                 try {
-                    CabbyCodes.log('[CabbyCodes] Item Giver: processOk called');
+                    itemGiverDebugLog('[CabbyCodes] Item Giver: processOk called');
                     const index = this.index();
-                    CabbyCodes.log('[CabbyCodes] Item Giver: index = ' + String(index));
+                    itemGiverDebugLog('[CabbyCodes] Item Giver: index = ' + String(index));
                     const symbol = this.commandSymbol(index);
-                    CabbyCodes.log('[CabbyCodes] Item Giver: symbol = ' + String(symbol || '(empty)'));
+                    itemGiverDebugLog('[CabbyCodes] Item Giver: symbol = ' + String(symbol || '(empty)'));
                     if (symbol === 'cabbycodes_itemGiver') {
                         // Always open the scene when this option is selected (don't toggle)
-                        CabbyCodes.log('[CabbyCodes] Item Giver: Opening scene');
+                        itemGiverDebugLog('[CabbyCodes] Item Giver: Opening scene');
                         if (typeof Scene_CabbyCodesItemGiver === 'undefined') {
                             CabbyCodes.error('[CabbyCodes] Item Giver: Scene_CabbyCodesItemGiver is undefined!');
                             return;
@@ -2550,7 +2556,7 @@
                     }
                     // Call the previous hook (which may be from settings.js)
                     if (typeof _Window_Options_processOk_itemGiver === 'function') {
-                        CabbyCodes.log('[CabbyCodes] Item Giver: Calling previous hook');
+                        itemGiverDebugLog('[CabbyCodes] Item Giver: Calling previous hook');
                         _Window_Options_processOk_itemGiver.call(this);
                     } else {
                         CabbyCodes.warn('[CabbyCodes] Item Giver: Previous hook is not a function, type:', typeof _Window_Options_processOk_itemGiver);
@@ -2568,7 +2574,7 @@
                     }
                 }
             };
-            CabbyCodes.log('[CabbyCodes] Item Giver: Hook installed successfully');
+            itemGiverDebugLog('[CabbyCodes] Item Giver: Hook installed successfully');
             return true;
         } catch (e) {
             CabbyCodes.error('[CabbyCodes] Item Giver: Error setting up hook:', e?.message || e, e?.stack);
@@ -2578,7 +2584,7 @@
     
     // Try to set up the hook immediately
     if (!setupProcessOkHook()) {
-        CabbyCodes.log('[CabbyCodes] Item Giver: Window_Options not ready, waiting...');
+        itemGiverDebugLog('[CabbyCodes] Item Giver: Window_Options not ready, waiting...');
         // If Window_Options isn't loaded yet, wait for it
         const checkWindowOptions = setInterval(() => {
             if (setupProcessOkHook()) {
@@ -2593,6 +2599,6 @@
         }, 5000);
     }
 
-    CabbyCodes.log('[CabbyCodes] Item Giver module loaded');
+    itemGiverDebugLog('[CabbyCodes] Item Giver module loaded');
 })();
 
