@@ -19,6 +19,10 @@
     }
     
     const SETTING_SYMBOL_PREFIX = 'cabbycodes_';
+    const CABBYCODES_OPTION_BG_COLOR_START = 'rgba(88, 176, 255, 0.3)';
+    const CABBYCODES_OPTION_BG_COLOR_END = 'rgba(88, 176, 255, 0.08)';
+    const CABBYCODES_OPTION_BG_COLOR_BORDER = 'rgba(88, 176, 255, 0.35)';
+    const CABBYCODES_OPTION_BG_PADDING = 2;
     
     // Settings registry - stores all registered settings
     CabbyCodes.settingsRegistry = CabbyCodes.settingsRegistry || [];
@@ -126,6 +130,10 @@
      */
     function cabbyCodesSymbol(key) {
         return `${SETTING_SYMBOL_PREFIX}${key}`;
+    }
+
+    function isCabbyCodesSymbol(symbol) {
+        return typeof symbol === 'string' && symbol.startsWith(SETTING_SYMBOL_PREFIX);
     }
     
     /**
@@ -282,6 +290,38 @@
             }
         }
         _Window_Options_processOk.call(this);
+    };
+
+    const _Window_Options_drawItemBackground = Window_Options.prototype.drawItemBackground;
+    Window_Options.prototype.drawItemBackground = function(index) {
+        const symbol = this.commandSymbol(index);
+        if (isCabbyCodesSymbol(symbol)) {
+            this.drawCabbyCodesOptionBackground(index);
+            return;
+        }
+        _Window_Options_drawItemBackground.call(this, index);
+    };
+
+    Window_Options.prototype.drawCabbyCodesOptionBackground = function(index) {
+        const rect = this.itemRect(index);
+        const x = rect.x + CABBYCODES_OPTION_BG_PADDING;
+        const y = rect.y;
+        const width = Math.max(0, rect.width - CABBYCODES_OPTION_BG_PADDING * 2);
+        const height = rect.height;
+        const backContext = this.contentsBack;
+        if (!backContext) {
+            return;
+        }
+        backContext.gradientFillRect(
+            x,
+            y,
+            width,
+            height,
+            CABBYCODES_OPTION_BG_COLOR_START,
+            CABBYCODES_OPTION_BG_COLOR_END,
+            true
+        );
+        backContext.strokeRect(x, y, width, height, CABBYCODES_OPTION_BG_COLOR_BORDER);
     };
     
     /**
