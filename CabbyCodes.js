@@ -30,6 +30,7 @@
             'cabbycodes-session-state.js',
             'cabbycodes-settings.js',
             'cabbycodes-version-display.js',
+            'cabbycodes-save-anywhere.js',
             'cabbycodes-infinite-money.js',
             'cabbycodes-invincibility.js',
             'cabbycodes-stamina.js',
