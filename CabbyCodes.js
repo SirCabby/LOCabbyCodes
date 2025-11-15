@@ -30,7 +30,8 @@
             'cabbycodes-invincibility.js',
             'cabbycodes-stamina.js',
             'cabbycodes-infinite-consumables.js',
-            'cabbycodes-unbreakable-items.js'
+            'cabbycodes-unbreakable-items.js',
+            'cabbycodes-friendly-door-visitors.js'
         ];
         
         scripts.forEach((scriptName) => {
