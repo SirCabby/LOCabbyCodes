@@ -27,6 +27,7 @@
             'cabbycodes-logger.js',
             'cabbycodes-patches.js',
             'cabbycodes-settings.js',
+            'cabbycodes-gold-editor.js',
             'cabbycodes-invincibility.js',
             'cabbycodes-stamina.js',
             'cabbycodes-infinite-consumables.js',
