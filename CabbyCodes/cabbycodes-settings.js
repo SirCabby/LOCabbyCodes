@@ -104,6 +104,6 @@
     // Example: Register a sample setting (can be removed or used as template)
     // CabbyCodes.registerSetting('exampleFeature', 'Example Feature', false);
     
-    console.log('[CabbyCodes] Settings module loaded');
+    CabbyCodes.log('[CabbyCodes] Settings module loaded');
 })();
 

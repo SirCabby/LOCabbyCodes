@@ -135,7 +135,12 @@ This is the most important step. You need to add the CabbyCodes plugin to the ga
 3. You can verify it's working by:
    - Opening the game's Options menu
    - Looking for CabbyCodes options such as "Invincibility" near the bottom of the list
-   - Checking the browser console (F12) for `[CabbyCodes]` messages (if you know how to access it)
+   - Opening the `CabbyCodes.log` file (created beside the game's executable) and confirming new `[CabbyCodes]` entries are being written when you toggle options
+
+### Log Output
+
+- Every CabbyCodes message is appended to `CabbyCodes.log` in the game's installation directory (next to `Look Outside.exe` / `Game.exe`).
+- If you need to share diagnostics, include this file; it contains timestamps for each log entry.
 
 ## Current Features
 
@@ -156,9 +161,9 @@ This is the most important step. You need to add the CabbyCodes plugin to the ga
    - Verify `"status": true` (not `false`)
    - Make sure there are no syntax errors (missing commas, brackets, etc.)
 
-3. **Check for errors:**
-   - If you know how to access the browser console (F12 in most browsers), check for any error messages
-   - Look for messages starting with `[CabbyCodes]`
+3. **Check the log:**
+   - Open `CabbyCodes.log` in the game's installation folder
+   - Look for recent lines that start with `[CabbyCodes]` to confirm the loader ran and to review any warnings/errors
 
 ### Game won't start after installation
 
@@ -204,12 +209,14 @@ C:\Program Files (x86)\Steam\steamapps\common\Look Outside\
 │   │   ├── CabbyCodes.js          ← Loader plugin (you added this)
 │   │   ├── CabbyCodes\            ← Mod folder (you added this)
 │   │   │   ├── cabbycodes-core.js
+│   │   │   ├── cabbycodes-logger.js
 │   │   │   ├── cabbycodes-patches.js
 │   │   │   ├── cabbycodes-settings.js
 │   │   │   └── cabbycodes-invincibility.js
 │   │   ├── plugins.js              ← You modified this file
 │   │   └── (other existing plugins...)
 │   └── (other game files...)
+├── CabbyCodes.log                  ← Automatically generated runtime log
 └── (other game folders...)
 ```
 
@@ -230,4 +237,5 @@ For developers or advanced users:
 - Settings are stored in browser localStorage under the key `CabbyCodes_Settings`
 - The loader plugin dynamically loads scripts from the `CabbyCodes` folder
 - All mod functionality is contained within the `CabbyCodes` folder - no game files are permanently modified
+- Diagnostic logs are written to `CabbyCodes.log` in the game's installation directory
 

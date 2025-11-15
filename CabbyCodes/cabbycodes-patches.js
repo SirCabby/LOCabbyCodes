@@ -26,7 +26,7 @@
      */
     CabbyCodes.override = function(target, functionName, newFunction, settingKey = null) {
         if (!target || typeof target[functionName] !== 'function') {
-            console.warn(`[CabbyCodes] Cannot override ${functionName}: function not found`);
+            CabbyCodes.warn(`[CabbyCodes] Cannot override ${functionName}: function not found`);
             return;
         }
         
@@ -44,7 +44,7 @@
         }
         target._cabbycodesOriginals[functionName] = original;
         
-        console.log(`[CabbyCodes] Overridden: ${functionName}`);
+        CabbyCodes.log(`[CabbyCodes] Overridden: ${functionName}`);
     };
     
     /**
@@ -56,7 +56,7 @@
      */
     CabbyCodes.before = function(target, functionName, hookFunction, settingKey = null) {
         if (!target || typeof target[functionName] !== 'function') {
-            console.warn(`[CabbyCodes] Cannot hook before ${functionName}: function not found`);
+            CabbyCodes.warn(`[CabbyCodes] Cannot hook before ${functionName}: function not found`);
             return;
         }
         
@@ -80,7 +80,7 @@
         }
         target._cabbycodesOriginals[functionName] = original;
         
-        console.log(`[CabbyCodes] Before hook added: ${functionName}`);
+        CabbyCodes.log(`[CabbyCodes] Before hook added: ${functionName}`);
     };
     
     /**
@@ -92,7 +92,7 @@
      */
     CabbyCodes.after = function(target, functionName, hookFunction, settingKey = null) {
         if (!target || typeof target[functionName] !== 'function') {
-            console.warn(`[CabbyCodes] Cannot hook after ${functionName}: function not found`);
+            CabbyCodes.warn(`[CabbyCodes] Cannot hook after ${functionName}: function not found`);
             return;
         }
         
@@ -118,7 +118,7 @@
         }
         target._cabbycodesOriginals[functionName] = original;
         
-        console.log(`[CabbyCodes] After hook added: ${functionName}`);
+        CabbyCodes.log(`[CabbyCodes] After hook added: ${functionName}`);
     };
     
     /**
@@ -128,16 +128,16 @@
      */
     CabbyCodes.restore = function(target, functionName) {
         if (!target || !target._cabbycodesOriginals || !target._cabbycodesOriginals[functionName]) {
-            console.warn(`[CabbyCodes] Cannot restore ${functionName}: original not found`);
+            CabbyCodes.warn(`[CabbyCodes] Cannot restore ${functionName}: original not found`);
             return;
         }
         
         target[functionName] = target._cabbycodesOriginals[functionName];
         delete target._cabbycodesOriginals[functionName];
         
-        console.log(`[CabbyCodes] Restored: ${functionName}`);
+        CabbyCodes.log(`[CabbyCodes] Restored: ${functionName}`);
     };
     
-    console.log('[CabbyCodes] Patches module loaded');
+    CabbyCodes.log('[CabbyCodes] Patches module loaded');
 })();
 

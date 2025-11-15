@@ -25,7 +25,7 @@
         'Invincibility',
         false,
         newValue => {
-            console.log(
+            CabbyCodes.log(
                 `[CabbyCodes] Invincibility ${newValue ? 'enabled' : 'disabled'}`
             );
         }
@@ -131,7 +131,7 @@
         }
     );
 
-    console.log('[CabbyCodes] Invincibility module loaded');
+    CabbyCodes.log('[CabbyCodes] Invincibility module loaded');
 })();
 
 

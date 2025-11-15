@@ -24,6 +24,7 @@
         // List of scripts to load in order
         const scripts = [
             'cabbycodes-core.js',
+            'cabbycodes-logger.js',
             'cabbycodes-patches.js',
             'cabbycodes-settings.js',
             'cabbycodes-invincibility.js'

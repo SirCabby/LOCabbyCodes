@@ -22,6 +22,17 @@
      * @type {string}
      */
     CabbyCodes.version = '0.0.1';
+
+    // Basic logging shims (can be enhanced by other modules)
+    CabbyCodes.log = CabbyCodes.log || function(message) {
+        console.log(message);
+    };
+    CabbyCodes.warn = CabbyCodes.warn || function(message) {
+        console.warn(message);
+    };
+    CabbyCodes.error = CabbyCodes.error || function(message) {
+        console.error(message);
+    };
     
     // Settings storage key
     const SETTINGS_KEY = 'CabbyCodes_Settings';
@@ -37,7 +48,7 @@
                 CabbyCodes.settings = JSON.parse(saved);
             }
         } catch (e) {
-            console.error('[CabbyCodes] Failed to load settings:', e);
+            CabbyCodes.error(`[CabbyCodes] Failed to load settings: ${e?.message || e}`);
             CabbyCodes.settings = {};
         }
     };
@@ -47,7 +58,7 @@
         try {
             localStorage.setItem(SETTINGS_KEY, JSON.stringify(CabbyCodes.settings));
         } catch (e) {
-            console.error('[CabbyCodes] Failed to save settings:', e);
+            CabbyCodes.error(`[CabbyCodes] Failed to save settings: ${e?.message || e}`);
         }
     };
     
@@ -69,6 +80,6 @@
     CabbyCodes.loadSettings();
     
     // Hook storage for settings persistence
-    console.log('[CabbyCodes] Core initialized');
+    CabbyCodes.log('[CabbyCodes] Core initialized');
 })();
 
