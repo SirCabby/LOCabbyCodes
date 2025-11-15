@@ -25,7 +25,8 @@
         const scripts = [
             'cabbycodes-core.js',
             'cabbycodes-patches.js',
-            'cabbycodes-settings.js'
+            'cabbycodes-settings.js',
+            'cabbycodes-invincibility.js'
         ];
         
         scripts.forEach((scriptName) => {

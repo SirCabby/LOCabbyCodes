@@ -55,11 +55,7 @@
     Window_Options.prototype.addGeneralOptions = function() {
         _Window_Options_addGeneralOptions.call(this);
         
-        // Add CabbyCodes settings section header
         if (CabbyCodes.settingsRegistry.length > 0) {
-            this.addCommand("--- CabbyCodes ---", "cabbycodes_header", false);
-            
-            // Add each registered setting
             CabbyCodes.settingsRegistry.forEach(setting => {
                 this.addCommand(setting.displayName, `cabbycodes_${setting.key}`, true);
             });
@@ -94,21 +90,11 @@
         }
     };
     
-    // Hook into Window_Options to handle disabled settings (header)
-    const _Window_Options_isCommandEnabled = Window_Options.prototype.isCommandEnabled;
-    Window_Options.prototype.isCommandEnabled = function(index) {
-        const symbol = this.commandSymbol(index);
-        if (symbol === 'cabbycodes_header') {
-            return false; // Header is not selectable
-        }
-        return _Window_Options_isCommandEnabled.call(this, index);
-    };
-    
     // Hook into Window_Options status text for boolean display
     const _Window_Options_statusText = Window_Options.prototype.statusText;
     Window_Options.prototype.statusText = function(index) {
         const symbol = this.commandSymbol(index);
-        if (symbol.startsWith('cabbycodes_') && symbol !== 'cabbycodes_header') {
+        if (symbol.startsWith('cabbycodes_')) {
             const value = this.getConfigValue(symbol);
             return this.booleanStatusText(value);
         }

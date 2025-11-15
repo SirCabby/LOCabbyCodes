@@ -134,8 +134,12 @@ This is the most important step. You need to add the CabbyCodes plugin to the ga
 2. The mod should load automatically when the game starts
 3. You can verify it's working by:
    - Opening the game's Options menu
-   - Looking for a "--- CabbyCodes ---" section (if any settings have been registered)
+   - Looking for CabbyCodes options such as "Invincibility" near the bottom of the list
    - Checking the browser console (F12) for `[CabbyCodes]` messages (if you know how to access it)
+
+## Current Features
+
+- **Invincibility Toggle:** Adds an "Invincibility" option to the CabbyCodes section of the Options menu. When enabled, any actor currently in the player's party is prevented from losing HP through combat damage, poison/regen ticks, scripted deaths, or other harmful effects. Toggle it on/off at any time while playing.
 
 ## Troubleshooting
 
@@ -201,7 +205,8 @@ C:\Program Files (x86)\Steam\steamapps\common\Look Outside\
 │   │   ├── CabbyCodes\            ← Mod folder (you added this)
 │   │   │   ├── cabbycodes-core.js
 │   │   │   ├── cabbycodes-patches.js
-│   │   │   └── cabbycodes-settings.js
+│   │   │   ├── cabbycodes-settings.js
+│   │   │   └── cabbycodes-invincibility.js
 │   │   ├── plugins.js              ← You modified this file
 │   │   └── (other existing plugins...)
 │   └── (other game files...)
