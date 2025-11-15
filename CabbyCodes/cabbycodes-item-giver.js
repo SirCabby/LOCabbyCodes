@@ -18,148 +18,447 @@
         window.CabbyCodes = {};
     }
 
+    function getNormalColor(instance) {
+        if (typeof ColorManager !== 'undefined' && typeof ColorManager.normalColor === 'function') {
+            return ColorManager.normalColor();
+        }
+        if (instance && typeof instance.textColor === 'function') {
+            return instance.textColor(0);
+        }
+        return '#ffffff';
+    }
+
+    function getGaugeBackColor() {
+        if (typeof ColorManager !== 'undefined' && typeof ColorManager.gaugeBackColor === 'function') {
+            return ColorManager.gaugeBackColor();
+        }
+        return '#202020';
+    }
+
+    const HEADER_MARKER_CHARS = new Set([
+        '-', '‐', '‑', '‒', '–', '—', '―',
+        '_', '=', '~', '*', '#', '+', '•', '·',
+        '<', '>', '[', ']', '{', '}', '(', ')',
+        '|', ':', ';', '.', ',', '!', '?', '/',
+        '\\', '\'', '"', '`'
+    ]);
+
+    const HEADER_MARKER_WHITESPACE = new Set([' ', '\t']);
+
+    function isHeaderBoundaryChar(char) {
+        return HEADER_MARKER_CHARS.has(char) || HEADER_MARKER_WHITESPACE.has(char);
+    }
+
+    function stripHeaderMarkers(text) {
+        if (!text) {
+            return null;
+        }
+
+        let start = 0;
+        let prefixMarkerCount = 0;
+        while (start < text.length && isHeaderBoundaryChar(text[start])) {
+            if (HEADER_MARKER_CHARS.has(text[start])) {
+                prefixMarkerCount++;
+            }
+            start++;
+        }
+
+        let end = text.length;
+        let suffixMarkerCount = 0;
+        while (end > start && isHeaderBoundaryChar(text[end - 1])) {
+            if (HEADER_MARKER_CHARS.has(text[end - 1])) {
+                suffixMarkerCount++;
+            }
+            end--;
+        }
+
+        if ((prefixMarkerCount >= 2 || suffixMarkerCount >= 2) && end > start) {
+            const candidate = text.substring(start, end).trim();
+            return candidate.length > 0 ? candidate : null;
+        }
+
+        return null;
+    }
+
+    const ITEM_GIVER_SECTION_DEFINITIONS = [
+        {
+            key: 'item',
+            label: 'Items',
+            dataAccessor: () => $dataItems,
+            validator: (entry) => DataManager.isItem(entry)
+        },
+        {
+            key: 'weapon',
+            label: 'Weapons',
+            dataAccessor: () => $dataWeapons,
+            validator: (entry) => DataManager.isWeapon(entry)
+        },
+        {
+            key: 'armor',
+            label: 'Armors',
+            dataAccessor: () => $dataArmors,
+            validator: (entry) => DataManager.isArmor(entry)
+        }
+    ];
+
+    const ITEM_GIVER_TYPE_VALIDATORS = ITEM_GIVER_SECTION_DEFINITIONS.reduce((acc, sectionDef) => {
+        acc[sectionDef.key] = sectionDef.validator;
+        return acc;
+    }, {});
+
+    const ITEM_GIVER_VALID_FILTERS = ITEM_GIVER_SECTION_DEFINITIONS.reduce((filters, sectionDef) => {
+        filters.add(sectionDef.key);
+        return filters;
+    }, new Set(['all']));
+
+    function sanitizeDatabaseName(name) {
+        return typeof name === 'string' ? name.trim() : '';
+    }
+
+    function hasUsableName(entry) {
+        return !!entry && sanitizeDatabaseName(entry.name).length > 0;
+    }
+
+    function normalizeCategory(categorySymbol) {
+        return ITEM_GIVER_VALID_FILTERS.has(categorySymbol) ? categorySymbol : 'all';
+    }
+
+    const DATA_SECTION_HEADER_REGEX = /^[-‐‑‒–—―_=]{2,}\s*(.+?)\s*[-‐‑‒–—―_=]{2,}$/i;
+
+    function extractDataSectionLabel(entry) {
+        if (!entry) {
+            return null;
+        }
+        const sanitizedName = sanitizeDatabaseName(entry.name || '');
+        const match = sanitizedName.match(DATA_SECTION_HEADER_REGEX);
+        if (match) {
+            const label = match[1] ? match[1].trim() : '';
+            if (label.length > 0) {
+                return label;
+            }
+        }
+
+        const stripped = stripHeaderMarkers(sanitizedName);
+        if (stripped) {
+            return stripped;
+        }
+
+        return null;
+    }
+
+    function isValidItemEntry(itemData) {
+        if (!itemData || itemData.isSectionHeader || itemData.isSubSectionHeader) {
+            return false;
+        }
+        if (!itemData.item || typeof itemData.type !== 'string') {
+            return false;
+        }
+        const validator = ITEM_GIVER_TYPE_VALIDATORS[itemData.type];
+        if (typeof validator !== 'function') {
+            return false;
+        }
+        return validator(itemData.item) && hasUsableName(itemData.item);
+    }
+
+    function collectEntriesForSection(sectionDef, subsectionStore) {
+        const entries = [];
+        const source = typeof sectionDef.dataAccessor === 'function' ? sectionDef.dataAccessor() : null;
+        const subsectionList = Array.isArray(subsectionStore) ? subsectionStore : null;
+
+        if (!Array.isArray(source)) {
+            return entries;
+        }
+
+        let currentSubSection = null;
+        let subsectionCounter = 0;
+
+        for (let i = 0; i < source.length; i++) {
+            const dbEntry = source[i];
+            if (!dbEntry || !sectionDef.validator(dbEntry) || !hasUsableName(dbEntry)) {
+                continue;
+            }
+
+            const headerLabel = extractDataSectionLabel(dbEntry);
+            if (headerLabel) {
+                subsectionCounter += 1;
+                const sectionKey = `${sectionDef.key}-subsection-${subsectionCounter}`;
+                currentSubSection = {
+                    key: sectionKey,
+                    label: headerLabel
+                };
+                const headerEntry = {
+                    isSubSectionHeader: true,
+                    type: sectionDef.key,
+                    sectionKey: sectionKey,
+                    name: headerLabel,
+                    sourceId: dbEntry.id
+                };
+                entries.push(headerEntry);
+                if (subsectionList) {
+                    subsectionList.push({
+                        key: sectionKey,
+                        label: headerLabel,
+                        type: sectionDef.key
+                    });
+                }
+                continue;
+            }
+
+            entries.push({
+                item: dbEntry,
+                type: sectionDef.key,
+                id: dbEntry.id,
+                name: sanitizeDatabaseName(dbEntry.name),
+                subSectionKey: currentSubSection ? currentSubSection.key : null,
+                subSectionLabel: currentSubSection ? currentSubSection.label : null,
+                sourceIndex: i
+            });
+        }
+
+        return entries;
+    }
+
     /**
      * Collects all valid items from the game database.
      * @returns {Array} Array of item objects with metadata
      */
     function collectAllItems() {
-        const items = [];
+        const orderedItems = [];
+        const subsections = {};
 
-        // Collect items
-        if ($dataItems && Array.isArray($dataItems)) {
-            for (let i = 0; i < $dataItems.length; i++) {
-                const item = $dataItems[i];
-                if (item && DataManager.isItem(item)) {
-                    // Skip items without names (these are expected placeholders)
-                    if (!item.name || item.name.trim() === '') {
-                        continue;
-                    }
-                    items.push({
-                        item: item,
-                        type: 'item',
-                        id: item.id,
-                        name: item.name
-                    });
-                }
+        ITEM_GIVER_SECTION_DEFINITIONS.forEach((sectionDef) => {
+            subsections[sectionDef.key] = [];
+            const sectionEntries = collectEntriesForSection(sectionDef, subsections[sectionDef.key]);
+            if (sectionEntries.length > 0) {
+                orderedItems.push({
+                    isSectionHeader: true,
+                    type: sectionDef.key,
+                    name: sectionDef.label
+                });
+                orderedItems.push(...sectionEntries);
             }
-        }
-
-        // Collect weapons
-        if ($dataWeapons && Array.isArray($dataWeapons)) {
-            for (let i = 0; i < $dataWeapons.length; i++) {
-                const weapon = $dataWeapons[i];
-                if (weapon && DataManager.isWeapon(weapon)) {
-                    // Skip weapons without names (these are expected placeholders)
-                    if (!weapon.name || weapon.name.trim() === '') {
-                        continue;
-                    }
-                    items.push({
-                        item: weapon,
-                        type: 'weapon',
-                        id: weapon.id,
-                        name: weapon.name
-                    });
-                }
-            }
-        }
-
-        // Collect armors
-        if ($dataArmors && Array.isArray($dataArmors)) {
-            for (let i = 0; i < $dataArmors.length; i++) {
-                const armor = $dataArmors[i];
-                if (armor && DataManager.isArmor(armor)) {
-                    // Skip armors without names (these are expected placeholders)
-                    if (!armor.name || armor.name.trim() === '') {
-                        continue;
-                    }
-                    items.push({
-                        item: armor,
-                        type: 'armor',
-                        id: armor.id,
-                        name: armor.name
-                    });
-                }
-            }
-        }
-
-        // Sort by name
-        items.sort((a, b) => {
-            if (a.name < b.name) return -1;
-            if (a.name > b.name) return 1;
-            return 0;
         });
 
-        return items;
+        return {
+            entries: orderedItems,
+            subsections
+        };
     }
 
     /**
-     * Window for filtering items by type and search text
+     * Selector background panel
      */
-    function Window_CabbyCodesItemGiverFilter() {
+    function Window_CabbyCodesSelectorPanel() {
         this.initialize(...arguments);
     }
 
-    window.Window_CabbyCodesItemGiverFilter = Window_CabbyCodesItemGiverFilter;
+    window.Window_CabbyCodesSelectorPanel = Window_CabbyCodesSelectorPanel;
 
-    Window_CabbyCodesItemGiverFilter.prototype = Object.create(Window_HorzCommand.prototype);
-    Window_CabbyCodesItemGiverFilter.prototype.constructor = Window_CabbyCodesItemGiverFilter;
+    Window_CabbyCodesSelectorPanel.prototype = Object.create(Window_Base.prototype);
+    Window_CabbyCodesSelectorPanel.prototype.constructor = Window_CabbyCodesSelectorPanel;
 
-    Window_CabbyCodesItemGiverFilter.prototype.initialize = function(rect) {
-        Window_HorzCommand.prototype.initialize.call(this, rect);
-        this._searchText = '';
-        this._category = 'all';
+    Window_CabbyCodesSelectorPanel.prototype.initialize = function(rect) {
+        Window_Base.prototype.initialize.call(this, rect);
+        this.opacity = 255;
+        this.contentsOpacity = 0;
+        this.refresh();
     };
 
-    Window_CabbyCodesItemGiverFilter.prototype.maxCols = function() {
-        return 4;
-    };
-
-    Window_CabbyCodesItemGiverFilter.prototype.makeCommandList = function() {
-        this.addCommand('All Items', 'all');
-        this.addCommand('Items', 'item');
-        this.addCommand('Weapons', 'weapon');
-        this.addCommand('Armors', 'armor');
-    };
-
-    Window_CabbyCodesItemGiverFilter.prototype.setCategory = function(category) {
-        if (this._category !== category) {
-            this._category = category;
-            this.refresh();
-            if (this._itemWindow) {
-                this._itemWindow.setFilters(this._category, this._searchText);
-            }
+    Window_CabbyCodesSelectorPanel.prototype.refresh = function() {
+        if (this.contentsBack) {
+            this.contentsBack.clear();
+            const rect = new Rectangle(0, 0, this.contentsBack.width, this.contentsBack.height);
+            this.contentsBack.paintOpacity = 160;
+            this.contentsBack.fillRect(rect.x, rect.y, rect.width, rect.height, getGaugeBackColor());
+            this.contentsBack.paintOpacity = 255;
         }
     };
 
-    Window_CabbyCodesItemGiverFilter.prototype.setSearchText = function(text) {
-        if (this._searchText !== text) {
-            this._searchText = text;
-            if (this._itemWindow) {
-                this._itemWindow.setFilters(this._category, this._searchText);
+    /**
+     * Generic dropdown button window (selectable label/value pair)
+     */
+    function Window_CabbyCodesDropdownButton() {
+        this.initialize(...arguments);
+    }
+
+    window.Window_CabbyCodesDropdownButton = Window_CabbyCodesDropdownButton;
+
+    Window_CabbyCodesDropdownButton.prototype = Object.create(Window_Selectable.prototype);
+    Window_CabbyCodesDropdownButton.prototype.constructor = Window_CabbyCodesDropdownButton;
+
+    Window_CabbyCodesDropdownButton.prototype.initialize = function(rect, label, placeholder) {
+        Window_Selectable.prototype.initialize.call(this, rect);
+        this._label = label || '';
+        this._placeholder = placeholder || '';
+        this._valueText = '';
+        this._currentKey = 'all';
+        this._disabled = false;
+        this.setBackgroundType(0);
+        this.opacity = 255;
+        this.deactivate();
+        this.refresh();
+    };
+
+    Window_CabbyCodesDropdownButton.prototype.maxItems = function() {
+        return 1;
+    };
+
+    Window_CabbyCodesDropdownButton.prototype.maxCols = function() {
+        return 1;
+    };
+
+    Window_CabbyCodesDropdownButton.prototype.setValue = function(text) {
+        this._valueText = text || '';
+        this.refresh();
+    };
+
+    Window_CabbyCodesDropdownButton.prototype.setKey = function(key) {
+        this._currentKey = key || 'all';
+    };
+
+    Window_CabbyCodesDropdownButton.prototype.currentKey = function() {
+        return this._currentKey || 'all';
+    };
+
+    Window_CabbyCodesDropdownButton.prototype.setDisabled = function(disabled) {
+        this._disabled = !!disabled;
+        if (this._disabled) {
+            this.deselect();
+            this.deactivate();
+        }
+        this.refresh();
+    };
+
+    Window_CabbyCodesDropdownButton.prototype.isCurrentItemEnabled = function() {
+        return !this._disabled;
+    };
+
+    Window_CabbyCodesDropdownButton.prototype.drawItem = function(index) {
+        const rect = this.itemLineRect(index);
+        this.drawBackground();
+        this.resetTextColor();
+        this.changeTextColor(this.systemColor());
+        this.drawText(`${this._label}:`, rect.x, rect.y, rect.width, 'left');
+        this.resetTextColor();
+        this.changePaintOpacity(!this._disabled);
+        const text = this._valueText || this._placeholder;
+        this.drawText(text, rect.x, rect.y, rect.width, 'right');
+        this.changePaintOpacity(true);
+    };
+
+    Window_CabbyCodesDropdownButton.prototype.processOk = function() {
+        if (this._disabled) {
+            SoundManager.playBuzzer();
+            return;
+        }
+        Window_Selectable.prototype.processOk.call(this);
+    };
+
+    Window_CabbyCodesDropdownButton.prototype.refresh = function() {
+        Window_Selectable.prototype.refresh.call(this);
+    };
+
+    Window_CabbyCodesDropdownButton.prototype.processTouch = function() {
+        if (!this.isOpen() || !this.visible) {
+            return;
+        }
+        if (TouchInput.isTriggered() && this.isTouchedInsideFrame()) {
+            if (this._disabled) {
+                SoundManager.playBuzzer();
+                return;
             }
+            this.playCursorSound();
+            this.select(0);
+            this.activate();
+            this.processOk();
         }
     };
 
-    Window_CabbyCodesItemGiverFilter.prototype.category = function() {
-        return this._category;
+    Window_CabbyCodesDropdownButton.prototype.drawBackground = function() {
+        if (this.contentsBack) {
+            const rect = this.baseRect();
+            this.contentsBack.paintOpacity = 64;
+            this.contentsBack.fillRect(rect.x, rect.y, rect.width, rect.height, getGaugeBackColor());
+            this.contentsBack.paintOpacity = 255;
+        }
     };
 
-    Window_CabbyCodesItemGiverFilter.prototype.searchText = function() {
-        return this._searchText;
+    Window_CabbyCodesDropdownButton.prototype.baseRect = function() {
+        return new Rectangle(0, 0, this.contentsWidth(), this.contentsHeight());
     };
 
-    Window_CabbyCodesItemGiverFilter.prototype.setItemWindow = function(itemWindow) {
-        this._itemWindow = itemWindow;
+    /**
+     * Generic dropdown list window that appears when selecting options
+     */
+    function Window_CabbyCodesDropdownList() {
+        this.initialize(...arguments);
+    }
+
+    window.Window_CabbyCodesDropdownList = Window_CabbyCodesDropdownList;
+
+    Window_CabbyCodesDropdownList.prototype = Object.create(Window_Selectable.prototype);
+    Window_CabbyCodesDropdownList.prototype.constructor = Window_CabbyCodesDropdownList;
+
+    Window_CabbyCodesDropdownList.prototype.initialize = function(rect) {
+        Window_Selectable.prototype.initialize.call(this, rect);
+        this._options = [];
+        this._maxVisibleItems = 6;
+        this.openness = 0;
+        this.hide();
+        this.deactivate();
     };
 
-    Window_CabbyCodesItemGiverFilter.prototype.processOk = function() {
-        const symbol = this.commandSymbol(this.index());
-        this.setCategory(symbol);
-        this._itemWindow.activate();
+    Window_CabbyCodesDropdownList.prototype.maxItems = function() {
+        return this._options.length;
     };
 
-    Window_CabbyCodesItemGiverFilter.prototype.processCancel = function() {
-        // Don't allow cancel from filter window
+    Window_CabbyCodesDropdownList.prototype.maxCols = function() {
+        return 1;
+    };
+
+    Window_CabbyCodesDropdownList.prototype.drawItem = function(index) {
+        const rect = this.itemLineRect(index);
+        const option = this._options[index];
+        if (!option) {
+            return;
+        }
+        this.resetTextColor();
+        this.changePaintOpacity(option.enabled !== false);
+        this.drawText(option.name, rect.x, rect.y, rect.width, 'left');
+        this.changePaintOpacity(true);
+    };
+
+    Window_CabbyCodesDropdownList.prototype.setOptions = function(options, currentKey) {
+        this._options = Array.isArray(options) ? options : [];
+        this._currentKey = currentKey || 'all';
+        const visibleItems = Math.min(Math.max(1, this._options.length), this._maxVisibleItems);
+        this.height = this.fittingHeight(visibleItems);
+        this.createContents();
+        Window_Selectable.prototype.refresh.call(this);
+        const index = this._options.findIndex(opt => opt.key === this._currentKey);
+        this.select(index >= 0 ? index : 0);
+    };
+
+    Window_CabbyCodesDropdownList.prototype.optionAt = function(index) {
+        return index >= 0 && index < this._options.length ? this._options[index] : null;
+    };
+
+    Window_CabbyCodesDropdownList.prototype.currentKey = function() {
+        const option = this.optionAt(this.index());
+        return option ? option.key : null;
+    };
+
+    Window_CabbyCodesDropdownList.prototype.isCurrentItemEnabled = function() {
+        const option = this.optionAt(this.index());
+        return option ? option.enabled !== false : false;
+    };
+
+    Window_CabbyCodesDropdownList.prototype.processOk = function() {
+        if (this.isCurrentItemEnabled()) {
+            Window_Selectable.prototype.processOk.call(this);
+        } else {
+            this.playBuzzerSound();
+        }
     };
 
     /**
@@ -180,25 +479,69 @@
         this._data = [];
         this._category = 'all';
         this._searchText = '';
+        this._subSectionKey = 'all';
+        this._subSectionsByType = {};
+        this._subSectionLookup = {};
         this.loadItems();
     };
 
     Window_CabbyCodesItemGiverList.prototype.loadItems = function() {
         try {
-            this._allItems = collectAllItems();
+            const result = collectAllItems();
+            this._allItems = result?.entries || [];
+            this._subSectionsByType = result?.subsections || {};
+            this._subSectionLookup = {};
+            Object.keys(this._subSectionsByType).forEach(typeKey => {
+                const list = this._subSectionsByType[typeKey];
+                if (Array.isArray(list)) {
+                    list.forEach(sub => {
+                        if (sub && sub.key) {
+                            this._subSectionLookup[sub.key] = sub;
+                        }
+                    });
+                }
+            });
             this.refresh();
         } catch (e) {
             CabbyCodes.error(`[CabbyCodes] Failed to load items: ${e?.message || e}`);
             this._allItems = [];
             this._data = [];
+            this._subSectionsByType = {};
+            this._subSectionLookup = {};
         }
     };
 
-    Window_CabbyCodesItemGiverList.prototype.setFilters = function(category, searchText) {
-        this._category = category;
-        this._searchText = searchText || '';
+    Window_CabbyCodesItemGiverList.prototype.resetScrollPosition = function() {
+        if (typeof this.scrollTo === 'function') {
+            this.scrollTo(0, 0);
+        }
+        this._scrollY = 0;
+        this._scrollTargetY = 0;
+    };
+
+    Window_CabbyCodesItemGiverList.prototype.clearListDisplay = function() {
+        this._data = [];
+        this.select(-1);
+        if (this.contents) {
+            this.contents.clear();
+        }
+        if (this.contentsBack) {
+            this.contentsBack.clear();
+        }
+        this.resetScrollPosition();
+    };
+
+    Window_CabbyCodesItemGiverList.prototype.setFilters = function(category, searchText, subSectionKey) {
+        this.clearListDisplay();
+        this._category = normalizeCategory(category);
+        this._searchText = searchText ? String(searchText) : '';
+        const lookup = this._subSectionLookup || {};
+        const normalizedSubKey = subSectionKey && subSectionKey !== 'all' && lookup[subSectionKey]
+            ? String(subSectionKey)
+            : 'all';
+        this._subSectionKey = normalizedSubKey;
         this.refresh();
-        this.scrollTo(0, 0);
+        this.resetScrollPosition();
     };
 
     Window_CabbyCodesItemGiverList.prototype.maxCols = function() {
@@ -217,22 +560,80 @@
         return this._data && index >= 0 && index < this._data.length ? this._data[index] : null;
     };
 
-    Window_CabbyCodesItemGiverList.prototype.makeItemList = function() {
-        this._data = this._allItems.filter(itemData => {
-            // Filter by category
-            if (this._category === 'item') {
-                if (itemData.type !== 'item') return false;
-            } else if (this._category === 'weapon') {
-                if (itemData.type !== 'weapon') return false;
-            } else if (this._category === 'armor') {
-                if (itemData.type !== 'armor') return false;
-            }
-            // else 'all' - no category filter
+    Window_CabbyCodesItemGiverList.prototype.currentCategory = function() {
+        return this._category;
+    };
 
-            // Filter by search text
-            if (this._searchText && this._searchText.trim() !== '') {
-                const searchLower = this._searchText.toLowerCase();
-                if (!itemData.name.toLowerCase().includes(searchLower)) {
+    Window_CabbyCodesItemGiverList.prototype.currentSubSectionKey = function() {
+        return this._subSectionKey || 'all';
+    };
+
+    Window_CabbyCodesItemGiverList.prototype.setSubSectionFilter = function(subSectionKey) {
+        const lookup = this._subSectionLookup || {};
+        const normalizedKey = subSectionKey && subSectionKey !== 'all' && lookup[subSectionKey]
+            ? String(subSectionKey)
+            : 'all';
+        if (this._subSectionKey !== normalizedKey) {
+            this._subSectionKey = normalizedKey;
+            this.clearListDisplay();
+            this.refresh();
+            this.resetScrollPosition();
+        }
+    };
+
+    Window_CabbyCodesItemGiverList.prototype.availableSubSections = function(type) {
+        const normalized = normalizeCategory(type);
+        if (normalized === 'all') {
+            return [];
+        }
+        const list = this._subSectionsByType?.[normalized];
+        return Array.isArray(list) ? list : [];
+    };
+
+    Window_CabbyCodesItemGiverList.prototype.resolveSubSection = function(key) {
+        if (!key || key === 'all') {
+            return null;
+        }
+        return this._subSectionLookup?.[key] || null;
+    };
+
+    Window_CabbyCodesItemGiverList.prototype.makeItemList = function() {
+        const searchLower = (this._searchText || '').trim().toLowerCase();
+        const hasSearch = searchLower.length > 0;
+        const includeTopLevelHeaders = this._category === 'all' && !hasSearch && (!this._subSectionKey || this._subSectionKey === 'all');
+        const includeSubSectionHeaders = !hasSearch && (!this._subSectionKey || this._subSectionKey === 'all');
+        const activeSubSectionKey = this._subSectionKey && this._subSectionKey !== 'all' ? this._subSectionKey : null;
+
+        this._data = this._allItems.filter(itemData => {
+            if (!itemData) {
+                return false;
+            }
+
+            if (itemData.isSectionHeader) {
+                return includeTopLevelHeaders;
+            }
+
+            if (itemData.isSubSectionHeader) {
+                if (activeSubSectionKey) {
+                    return itemData.sectionKey === activeSubSectionKey;
+                }
+                return includeSubSectionHeaders && (!this._category || this._category === 'all' || itemData.type === this._category);
+            }
+
+            if (!isValidItemEntry(itemData)) {
+                return false;
+            }
+
+            if (this._category !== 'all' && itemData.type !== this._category) {
+                return false;
+            }
+
+            if (activeSubSectionKey && itemData.subSectionKey !== activeSubSectionKey) {
+                return false;
+            }
+
+            if (hasSearch) {
+                if (!itemData.name || !itemData.name.toLowerCase().includes(searchLower)) {
                     return false;
                 }
             }
@@ -247,18 +648,24 @@
             if (!itemData) {
                 return;
             }
-            
-            if (!itemData.item) {
-                CabbyCodes.warn('[CabbyCodes] Item Giver: itemData.item is null/undefined at index ' + index);
-                return;
-            }
-            
-            if (!itemData.type) {
-                CabbyCodes.warn('[CabbyCodes] Item Giver: itemData.type is null/undefined at index ' + index);
-                return;
-            }
-            
+
             const rect = this.itemLineRect(index);
+
+            if (itemData.isSectionHeader) {
+                this.drawSectionHeader(itemData, rect);
+                return;
+            }
+
+            if (itemData.isSubSectionHeader) {
+                this.drawSubSectionHeader(itemData, rect);
+                return;
+            }
+
+            if (!isValidItemEntry(itemData)) {
+                CabbyCodes.warn('[CabbyCodes] Item Giver: Invalid item entry at index ' + index);
+                return;
+            }
+
             const item = itemData.item;
             const typeText = itemData.type.charAt(0).toUpperCase() + itemData.type.slice(1);
             const typeWidth = this.textWidth(typeText);
@@ -284,13 +691,63 @@
         }
     };
 
+    Window_CabbyCodesItemGiverList.prototype.drawSectionHeader = function(itemData, rect) {
+        const headerText = itemData?.name || '';
+        const paddingX = rect.x + 12;
+        const textWidth = rect.width - 24;
+
+        this.resetTextColor();
+        this.changeTextColor(this.systemColor());
+        this.changePaintOpacity(true);
+        this.drawText(headerText, paddingX, rect.y, textWidth, 'left');
+
+        // Draw a subtle line under the header for separation
+        if (this.contents) {
+            const lineY = rect.y + rect.height - 4;
+            this.contents.paintOpacity = 96;
+            this.contents.fillRect(rect.x, lineY, rect.width, 2, getGaugeBackColor());
+            this.contents.paintOpacity = 255;
+        }
+
+        this.resetTextColor();
+    };
+
+    Window_CabbyCodesItemGiverList.prototype.drawSubSectionHeader = function(itemData, rect) {
+        const headerText = itemData?.name || '';
+        const paddingX = rect.x + 30;
+        const textWidth = rect.width - 60;
+
+        this.resetTextColor();
+        this.changeTextColor(this.systemColor());
+        this.contents.fontBold = true;
+        this.drawText(headerText, paddingX, rect.y, textWidth, 'left');
+
+        if (this.contents) {
+            const lineY = rect.y + rect.height - 6;
+            this.contents.paintOpacity = 64;
+            this.contents.fillRect(paddingX, lineY, textWidth, 1, getGaugeBackColor());
+            this.contents.paintOpacity = 255;
+        }
+
+        this.contents.fontBold = false;
+        this.resetTextColor();
+    };
+
+    Window_CabbyCodesItemGiverList.prototype.isSelectableItem = function(itemData) {
+        return isValidItemEntry(itemData);
+    };
+
+    Window_CabbyCodesItemGiverList.prototype.isCurrentItemEnabled = function() {
+        return this.isSelectableItem(this.item());
+    };
+
     Window_CabbyCodesItemGiverList.prototype.updateHelp = function() {
         try {
             const itemData = this.item();
             CabbyCodes.log('[CabbyCodes] Item Giver: updateHelp called, itemData: ' + (itemData ? itemData.name : 'null'));
             // Update description window (not header window)
             if (this._scene) {
-                if (itemData && itemData.item) {
+                if (isValidItemEntry(itemData)) {
                     const description = itemData.item.description || '';
                     CabbyCodes.log('[CabbyCodes] Item Giver: Item description: ' + (description ? description.substring(0, 50) + '...' : 'empty'));
                     // Use scene's update method to resize window dynamically
@@ -362,6 +819,58 @@
         }
     };
 
+    Window_CabbyCodesItemGiverList.prototype.processHandling = function() {
+        Window_Selectable.prototype.processHandling.call(this);
+        if (!this.isOpenAndActive()) {
+            return;
+        }
+
+        if (Input.isTriggered('pageup')) {
+            this.cycleSubSectionFilter(-1);
+        } else if (Input.isTriggered('pagedown')) {
+            this.cycleSubSectionFilter(1);
+        }
+    };
+
+    Window_CabbyCodesItemGiverList.prototype.cycleSubSectionFilter = function(direction) {
+        if (!direction || direction === 0) {
+            return;
+        }
+
+        const category = this.currentCategory();
+        const subsections = this.availableSubSections(category);
+        if (!subsections || subsections.length === 0) {
+            if (category !== 'all') {
+                const nextKey = direction > 0 ? 'all' : 'all';
+                if (this._subSectionKey !== nextKey) {
+                    this.setSubSectionFilter(nextKey);
+                    if (this._scene && typeof this._scene.syncSubFilterSelection === 'function') {
+                        this._scene.syncSubFilterSelection(nextKey, category);
+                    }
+                }
+            }
+            return;
+        }
+
+        const options = [{ key: 'all', label: 'All Groups' }, ...subsections];
+        let currentIndex = options.findIndex(option => option.key === this.currentSubSectionKey());
+        if (currentIndex < 0) {
+            currentIndex = 0;
+        }
+        const nextIndex = (currentIndex + direction + options.length) % options.length;
+        const nextKey = options[nextIndex].key;
+
+        if (nextKey === this.currentSubSectionKey()) {
+            return;
+        }
+
+        this.setSubSectionFilter(nextKey);
+        if (this._scene && typeof this._scene.syncSubFilterSelection === 'function') {
+            this._scene.syncSubFilterSelection(nextKey, category);
+        }
+        SoundManager.playCursor();
+    };
+
     Window_CabbyCodesItemGiverList.prototype.refresh = function() {
         try {
             this.makeItemList();
@@ -377,6 +886,31 @@
             CabbyCodes.error('[CabbyCodes] Item Giver: Error in base window refresh: ' + (e?.message || e));
             CabbyCodes.error('[CabbyCodes] Item Giver: Stack: ' + (e?.stack || 'No stack trace'));
             // Don't throw - window will just not refresh
+        }
+
+        this.ensureValidSelection();
+    };
+
+    Window_CabbyCodesItemGiverList.prototype.ensureValidSelection = function(preferredIndex) {
+        if (!this._data || this._data.length === 0) {
+            this.select(-1);
+            return;
+        }
+
+        let targetIndex = typeof preferredIndex === 'number' ? preferredIndex : this.index();
+        if (targetIndex < 0 || targetIndex >= this._data.length) {
+            targetIndex = 0;
+        }
+
+        if (!this.isSelectableItem(this._data[targetIndex])) {
+            const nextIndex = this._data.findIndex(entry => this.isSelectableItem(entry));
+            targetIndex = nextIndex >= 0 ? nextIndex : -1;
+        }
+
+        this.select(targetIndex);
+
+        if (targetIndex < 0) {
+            this.callUpdateHelp();
         }
     };
 
@@ -831,17 +1365,23 @@
             CabbyCodes.log('[CabbyCodes] Item Giver: Creating scene');
             Scene_MenuBase.prototype.create.call(this);
             CabbyCodes.log('[CabbyCodes] Item Giver: Base scene created');
-            // Create in order: header at top, then filter, then description, then hidden search window, then item list
+            // Create in order: header at top, selectors, description, hidden search window, then item list
             this.createHelpWindow();
             CabbyCodes.log('[CabbyCodes] Item Giver: Help window created');
-            this.createFilterWindow();
-            CabbyCodes.log('[CabbyCodes] Item Giver: Filter window created');
+            this.createSelectorPanelWindow();
+            CabbyCodes.log('[CabbyCodes] Item Giver: Selector panel created');
+            this.createTypeDropdownButton();
+            CabbyCodes.log('[CabbyCodes] Item Giver: Type dropdown created');
+            this.createSubtypeDropdownButton();
+            CabbyCodes.log('[CabbyCodes] Item Giver: Subtype dropdown created');
             this.createDescriptionWindow();
             CabbyCodes.log('[CabbyCodes] Item Giver: Description window created');
             this.createSearchWindow();
             CabbyCodes.log('[CabbyCodes] Item Giver: Search window created (hidden)');
             this.createItemWindow();
             CabbyCodes.log('[CabbyCodes] Item Giver: Item window created');
+            this.createDropdownListWindow();
+            CabbyCodes.log('[CabbyCodes] Item Giver: Dropdown list window created');
         } catch (e) {
             CabbyCodes.error('[CabbyCodes] Item Giver: Error in scene create:', e?.message || e, e?.stack);
             throw e;
@@ -891,6 +1431,13 @@
         this._descriptionWindow.setText(''); // Start empty
         this.addWindow(this._descriptionWindow);
     };
+
+    Scene_CabbyCodesItemGiver.prototype.descriptionWindowHeight = function() {
+        if (this._descriptionWindow) {
+            return this._descriptionWindow.height;
+        }
+        return this.calcWindowHeight(1, false);
+    };
     
     Scene_CabbyCodesItemGiver.prototype.updateDescriptionWindow = function(text) {
         if (!this._descriptionWindow) {
@@ -933,18 +1480,46 @@
                 this._descriptionWindow.setText('');
                 this._descriptionWindow.refresh();
             }
+            this.updateItemWindowLayout();
         } catch (e) {
             CabbyCodes.error('[CabbyCodes] Item Giver: Error updating description window: ' + (e?.message || e));
             CabbyCodes.error('[CabbyCodes] Item Giver: Stack: ' + (e?.stack || 'No stack trace'));
         }
     };
 
-    Scene_CabbyCodesItemGiver.prototype.createFilterWindow = function() {
-        const rect = this.filterWindowRect();
-        this._filterWindow = new Window_CabbyCodesItemGiverFilter(rect);
-        this._filterWindow.setHandler('ok', this.onFilterOk.bind(this));
-        this._filterWindow.setHandler('cancel', this.onFilterCancel.bind(this));
-        this.addWindow(this._filterWindow);
+    Scene_CabbyCodesItemGiver.prototype.createSelectorPanelWindow = function() {
+        const rect = this.selectorPanelRect();
+        this._selectorPanel = new Window_CabbyCodesSelectorPanel(rect);
+        this.addWindow(this._selectorPanel);
+    };
+
+    Scene_CabbyCodesItemGiver.prototype.createTypeDropdownButton = function() {
+        const rect = this.typeDropdownRect();
+        this._typeDropdown = new Window_CabbyCodesDropdownButton(rect, 'Type', 'Select type');
+        this._typeDropdown.setHandler('ok', this.onTypeDropdownOk.bind(this));
+        this._typeDropdown.setHandler('cancel', this.onDropdownButtonCancel.bind(this));
+        this._typeDropdown.setValue(this.typeLabelForKey('all'));
+        this._typeDropdown.setKey('all');
+        this.addWindow(this._typeDropdown);
+    };
+
+    Scene_CabbyCodesItemGiver.prototype.createSubtypeDropdownButton = function() {
+        const rect = this.subtypeDropdownRect();
+        this._subtypeDropdown = new Window_CabbyCodesDropdownButton(rect, 'Subtype', 'Select subtype');
+        this._subtypeDropdown.setHandler('ok', this.onSubtypeDropdownOk.bind(this));
+        this._subtypeDropdown.setHandler('cancel', this.onDropdownButtonCancel.bind(this));
+        this._subtypeDropdown.setValue('All');
+        this._subtypeDropdown.setKey('all');
+        this._subtypeDropdown.setDisabled(true);
+        this.addWindow(this._subtypeDropdown);
+    };
+
+    Scene_CabbyCodesItemGiver.prototype.createDropdownListWindow = function() {
+        const rect = new Rectangle(0, 0, 360, this.calcWindowHeight(4, true));
+        this._dropdownListWindow = new Window_CabbyCodesDropdownList(rect);
+        this._dropdownListWindow.setHandler('ok', this.onDropdownListOk.bind(this));
+        this._dropdownListWindow.setHandler('cancel', this.onDropdownListCancel.bind(this));
+        this.addWindow(this._dropdownListWindow);
     };
 
     Scene_CabbyCodesItemGiver.prototype.createItemWindow = function() {
@@ -978,18 +1553,13 @@
             this._itemWindow.setHandler('cancel', this.onItemCancel.bind(this));
             this.addWindow(this._itemWindow);
             
-            if (this._filterWindow) {
-                if (typeof this._filterWindow.setItemWindow === 'function') {
-                    this._filterWindow.setItemWindow(this._itemWindow);
-                } else {
-                    CabbyCodes.error('[CabbyCodes] Item Giver: setItemWindow is not a function on filter window');
-                }
+            if (typeof this._itemWindow.ensureValidSelection === 'function') {
+                this._itemWindow.ensureValidSelection(0);
             }
             
+            this.refreshSubtypeDropdownState();
+
             this._itemWindow.activate();
-            this._itemWindow.select(0);
-            // Update help window with initial selection
-            this._itemWindow.callUpdateHelp();
             CabbyCodes.log('[CabbyCodes] Item Giver: Item window setup complete');
         } catch (e) {
             CabbyCodes.error('[CabbyCodes] Item Giver: Error creating item window:', e?.message || e, e?.stack);
@@ -1012,38 +1582,306 @@
         return new Rectangle(0, Graphics.boxHeight + 50, Graphics.boxWidth, this.calcWindowHeight(1, false));
     };
 
-    Scene_CabbyCodesItemGiver.prototype.filterWindowRect = function() {
-        // Position filter below help window at top
+    Scene_CabbyCodesItemGiver.prototype.dropdownButtonHeight = function() {
+        return this.calcWindowHeight(1, true);
+    };
+
+    Scene_CabbyCodesItemGiver.prototype.selectorAreaHeight = function() {
+        return this.dropdownButtonHeight() + 12;
+    };
+
+    Scene_CabbyCodesItemGiver.prototype.selectorPanelRect = function() {
         const helpHeight = this.helpAreaHeight();
         const wx = 0;
         const wy = helpHeight;
         const ww = Graphics.boxWidth;
-        const wh = this.calcWindowHeight(1, true);
+        const wh = this.selectorAreaHeight();
         return new Rectangle(wx, wy, ww, wh);
+    };
+
+    Scene_CabbyCodesItemGiver.prototype.typeDropdownRect = function() {
+        const helpHeight = this.helpAreaHeight();
+        const padding = 12;
+        const wy = helpHeight + 6;
+        const buttonWidth = (Graphics.boxWidth - padding * 3) / 2;
+        const wh = this.dropdownButtonHeight();
+        return new Rectangle(padding, wy, buttonWidth, wh);
+    };
+
+    Scene_CabbyCodesItemGiver.prototype.subtypeDropdownRect = function() {
+        const helpHeight = this.helpAreaHeight();
+        const padding = 12;
+        const wy = helpHeight + 6;
+        const buttonWidth = (Graphics.boxWidth - padding * 3) / 2;
+        const wh = this.dropdownButtonHeight();
+        const wx = padding * 2 + buttonWidth;
+        return new Rectangle(wx, wy, buttonWidth, wh);
     };
 
     Scene_CabbyCodesItemGiver.prototype.itemWindowRect = function() {
-        // Item list fills most of the screen, between filter and description
-        const filterHeight = this.calcWindowHeight(1, true);
+        const selectorHeight = this.selectorAreaHeight();
         const helpHeight = this.helpAreaHeight();
-        // Use minimum description height for layout calculation
-        const minDescHeight = this.calcWindowHeight(1, false);
+        const descHeight = this.descriptionWindowHeight();
         const wx = 0;
-        const wy = helpHeight + filterHeight;
+        const wy = helpHeight + selectorHeight;
         const ww = Graphics.boxWidth;
         // Fill space between filter and description window at bottom
-        const wh = Graphics.boxHeight - helpHeight - filterHeight - minDescHeight;
+        const availableHeight = Graphics.boxHeight - helpHeight - selectorHeight - descHeight;
+        const minHeight = this.calcWindowHeight(4, true);
+        const wh = Math.max(minHeight, availableHeight);
         return new Rectangle(wx, wy, ww, wh);
     };
 
-    Scene_CabbyCodesItemGiver.prototype.onFilterOk = function() {
-        const symbol = this._filterWindow.commandSymbol(this._filterWindow.index());
-        this._filterWindow.setCategory(symbol);
+    Scene_CabbyCodesItemGiver.prototype.typeOptions = function() {
+        const options = [{ key: 'all', name: 'All Items' }];
+        ITEM_GIVER_SECTION_DEFINITIONS.forEach(def => {
+            options.push({ key: def.key, name: def.label });
+        });
+        return options;
+    };
+
+    Scene_CabbyCodesItemGiver.prototype.typeLabelForKey = function(key) {
+        if (!key || key === 'all') {
+            return 'All Items';
+        }
+        const match = ITEM_GIVER_SECTION_DEFINITIONS.find(def => def.key === key);
+        return match ? match.label : 'All Items';
+    };
+
+    Scene_CabbyCodesItemGiver.prototype.subtypeOptionsData = function() {
+        if (!this._itemWindow) {
+            return [];
+        }
+        const category = this._itemWindow.currentCategory();
+        const subs = this._itemWindow.availableSubSections(category);
+        if (!subs || subs.length === 0) {
+            return [];
+        }
+        return subs.map(sub => ({
+            key: sub.key,
+            name: sub.label
+        }));
+    };
+
+    Scene_CabbyCodesItemGiver.prototype.subtypeOptions = function() {
+        const data = this.subtypeOptionsData();
+        const options = [{ key: 'all', name: 'All Subtypes' }];
+        data.forEach(entry => options.push(entry));
+        this._currentSubtypeOptions = data;
+        return options;
+    };
+
+    Scene_CabbyCodesItemGiver.prototype.subtypeLabelForKey = function(key) {
+        if (!key || key === 'all') {
+            return 'All';
+        }
+        if (!this._currentSubtypeOptions) {
+            this._currentSubtypeOptions = this.subtypeOptionsData();
+        }
+        const match = this._currentSubtypeOptions.find(option => option.key === key);
+        return match ? match.name : 'All';
+    };
+
+    Scene_CabbyCodesItemGiver.prototype.dropdownListRectForButton = function(button, listHeight) {
+        const width = button ? button.width : 320;
+        const buttonX = button ? button.x : 0;
+        const buttonY = button ? button.y : 0;
+        let y = buttonY + button.height;
+        if (y + listHeight > Graphics.boxHeight) {
+            y = Math.max(0, buttonY - listHeight);
+        }
+        return new Rectangle(buttonX, y, width, listHeight);
+    };
+
+    Scene_CabbyCodesItemGiver.prototype.deactivateSelectorInputs = function() {
+        if (this._itemWindow) {
+            this._itemWindow.deactivate();
+        }
+        if (this._typeDropdown) {
+            this._typeDropdown.deactivate();
+            this._typeDropdown.deselect();
+        }
+        if (this._subtypeDropdown) {
+            this._subtypeDropdown.deactivate();
+            this._subtypeDropdown.deselect();
+        }
+    };
+
+    Scene_CabbyCodesItemGiver.prototype.openDropdown = function(target) {
+        if (!this._dropdownListWindow) {
+            return;
+        }
+        const isType = target === 'type';
+        const button = isType ? this._typeDropdown : this._subtypeDropdown;
+        if (!button || button._disabled) {
+            SoundManager.playBuzzer();
+            return;
+        }
+        const options = isType ? this.typeOptions() : this.subtypeOptions();
+        if (!options.length) {
+            SoundManager.playBuzzer();
+            return;
+        }
+        this.deactivateSelectorInputs();
+        this._activeDropdownTarget = target;
+        const currentKey = button.currentKey();
+        this._dropdownListWindow.setOptions(options, currentKey);
+        const rect = this.dropdownListRectForButton(button, this._dropdownListWindow.height);
+        this._dropdownListWindow.move(rect.x, rect.y, rect.width, this._dropdownListWindow.height);
+        if (typeof this._dropdownListWindow.raise === 'function') {
+            this._dropdownListWindow.raise();
+        } else if (typeof this._dropdownListWindow.z !== 'undefined') {
+            const topZ = Math.max(
+                this._itemWindow ? this._itemWindow.z : 0,
+                this._typeDropdown ? this._typeDropdown.z : 0,
+                this._subtypeDropdown ? this._subtypeDropdown.z : 0
+            );
+            this._dropdownListWindow.z = topZ + 50;
+        }
+        this._dropdownListWindow.show();
+        this._dropdownListWindow.open();
+        this._dropdownListWindow.activate();
+    };
+
+    Scene_CabbyCodesItemGiver.prototype.closeDropdownList = function() {
+        if (!this._dropdownListWindow) {
+            return;
+        }
+        this._dropdownListWindow.hide();
+        this._dropdownListWindow.deactivate();
+        this._dropdownListWindow.close();
+        this._activeDropdownTarget = null;
+    };
+
+    Scene_CabbyCodesItemGiver.prototype.refreshSubtypeDropdownState = function() {
+        if (!this._subtypeDropdown) {
+            return;
+        }
+        const data = this.subtypeOptionsData();
+        this._currentSubtypeOptions = data;
+        if (!data.length) {
+            this._subtypeDropdown.setDisabled(true);
+            this._subtypeDropdown.setValue('All');
+            this._subtypeDropdown.setKey('all');
+            return;
+        }
+        this._subtypeDropdown.setDisabled(false);
+        this._subtypeDropdown.setValue('All');
+        this._subtypeDropdown.setKey('all');
+    };
+
+    Scene_CabbyCodesItemGiver.prototype.syncSubFilterSelection = function(key) {
+        if (!this._subtypeDropdown) {
+            return;
+        }
+        const label = this.subtypeLabelForKey(key);
+        this._subtypeDropdown.setValue(label);
+        this._subtypeDropdown.setKey(key || 'all');
+    };
+
+    Scene_CabbyCodesItemGiver.prototype.resetItemListPosition = function() {
+        if (!this._itemWindow) {
+            return;
+        }
+        if (typeof this._itemWindow.resetScrollPosition === 'function') {
+            this._itemWindow.resetScrollPosition();
+        } else if (typeof this._itemWindow.scrollTo === 'function') {
+            this._itemWindow.scrollTo(0, 0);
+            this._itemWindow._scrollY = 0;
+            this._itemWindow._scrollTargetY = 0;
+        } else {
+            this._itemWindow._scrollY = 0;
+            this._itemWindow._scrollTargetY = 0;
+        }
+        if (typeof this._itemWindow.ensureValidSelection === 'function') {
+            this._itemWindow.ensureValidSelection(0);
+        } else if (typeof this._itemWindow.select === 'function') {
+            this._itemWindow.select(0);
+        }
+    };
+
+    Scene_CabbyCodesItemGiver.prototype.onTypeDropdownOk = function() {
+        this.openDropdown('type');
+    };
+
+    Scene_CabbyCodesItemGiver.prototype.onSubtypeDropdownOk = function() {
+        this.openDropdown('subtype');
+    };
+
+    Scene_CabbyCodesItemGiver.prototype.onDropdownButtonCancel = function() {
+        if (this._itemWindow) {
+            this._itemWindow.activate();
+        }
+    };
+
+    Scene_CabbyCodesItemGiver.prototype.onDropdownListOk = function() {
+        const key = this._dropdownListWindow.currentKey();
+        if (!this._activeDropdownTarget) {
+            this.closeDropdownList();
+            if (this._itemWindow) {
+                this._itemWindow.activate();
+            }
+            return;
+        }
+        if (this._activeDropdownTarget === 'type') {
+            this.applyTypeSelection(key);
+        } else {
+            this.applySubtypeSelection(key);
+        }
+    };
+
+    Scene_CabbyCodesItemGiver.prototype.onDropdownListCancel = function() {
+        const target = this._activeDropdownTarget;
+        this.closeDropdownList();
+        const button = target === 'subtype' ? this._subtypeDropdown : this._typeDropdown;
+        if (button && !button._disabled) {
+            button.activate();
+            button.select(0);
+        } else if (this._itemWindow) {
+            this._itemWindow.activate();
+        }
+    };
+
+    Scene_CabbyCodesItemGiver.prototype.applyTypeSelection = function(key) {
+        const normalized = normalizeCategory(key);
+        const label = this.typeLabelForKey(normalized);
+        this._typeDropdown.setValue(label);
+        this._typeDropdown.setKey(normalized);
+        const searchText = this._searchWindow ? this._searchWindow.searchText() : '';
+        this._itemWindow.setFilters(normalized, searchText, 'all');
+        this._itemWindow.setSubSectionFilter('all');
+        this.resetItemListPosition();
+        this.refreshSubtypeDropdownState();
+        this._subtypeDropdown.setValue('All');
+        this.closeDropdownList();
+        if (!this._subtypeDropdown._disabled) {
+            this._subtypeDropdown.activate();
+            this._subtypeDropdown.select(0);
+        } else if (this._itemWindow) {
+            this._itemWindow.activate();
+        }
+    };
+
+    Scene_CabbyCodesItemGiver.prototype.applySubtypeSelection = function(key) {
+        if (!this._itemWindow) {
+            this.closeDropdownList();
+            return;
+        }
+        const label = this.subtypeLabelForKey(key);
+        this._subtypeDropdown.setValue(label);
+        this._subtypeDropdown.setKey(key || 'all');
+        this._itemWindow.setSubSectionFilter(key || 'all');
+        this.resetItemListPosition();
+        this.closeDropdownList();
         this._itemWindow.activate();
     };
 
-    Scene_CabbyCodesItemGiver.prototype.onFilterCancel = function() {
-        // Don't allow cancel from filter
+    Scene_CabbyCodesItemGiver.prototype.updateItemWindowLayout = function() {
+        if (!this._itemWindow) {
+            return;
+        }
+        const rect = this.itemWindowRect();
+        this._itemWindow.move(rect.x, rect.y, rect.width, rect.height);
     };
 
     Scene_CabbyCodesItemGiver.prototype.onItemOk = function() {
@@ -1051,10 +1889,12 @@
             CabbyCodes.log('[CabbyCodes] Item Giver: onItemOk called');
             const itemData = this._itemWindow.item();
             CabbyCodes.log('[CabbyCodes] Item Giver: itemData = ' + (itemData ? itemData.name : 'null'));
-            if (itemData) {
+            if (isValidItemEntry(itemData)) {
                 this.openQuantityWindow(itemData);
             } else {
-                CabbyCodes.warn('[CabbyCodes] Item Giver: itemData is null in onItemOk');
+                CabbyCodes.warn('[CabbyCodes] Item Giver: Invalid or non-selectable item in onItemOk');
+                SoundManager.playBuzzer();
+                this._itemWindow.activate();
             }
         } catch (e) {
             CabbyCodes.error('[CabbyCodes] Item Giver: Error in onItemOk: ' + (e?.message || e));
@@ -1129,6 +1969,11 @@
 
     Scene_CabbyCodesItemGiver.prototype.openQuantityWindow = function(itemData) {
         try {
+            if (!isValidItemEntry(itemData)) {
+                CabbyCodes.warn('[CabbyCodes] Item Giver: Tried to open quantity window for invalid item');
+                SoundManager.playBuzzer();
+                return;
+            }
             CabbyCodes.log('[CabbyCodes] Item Giver: Opening quantity window for item: ' + (itemData?.name || 'unknown'));
             const callbacks = {
                 onApply: (quantity) => {
@@ -1152,6 +1997,11 @@
 
     Scene_CabbyCodesItemGiver.prototype.addItemToInventory = function(itemData, quantity) {
         try {
+            if (!isValidItemEntry(itemData)) {
+                CabbyCodes.warn('[CabbyCodes] Item Giver: Attempted to add invalid item to inventory');
+                SoundManager.playBuzzer();
+                return;
+            }
             // Only add if quantity is greater than 0
             if (quantity > 0) {
                 $gameParty.gainItem(itemData.item, quantity);
@@ -1164,6 +2014,9 @@
             // Refresh item window if it exists
             if (this._itemWindow) {
                 this._itemWindow.refresh();
+                if (typeof this._itemWindow.ensureValidSelection === 'function') {
+                    this._itemWindow.ensureValidSelection();
+                }
             }
         } catch (e) {
             CabbyCodes.error(`[CabbyCodes] Failed to add item: ${e?.message || e}`);
@@ -1373,7 +2226,13 @@
         this._searchText = '';
         this.refresh();
         if (this._itemWindow) {
-            this._itemWindow.setFilters(this._itemWindow._category, '');
+            const category = typeof this._itemWindow.currentCategory === 'function'
+                ? this._itemWindow.currentCategory()
+                : (this._itemWindow._category || 'all');
+            const subKey = typeof this._itemWindow.currentSubSectionKey === 'function'
+                ? this._itemWindow.currentSubSectionKey()
+                : 'all';
+            this._itemWindow.setFilters(category, '', subKey);
         }
     };
 
@@ -1425,7 +2284,9 @@
                 }
             }
             const displayText = this._searchText || (isActive ? '(Type to search)' : '');
-            this.changeTextColor(isActive ? this.normalColor() : this.gaugeBackColor());
+            const activeColor = getNormalColor(this);
+            const inactiveColor = getGaugeBackColor();
+            this.changeTextColor(isActive ? activeColor : inactiveColor);
             this.drawText(displayText, searchRect.x, rect.y, searchRect.width, 'left');
             this.resetTextColor();
             
@@ -1487,8 +2348,13 @@
                 this._searchText = (this._searchText || '') + event.key;
                 this.refresh();
                 if (this._itemWindow && typeof this._itemWindow.setFilters === 'function') {
-                    const category = this._itemWindow._category || 'all';
-                    this._itemWindow.setFilters(category, this._searchText);
+                    const category = typeof this._itemWindow.currentCategory === 'function'
+                        ? this._itemWindow.currentCategory()
+                        : (this._itemWindow._category || 'all');
+                    const subKey = typeof this._itemWindow.currentSubSectionKey === 'function'
+                        ? this._itemWindow.currentSubSectionKey()
+                        : 'all';
+                    this._itemWindow.setFilters(category, this._searchText, subKey);
                 }
                 if (event.preventDefault) {
                     event.preventDefault();
@@ -1497,8 +2363,13 @@
                 this._searchText = (this._searchText || '').slice(0, -1);
                 this.refresh();
                 if (this._itemWindow && typeof this._itemWindow.setFilters === 'function') {
-                    const category = this._itemWindow._category || 'all';
-                    this._itemWindow.setFilters(category, this._searchText);
+                    const category = typeof this._itemWindow.currentCategory === 'function'
+                        ? this._itemWindow.currentCategory()
+                        : (this._itemWindow._category || 'all');
+                    const subKey = typeof this._itemWindow.currentSubSectionKey === 'function'
+                        ? this._itemWindow.currentSubSectionKey()
+                        : 'all';
+                    this._itemWindow.setFilters(category, this._searchText, subKey);
                 }
                 if (event.preventDefault) {
                     event.preventDefault();

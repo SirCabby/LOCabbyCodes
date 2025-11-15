@@ -10,9 +10,10 @@ DIST_DIR := dist
 STAGE_DIR := $(DIST_DIR)/stage
 PACKAGE_NAME := LOCabbyCodes.v$(VERSION).zip
 PACKAGE_PATH := $(DIST_DIR)/$(PACKAGE_NAME)
+LOG_FILE := $(INSTALL_DIR)/CabbyCodes.log
 POWERSHELL := powershell -NoProfile -Command
 
-.PHONY: help ensure-version check-install deploy rev package ensure-dist clean-dist run stop-game
+.PHONY: help ensure-version check-install deploy rev package ensure-dist clean-dist run stop-game clean-log
 
 help:
 	@echo "CabbyCodes automation"
@@ -102,7 +103,22 @@ stop-game:
 	@echo Stopping Look Outside if running...
 	@taskkill /f /im "Game.exe" >nul 2>&1 || exit /b 0
 
-run: deploy stop-game
+clean-log:
+	@$(POWERSHELL) "& { \
+		$$logPath = '$(LOG_FILE)'; \
+		if (Test-Path -LiteralPath $$logPath) { \
+			try { \
+				Remove-Item -LiteralPath $$logPath -Force; \
+				Write-Host 'Deleted CabbyCodes.log at $(LOG_FILE)'; \
+			} catch { \
+				Write-Warning ('Failed to delete CabbyCodes.log: ' + $$_.Exception.Message); \
+			} \
+		} else { \
+			Write-Host 'CabbyCodes.log not found, nothing to delete.'; \
+		} \
+	}"
+
+run: deploy stop-game clean-log
 	@$(POWERSHELL) "& { \
 		$$steam = '$(STEAM_APP_ID)'; \
 		if (-not [string]::IsNullOrWhiteSpace($$steam)) { \
