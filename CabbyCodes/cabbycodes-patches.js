@@ -17,6 +17,72 @@
         window.CabbyCodes = {};
     }
     
+    // Track applied patches for debugging
+    CabbyCodes._appliedPatches = CabbyCodes._appliedPatches || [];
+    
+    /**
+     * Log patch application for debugging
+     */
+    function logPatch(type, target, functionName, settingKey) {
+        const targetName = target.constructor?.name || 'Unknown';
+        const patchInfo = {
+            type: type,
+            target: targetName,
+            function: functionName,
+            setting: settingKey,
+            timestamp: Date.now()
+        };
+        CabbyCodes._appliedPatches.push(patchInfo);
+        CabbyCodes.log(`[CabbyCodes] Patch applied: ${type} on ${targetName}.${functionName}${settingKey ? ` (setting: ${settingKey})` : ''}`);
+        
+        // Check for duplicate patches
+        const duplicates = CabbyCodes._appliedPatches.filter(p => 
+            p.target === targetName && 
+            p.function === functionName && 
+            p !== patchInfo
+        );
+        if (duplicates.length > 0) {
+            CabbyCodes.warn(`[CabbyCodes] WARNING: Multiple patches detected on ${targetName}.${functionName}:`);
+            duplicates.forEach(dup => {
+                CabbyCodes.warn(`[CabbyCodes]   - ${dup.type} patch applied at ${new Date(dup.timestamp).toISOString()}`);
+            });
+            CabbyCodes.warn(`[CabbyCodes]   - ${type} patch applied now`);
+        }
+    }
+    
+    /**
+     * Get the true original function from the chain
+     * @param {Object} target - The object containing the function
+     * @param {string} functionName - Name of the function
+     * @returns {Function|null} The original function or null if not found
+     */
+    function getTrueOriginal(target, functionName) {
+        if (!target._cabbycodesOriginals) {
+            return null;
+        }
+        
+        // The true original is always stored in _cabbycodesOriginals[functionName]
+        // This is set only on the first override and never overwritten
+        const original = target._cabbycodesOriginals[functionName];
+        if (original && typeof original === 'function') {
+            return original;
+        }
+        
+        return null;
+    }
+    
+    /**
+     * Get the previous function in the override chain
+     * @param {Function} currentFunction - The current function
+     * @returns {Function|null} The previous function in the chain
+     */
+    function getPreviousInChain(currentFunction) {
+        if (currentFunction && currentFunction._cabbycodesIsOverride && currentFunction._cabbycodesOriginal) {
+            return currentFunction._cabbycodesOriginal;
+        }
+        return null;
+    }
+    
     /**
      * Override a function completely
      * @param {Object} target - The object containing the function
@@ -35,16 +101,126 @@
             return; // Setting is disabled, don't apply override
         }
         
-        const original = target[functionName];
-        target[functionName] = newFunction;
+        const currentFunction = target[functionName];
         
-        // Store original for potential restoration
+        // Initialize originals storage if needed
         if (!target._cabbycodesOriginals) {
             target._cabbycodesOriginals = {};
         }
-        target._cabbycodesOriginals[functionName] = original;
         
-        CabbyCodes.log(`[CabbyCodes] Overridden: ${functionName}`);
+        // If this is the first override, store the true original
+        if (!target._cabbycodesOriginals[functionName]) {
+            target._cabbycodesOriginals[functionName] = currentFunction;
+        }
+        
+        // Check if current function is already an override
+        const isCurrentAnOverride = currentFunction._cabbycodesIsOverride === true;
+        
+        // Create a wrapper that chains properly
+        // If current is an override, we need to make sure our override can call it via callPrevious
+        const chainedFunction = function(...args) {
+            // Call the new override function
+            // The new override can use callOriginal to get the true original,
+            // or callPrevious to get the previous override in the chain
+            return newFunction.apply(this, args);
+        };
+        
+        // Mark this as an override and store the previous function in the chain
+        chainedFunction._cabbycodesIsOverride = true;
+        chainedFunction._cabbycodesOriginal = currentFunction;
+        
+        // Wrap the chained function with debugging if available
+        const wrappedFunction = (typeof CabbyCodes.debugWrap === 'function') 
+            ? CabbyCodes.debugWrap(target, functionName, chainedFunction)
+            : chainedFunction;
+        
+        // Preserve the override marker
+        if (wrappedFunction !== chainedFunction) {
+            wrappedFunction._cabbycodesIsOverride = true;
+            wrappedFunction._cabbycodesOriginal = currentFunction;
+        }
+        
+        target[functionName] = wrappedFunction;
+        
+        logPatch('override', target, functionName, settingKey);
+    };
+    
+    /**
+     * Helper function to call the original function from within an override
+     * This properly handles chained overrides by calling the previous override
+     * in the chain if one exists, otherwise the true original
+     * @param {Object} target - The object containing the function
+     * @param {string} functionName - Name of the function
+     * @param {Object} context - The 'this' context to use
+     * @param {Array} args - Arguments to pass to the original function
+     * @returns {*} The return value of the original function
+     */
+    CabbyCodes.callOriginal = function(target, functionName, context, args) {
+        // Get the current function (which is the override calling this)
+        // This might be wrapped by debugWrap, so we need to follow the chain
+        let currentFunction = target[functionName];
+        
+        // If the current function is wrapped by debugWrap, we need to get the actual override
+        // The debug wrapper should have _cabbycodesOriginal pointing to the chained function
+        // Check for debug wrapper explicitly using _cabbycodesDebugWrapped
+        while (currentFunction && currentFunction._cabbycodesDebugWrapped && 
+               currentFunction._cabbycodesOriginal) {
+            // This is a debug wrapper, unwrap to get the actual override
+            currentFunction = currentFunction._cabbycodesOriginal;
+        }
+        
+        // Now currentFunction should be the actual override (or original if no overrides)
+        // If current function is an override, try to get the previous in chain
+        const previous = getPreviousInChain(currentFunction);
+        if (previous && typeof previous === 'function') {
+            // Call the previous override in the chain
+            return previous.apply(context, args);
+        }
+        
+        // No previous override, call the true original
+        const original = getTrueOriginal(target, functionName);
+        if (original && typeof original === 'function') {
+            return original.apply(context, args);
+        }
+        
+        return undefined;
+    };
+    
+    /**
+     * Helper function to call the true original function, bypassing all overrides
+     * Use this when you specifically need the original game function, not any overrides
+     * @param {Object} target - The object containing the function
+     * @param {string} functionName - Name of the function
+     * @param {Object} context - The 'this' context to use
+     * @param {Array} args - Arguments to pass to the original function
+     * @returns {*} The return value of the original function
+     */
+    CabbyCodes.callTrueOriginal = function(target, functionName, context, args) {
+        const original = getTrueOriginal(target, functionName);
+        if (original && typeof original === 'function') {
+            return original.apply(context, args);
+        }
+        
+        return undefined;
+    };
+    
+    /**
+     * Helper function to call the previous override in the chain
+     * This allows overrides to call the previous override instead of the true original
+     * @param {Object} target - The object containing the function
+     * @param {string} functionName - Name of the function
+     * @param {Object} context - The 'this' context to use
+     * @param {Array} args - Arguments to pass to the previous function
+     * @returns {*} The return value of the previous function
+     */
+    CabbyCodes.callPrevious = function(target, functionName, context, args) {
+        const currentFunction = target[functionName];
+        const previous = getPreviousInChain(currentFunction);
+        if (previous && typeof previous === 'function') {
+            return previous.apply(context, args);
+        }
+        // If no previous override, fall back to true original
+        return CabbyCodes.callOriginal(target, functionName, context, args);
     };
     
     /**
@@ -67,12 +243,19 @@
         
         const original = target[functionName];
         
-        target[functionName] = function(...args) {
+        const wrappedFunction = function(...args) {
             // Run the hook function first
             hookFunction.apply(this, args);
             // Then run the original function
             return original.apply(this, args);
         };
+        
+        // Wrap with debugging if available
+        const finalFunction = (typeof CabbyCodes.debugWrap === 'function')
+            ? CabbyCodes.debugWrap(target, functionName, wrappedFunction)
+            : wrappedFunction;
+        
+        target[functionName] = finalFunction;
         
         // Store original for potential restoration
         if (!target._cabbycodesOriginals) {
@@ -80,7 +263,7 @@
         }
         target._cabbycodesOriginals[functionName] = original;
         
-        CabbyCodes.log(`[CabbyCodes] Before hook added: ${functionName}`);
+        logPatch('before', target, functionName, settingKey);
     };
     
     /**
@@ -103,7 +286,7 @@
         
         const original = target[functionName];
         
-        target[functionName] = function(...args) {
+        const wrappedFunction = function(...args) {
             // Run the original function first
             const result = original.apply(this, args);
             // Then run the hook function
@@ -112,13 +295,20 @@
             return result;
         };
         
+        // Wrap with debugging if available
+        const finalFunction = (typeof CabbyCodes.debugWrap === 'function')
+            ? CabbyCodes.debugWrap(target, functionName, wrappedFunction)
+            : wrappedFunction;
+        
+        target[functionName] = finalFunction;
+        
         // Store original for potential restoration
         if (!target._cabbycodesOriginals) {
             target._cabbycodesOriginals = {};
         }
         target._cabbycodesOriginals[functionName] = original;
         
-        CabbyCodes.log(`[CabbyCodes] After hook added: ${functionName}`);
+        logPatch('after', target, functionName, settingKey);
     };
     
     /**
@@ -135,7 +325,30 @@
         target[functionName] = target._cabbycodesOriginals[functionName];
         delete target._cabbycodesOriginals[functionName];
         
+        // Remove from patch tracking
+        const targetName = target.constructor?.name || 'Unknown';
+        CabbyCodes._appliedPatches = CabbyCodes._appliedPatches.filter(p => 
+            !(p.target === targetName && p.function === functionName)
+        );
+        
         CabbyCodes.log(`[CabbyCodes] Restored: ${functionName}`);
+    };
+    
+    /**
+     * Get list of all applied patches (for debugging)
+     */
+    CabbyCodes.getAppliedPatches = function() {
+        return CabbyCodes._appliedPatches.slice();
+    };
+    
+    /**
+     * Log all applied patches (for debugging)
+     */
+    CabbyCodes.logAppliedPatches = function() {
+        CabbyCodes.log(`[CabbyCodes] Applied patches (${CabbyCodes._appliedPatches.length} total):`);
+        CabbyCodes._appliedPatches.forEach((patch, idx) => {
+            CabbyCodes.log(`[CabbyCodes]   ${idx + 1}. ${patch.type} on ${patch.target}.${patch.function}${patch.setting ? ` (${patch.setting})` : ''}`);
+        });
     };
     
     CabbyCodes.log('[CabbyCodes] Patches module loaded');

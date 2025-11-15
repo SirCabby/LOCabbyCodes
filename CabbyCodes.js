@@ -25,6 +25,7 @@
         const scripts = [
             'cabbycodes-core.js',
             'cabbycodes-logger.js',
+            'cabbycodes-debug.js',
             'cabbycodes-patches.js',
             'cabbycodes-session-state.js',
             'cabbycodes-settings.js',

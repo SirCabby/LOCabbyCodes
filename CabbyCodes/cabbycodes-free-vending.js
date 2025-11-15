@@ -22,13 +22,17 @@
     const settingKey = 'freeVendingMachines';
     const COST_VARIABLE_ID = 229;
     const isFeatureEnabled = () => CabbyCodes.getSetting(settingKey, false);
-    const callOriginal = (target, functionName, context, args) => {
-        const originals = target._cabbycodesOriginals;
-        if (originals && typeof originals[functionName] === 'function') {
-            return originals[functionName].apply(context, args);
-        }
-        return undefined;
-    };
+    
+    // Use CabbyCodes.callOriginal if available, otherwise fall back to manual lookup
+    const callOriginal = (typeof CabbyCodes.callOriginal === 'function')
+        ? CabbyCodes.callOriginal
+        : (target, functionName, context, args) => {
+            const originals = target._cabbycodesOriginals;
+            if (originals && typeof originals[functionName] === 'function') {
+                return originals[functionName].apply(context, args);
+            }
+            return undefined;
+        };
 
     CabbyCodes.registerSetting(
         settingKey,

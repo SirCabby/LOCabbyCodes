@@ -38,6 +38,7 @@
 
     /**
      * Safely invokes the original implementation that was overridden.
+     * Uses CabbyCodes.callOriginal if available for proper chaining support.
      * @param {Object} targetPrototype
      * @param {string} functionName
      * @param {Object} context
@@ -45,6 +46,11 @@
      * @returns {*}
      */
     function callOriginal(targetPrototype, functionName, context, args) {
+        // Use CabbyCodes.callOriginal if available (supports chained overrides)
+        if (typeof CabbyCodes.callOriginal === 'function') {
+            return CabbyCodes.callOriginal(targetPrototype, functionName, context, args);
+        }
+        // Fallback to manual lookup
         const originals = targetPrototype._cabbycodesOriginals;
         if (originals && typeof originals[functionName] === 'function') {
             return originals[functionName].apply(context, args);

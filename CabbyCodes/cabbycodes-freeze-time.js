@@ -44,19 +44,31 @@
         return timeVariableIds.includes(numericId);
     }
 
-    if (Game_Variables.prototype._cabbycodesFreezeTimeWrapped !== true) {
-        Game_Variables.prototype._cabbycodesFreezeTimeWrapped = true;
-        const previousSetValue = Game_Variables.prototype.setValue;
+    // Use CabbyCodes.callOriginal if available, otherwise fall back to manual lookup
+    const callOriginal = (typeof CabbyCodes.callOriginal === 'function')
+        ? CabbyCodes.callOriginal
+        : (target, functionName, context, args) => {
+            const originals = target._cabbycodesOriginals;
+            if (originals && typeof originals[functionName] === 'function') {
+                return originals[functionName].apply(context, args);
+            }
+            return undefined;
+        };
 
-        Game_Variables.prototype.setValue = function(variableId, value) {
+    CabbyCodes.override(
+        Game_Variables.prototype,
+        'setValue',
+        function(variableId, value) {
             if (shouldBlock(variableId)) {
                 return this.value(Number(variableId));
             }
-            return previousSetValue.apply(this, arguments);
-        };
-    } else {
-        CabbyCodes.warn('[CabbyCodes] Freeze Time patch already applied; skipping duplicate wrap.');
-    }
+            return callOriginal(Game_Variables.prototype, 'setValue', this, [
+                variableId,
+                value
+            ]);
+        },
+        settingKey
+    );
 
     CabbyCodes.log('[CabbyCodes] Freeze Time module loaded');
 })();
