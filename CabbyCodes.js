@@ -28,7 +28,8 @@
             'cabbycodes-patches.js',
             'cabbycodes-settings.js',
             'cabbycodes-invincibility.js',
-            'cabbycodes-stamina.js'
+            'cabbycodes-stamina.js',
+            'cabbycodes-infinite-consumables.js'
         ];
         
         scripts.forEach((scriptName) => {

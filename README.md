@@ -145,6 +145,8 @@ This is the most important step. You need to add the CabbyCodes plugin to the ga
 ## Current Features
 
 - **Invincibility Toggle:** Adds an "Invincibility" option to the CabbyCodes section of the Options menu. When enabled, any actor currently in the player's party is prevented from losing HP through combat damage, poison/regen ticks, scripted deaths, or other harmful effects. Toggle it on/off at any time while playing.
+- **Stamina Control:** Prevents party actors from spending MP (stamina) when using skills, letting you cast freely without worrying about resource management.
+- **Infinite Consumables:** Adds an option that keeps consumable item counts (healing items, ammo, thrown objects, cooking ingredients, etc.) from decreasing. You can still pick up more, but using them no longer consumes inventory.
 
 ## Troubleshooting
 
@@ -212,7 +214,9 @@ C:\Program Files (x86)\Steam\steamapps\common\Look Outside\
 │   │   │   ├── cabbycodes-logger.js
 │   │   │   ├── cabbycodes-patches.js
 │   │   │   ├── cabbycodes-settings.js
-│   │   │   └── cabbycodes-invincibility.js
+│   │   │   ├── cabbycodes-invincibility.js
+│   │   │   ├── cabbycodes-stamina.js
+│   │   │   └── cabbycodes-infinite-consumables.js
 │   │   ├── plugins.js              ← You modified this file
 │   │   └── (other existing plugins...)
 │   └── (other game files...)
