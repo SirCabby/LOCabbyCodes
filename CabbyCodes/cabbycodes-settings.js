@@ -135,6 +135,21 @@
     function isCabbyCodesSymbol(symbol) {
         return typeof symbol === 'string' && symbol.startsWith(SETTING_SYMBOL_PREFIX);
     }
+
+    function shouldDisplayCabbyCodesOptions() {
+        if (typeof CabbyCodes.canShowCabbyCodesOptions === 'function') {
+            try {
+                return Boolean(CabbyCodes.canShowCabbyCodesOptions());
+            } catch (error) {
+                CabbyCodes.warn(`[CabbyCodes] Failed to check options visibility: ${error?.message || error}`);
+                return false;
+            }
+        }
+        if (typeof $gameParty !== 'undefined' && typeof $gameParty.members === 'function') {
+            return $gameParty.members().length > 0;
+        }
+        return false;
+    }
     
     /**
      * Applies a value change for a setting, invoking callbacks as needed.
@@ -199,6 +214,10 @@
     const _Window_Options_addGeneralOptions = Window_Options.prototype.addGeneralOptions;
     Window_Options.prototype.addGeneralOptions = function() {
         _Window_Options_addGeneralOptions.call(this);
+        
+        if (!shouldDisplayCabbyCodesOptions()) {
+            return;
+        }
         
         CabbyCodes.settingsRegistry.forEach(setting => {
             this.addCommand(setting.displayName, cabbyCodesSymbol(setting.key), true);

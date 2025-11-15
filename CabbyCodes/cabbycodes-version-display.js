@@ -27,6 +27,25 @@
     const CABBYCODES_LABEL = 'CabbyCodes';
     const CABBYCODES_LABEL_COLOR = '#3f82ff';
 
+    function cabbyCodesOptionsAreVisible() {
+        if (typeof CabbyCodes.canShowCabbyCodesOptions === 'function') {
+            try {
+                return Boolean(CabbyCodes.canShowCabbyCodesOptions());
+            } catch (error) {
+                CabbyCodes.warn?.(`[CabbyCodes] Option visibility error: ${error?.message || error}`);
+                return false;
+            }
+        }
+        return false;
+    }
+
+    function cabbyCodesOptionCount() {
+        if (!Array.isArray(CabbyCodes.settingsRegistry)) {
+            return 0;
+        }
+        return cabbyCodesOptionsAreVisible() ? CabbyCodes.settingsRegistry.length : 0;
+    }
+
     function desiredOptionsWidth() {
         const available = Math.max(0, Graphics.boxWidth - OPTIONS_SIDE_PADDING * 2);
         return Math.min(OPTIONS_MAX_WIDTH, available);
@@ -104,8 +123,7 @@
         const base = typeof _Scene_Options_maxCommands === 'function'
             ? _Scene_Options_maxCommands.call(this)
             : 7;
-        const extra = Array.isArray(CabbyCodes.settingsRegistry) ? CabbyCodes.settingsRegistry.length : 0;
-        return base + extra;
+        return base + cabbyCodesOptionCount();
     });
 
     const _Scene_Options_maxVisibleCommands = Scene_Options.prototype.maxVisibleCommands;
@@ -128,7 +146,7 @@
      * Calculates and creates the version window for Scene_Options.
      */
     Scene_Options.prototype.createCabbyCodesVersionWindow = function() {
-        if (this._cabbyCodesVersionWindow) {
+        if (this._cabbyCodesVersionWindow || !cabbyCodesOptionsAreVisible()) {
             return;
         }
         const rect = this.cabbyCodesVersionWindowRect();

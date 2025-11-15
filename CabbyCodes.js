@@ -26,6 +26,7 @@
             'cabbycodes-core.js',
             'cabbycodes-logger.js',
             'cabbycodes-patches.js',
+            'cabbycodes-session-state.js',
             'cabbycodes-settings.js',
             'cabbycodes-version-display.js',
             'cabbycodes-infinite-money.js',
