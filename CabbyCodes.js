@@ -32,7 +32,8 @@
             'cabbycodes-stamina.js',
             'cabbycodes-infinite-consumables.js',
             'cabbycodes-unbreakable-items.js',
-            'cabbycodes-friendly-door-visitors.js'
+            'cabbycodes-friendly-door-visitors.js',
+            'cabbycodes-free-vending.js'
         ];
         
         scripts.forEach((scriptName) => {
