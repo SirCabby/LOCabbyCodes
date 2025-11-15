@@ -40,7 +40,8 @@
             'cabbycodes-free-vending.js',
             'cabbycodes-doorbell.js',
             'cabbycodes-freeze-time.js',
-            'cabbycodes-freeze-hygiene.js'
+            'cabbycodes-freeze-hygiene.js',
+            'cabbycodes-item-giver.js'
         ];
         
         scripts.forEach((scriptName) => {

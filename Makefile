@@ -99,13 +99,8 @@ package: ensure-version ensure-dist
 	}"
 
 stop-game:
-	@$(POWERSHELL) "& { \
-		Write-Host 'Stopping Look Outside if running...'; \
-		$$names = @('Look Outside.exe','LookOutside.exe'); \
-		foreach ($$name in $$names) { \
-			cmd /c \"taskkill /F /IM \"\"$${name}\"\" >nul 2>&1\" | Out-Null \
-		} \
-	}"
+	@echo Stopping Look Outside if running...
+	@taskkill /f /im "Game.exe" >nul 2>&1 || exit /b 0
 
 run: deploy stop-game
 	@$(POWERSHELL) "& { \
