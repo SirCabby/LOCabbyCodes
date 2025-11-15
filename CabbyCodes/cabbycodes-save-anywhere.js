@@ -78,6 +78,27 @@
         }
     );
 
+    /**
+     * Override Window_MenuCommand.addSaveCommand to bypass gSw(37) check when feature is enabled
+     * This ensures the save command appears in the menu even on higher difficulties
+     */
+    CabbyCodes.override(
+        Window_MenuCommand.prototype,
+        'addSaveCommand',
+        function() {
+            if (isFeatureEnabled()) {
+                // When feature is enabled, bypass the gSw(37) check and always add save command
+                if (this.needsCommand("save")) {
+                    const enabled = this.isSaveEnabled();
+                    this.addCommand(TextManager.save, "save", enabled);
+                }
+            } else {
+                // Call original implementation (which may include gSw(37) check from other plugins)
+                return CabbyCodes.callOriginal(Window_MenuCommand.prototype, 'addSaveCommand', this, []);
+            }
+        }
+    );
+
     CabbyCodes.log('[CabbyCodes] Save anywhere patch loaded');
 })();
 
