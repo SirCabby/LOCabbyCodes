@@ -1853,12 +1853,13 @@
         this.resetItemListPosition();
         this.refreshSubtypeDropdownState();
         this._subtypeDropdown.setValue('All');
+        this._subtypeDropdown.setKey('all');
         this.closeDropdownList();
-        if (!this._subtypeDropdown._disabled) {
-            this._subtypeDropdown.activate();
-            this._subtypeDropdown.select(0);
-        } else if (this._itemWindow) {
+        if (this._itemWindow) {
             this._itemWindow.activate();
+        } else if (this._typeDropdown && !this._typeDropdown._disabled) {
+            this._typeDropdown.activate();
+            this._typeDropdown.select(0);
         }
     };
 
