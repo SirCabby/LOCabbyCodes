@@ -145,6 +145,7 @@ This is the most important step. You need to add the CabbyCodes plugin to the ga
 ## Current Features
 
 - **Invincibility Toggle:** Adds an "Invincibility" option to the CabbyCodes section of the Options menu. When enabled, any actor currently in the player's party is prevented from losing HP through combat damage, poison/regen ticks, scripted deaths, or other harmful effects. Toggle it on/off at any time while playing.
+- **Always Escape Battles:** Guarantees that the Escape party command succeeds instantly, bypassing the normal escape ratio so you can bail out of encounters without relying on luck.
 - **Stamina Control:** Prevents party actors from spending MP (stamina) when using skills, letting you cast freely without worrying about resource management.
 - **Infinite Consumables:** Adds an option that keeps consumable item counts (healing items, ammo, thrown objects, cooking ingredients, etc.) from decreasing. You can still pick up more, but using them no longer consumes inventory.
 - **Unbreakable Items:** Adds a toggle that stops weapons (and any other breakable gear) from losing durability when you attack or when enemies use weapon-breaking abilities. Keep your favorite equipment intact regardless of difficulty or special encounters.
@@ -152,6 +153,7 @@ This is the most important step. You need to add the CabbyCodes plugin to the ga
 - **Send Next Door Visitor:** Adds a one-press option that immediately schedules the next queued (or freshly rolled) knock visitor so you can trigger door events on demand.
 - **Free Vending Machines:** Instantly bypass the coin slot mini-game so every vending machine interaction jumps right to the purchase menu with a price of zero.
 - **Freeze Time of Day:** Locks the in-game time variable so wandering, minigames, or scripted sequences no longer push the clock forward while enabled.
+- **Video Games Cost No Time:** Lets you enjoy every console game in your apartment without advancing the in-game clock. The option automatically rewinds the time-of-day variable after each gaming session so the rest of the world remains in sync.
 - **Freeze Hygiene Decay:** Stops the hygiene stat and the hidden bad-breath counter from dropping (hourly ticks, scripted penalties, etc.) while leaving showers, brushing, gum, and other increases untouched so you can stay fresh indefinitely.
 
 ## Troubleshooting

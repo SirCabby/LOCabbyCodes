@@ -304,7 +304,9 @@
     Window_CabbyCodesDropdownButton.prototype.constructor = Window_CabbyCodesDropdownButton;
 
     Window_CabbyCodesDropdownButton.prototype.standardPadding = function() {
-        return ITEM_GIVER_UI_CONSTANTS.dropdownPadding;
+        const outerPadding = ITEM_GIVER_UI_CONSTANTS.dropdownPadding;
+        // Give the contents a little less padding than the outer frame so text can center
+        return Math.max(0, outerPadding - 4);
     };
 
     Window_CabbyCodesDropdownButton.prototype.initialize = function(rect, label, placeholder) {
@@ -314,6 +316,7 @@
         this._valueText = '';
         this._currentKey = 'all';
         this._disabled = false;
+        this.padding = this.standardPadding();
         this.setBackgroundType(0);
         this.opacity = 255;
         this.deactivate();
@@ -355,15 +358,19 @@
     };
 
     Window_CabbyCodesDropdownButton.prototype.drawItem = function(index) {
-        const rect = this.itemLineRect(index);
+        const rect = this.baseRect();
+        const textY = rect.y + this._verticalTextOffset();
+        const horizontalPadding = this.standardPadding();
+        const textWidth = Math.max(0, rect.width - horizontalPadding * 2);
+        const labelX = rect.x + horizontalPadding;
         this.drawBackground();
         this.resetTextColor();
         this.changeTextColor(this.systemColor());
-        this.drawText(`${this._label}:`, rect.x, rect.y, rect.width, 'left');
+        this.drawText(`${this._label}:`, labelX, textY, textWidth, 'left');
         this.resetTextColor();
         this.changePaintOpacity(!this._disabled);
         const text = this._valueText || this._placeholder;
-        this.drawText(text, rect.x, rect.y, rect.width, 'right');
+        this.drawText(text, labelX, textY, textWidth, 'right');
         this.changePaintOpacity(true);
     };
 
@@ -405,7 +412,26 @@
     };
 
     Window_CabbyCodesDropdownButton.prototype.baseRect = function() {
-        return new Rectangle(0, 0, this.contentsWidth(), this.contentsHeight());
+        return new Rectangle(0, 0, this.innerWidth, this.innerHeight);
+    };
+
+    Window_CabbyCodesDropdownButton.prototype._verticalTextOffset = function() {
+        const rect = this.baseRect();
+        const available = rect.height;
+        const lineHeight = this.lineHeight();
+        if (available <= lineHeight) {
+            return 0;
+        }
+        return Math.floor((available - lineHeight) / 2);
+    };
+
+    Window_CabbyCodesDropdownButton.prototype.updateArrows = function() {
+        this.downArrowVisible = false;
+        this.upArrowVisible = false;
+    };
+
+    Window_CabbyCodesDropdownButton.prototype.ensureCursorVisible = function() {
+        this.scrollTo(0, 0);
     };
 
     /**
@@ -424,9 +450,26 @@
         Window_Selectable.prototype.initialize.call(this, rect);
         this._options = [];
         this._maxVisibleItems = 6;
-        this.openness = 0;
+        this._opening = false;
+        this._closing = false;
+        this.openness = 255;
         this.hide();
         this.deactivate();
+    };
+
+    Window_CabbyCodesDropdownList.prototype.open = function() {
+        this._opening = false;
+        this._closing = false;
+        this.openness = 255;
+        this.show();
+        return this;
+    };
+
+    Window_CabbyCodesDropdownList.prototype.close = function() {
+        this._opening = false;
+        this._closing = false;
+        this.hide();
+        return this;
     };
 
     Window_CabbyCodesDropdownList.prototype.maxItems = function() {
@@ -480,6 +523,11 @@
         } else {
             this.playBuzzerSound();
         }
+    };
+
+    Window_CabbyCodesDropdownList.prototype.updateArrows = function() {
+        this.downArrowVisible = false;
+        this.upArrowVisible = false;
     };
 
     /**
@@ -1604,8 +1652,8 @@
             : (typeof Window_Base !== 'undefined' && typeof Window_Base.prototype.lineHeight === 'function'
                 ? Window_Base.prototype.lineHeight()
                 : 36);
-        const padding = ITEM_GIVER_UI_CONSTANTS.dropdownPadding;
-        return lineHeight + padding * 2;
+        const padding = Math.max(4, ITEM_GIVER_UI_CONSTANTS.dropdownPadding - 2);
+        return lineHeight + padding;
     };
 
     Scene_CabbyCodesItemGiver.prototype.searchWindowHeight = function() {

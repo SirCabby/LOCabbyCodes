@@ -33,6 +33,7 @@
             'cabbycodes-save-anywhere.js',
             'cabbycodes-infinite-money.js',
             'cabbycodes-invincibility.js',
+            'cabbycodes-always-escape.js',
             'cabbycodes-stamina.js',
             'cabbycodes-infinite-consumables.js',
             'cabbycodes-unbreakable-items.js',

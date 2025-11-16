@@ -21,7 +21,28 @@
     }
 
     const settingKey = 'freezeTimeOfDay';
-    const defaultTimeVariableIds = [];
+    const videoGameSettingKey = 'videoGamesNoTimeCost';
+    const defaultTimeVariableIds = [
+        10, // Clock pendulum / animation state
+        12, // Time display string (HH:MM)
+        13, // Day segment tracker
+        16, // Hour of day
+        17, // Minute of day
+        18, // Travel fatigue accumulator
+        19, // Minutes to advance
+        48, // Door event timer
+        49, // Door event label
+        50, // Door hour slot
+        51, // Door minute slot
+        67, // Door encounter type
+        112, // Encounter danger modifier (time-based)
+        122, // Time-of-day bucket
+        617 // Door cooldown tracker
+    ];
+    const defaultTimeSwitchIds = [
+        24 // Door knock pending flag
+    ];
+    const sentinelVariableIds = [16, 17, 122];
     const trackedVariableIds = new Set(defaultTimeVariableIds);
     const frozenValues = {};
 
@@ -35,6 +56,17 @@
     const detectionState = {
         hits: Object.create(null)
     };
+
+    const interpreterStack = [];
+    const interpreterThawStates = new WeakMap();
+    const videoGameCommonEventId = 12;
+    const videoGameInterpreterFlag = '_cabbycodesVideoGameCommonEvent';
+    let timeDataInitialized = false;
+    let pendingFreezeCaptureTimer = null;
+    let freezeCaptureRequested = false;
+    let activeSuspensions = 0;
+    let videoGameSuspension = null;
+    let freezeSessionId = 0;
 
     const initializationWindowMs = 5000;
     let freezeActivatedAt = 0;
@@ -54,20 +86,45 @@
     }
 
     function captureFrozenValues() {
+        if (!timeDataInitialized) {
+            return false;
+        }
+        if (typeof $gameVariables === 'undefined' || !$gameVariables) {
+            return false;
+        }
         trackedVariableIds.forEach(varId => {
-            if (typeof $gameVariables !== 'undefined' && $gameVariables) {
-                frozenValues[varId] = getTrueOriginalValue($gameVariables, varId);
-            }
+            frozenValues[varId] = getTrueOriginalValue($gameVariables, varId);
         });
+        return true;
+    }
+
+    function requestCaptureFrozenValues() {
+        freezeCaptureRequested = true;
+        if (captureFrozenValues()) {
+            freezeCaptureRequested = false;
+            return;
+        }
+        if (pendingFreezeCaptureTimer !== null) {
+            return;
+        }
+        pendingFreezeCaptureTimer = setTimeout(() => {
+            pendingFreezeCaptureTimer = null;
+            requestCaptureFrozenValues();
+        }, 250);
+    }
+
+    function canEnforceTimeLock() {
+        return timeDataInitialized && isAnyTimeLockActive();
     }
 
     CabbyCodes.registerSetting(settingKey, 'Freeze Time of Day', {
         defaultValue: false,
         order: 60,
         onChange: newValue => {
+            freezeSessionId += 1;
             if (newValue) {
                 freezeActivatedAt = nowMs();
-                setTimeout(() => captureFrozenValues(), 0);
+                requestCaptureFrozenValues();
             } else {
                 freezeActivatedAt = 0;
                 trackedVariableIds.forEach(varId => {
@@ -77,8 +134,37 @@
         }
     });
 
+    CabbyCodes.registerSetting(videoGameSettingKey, 'Video Games Cost No Time', {
+        defaultValue: false,
+        order: 61
+    });
+
+    function isFreezeSettingActive() {
+        return CabbyCodes.getSetting(settingKey, false);
+    }
+
+    function isVideoGameCheatEnabled() {
+        return CabbyCodes.getSetting(videoGameSettingKey, false);
+    }
+
+    function isTrackingEnabled() {
+        return isFreezeSettingActive() || isVideoGameCheatEnabled();
+    }
+
+    function shouldControlVideoGameTime() {
+        return isFreezeSettingActive() || isVideoGameCheatEnabled();
+    }
+
+    function isVideoGameBlockActive() {
+        return Boolean(videoGameSuspension && videoGameSuspension.blockActive);
+    }
+
+    function isAnyTimeLockActive() {
+        return isFreezeEnabled() || isVideoGameBlockActive();
+    }
+
     function shouldBlock(variableId) {
-        if (!CabbyCodes.getSetting(settingKey, false)) {
+        if (!canEnforceTimeLock()) {
             return false;
         }
         const numericId = Number(variableId);
@@ -101,9 +187,262 @@
     const getTrueOriginalValue = (function() {
         const originalValue = Game_Variables.prototype.value;
         return function(instance, variableId) {
+            if (instance && instance._cabbycodesRawVariables) {
+                const raw = instance._cabbycodesRawVariables;
+                const index = Number(variableId);
+                if (Number.isFinite(index)) {
+                    const stored = raw[index];
+                    return typeof stored === 'undefined' ? 0 : stored;
+                }
+            }
             return originalValue.call(instance, variableId);
         };
     })();
+
+    function isFreezeEnabled() {
+        if (!isFreezeSettingActive()) {
+            return false;
+        }
+        return activeSuspensions === 0;
+    }
+
+    function getOwningInterpreter() {
+        if (interpreterStack.length === 0) {
+            return null;
+        }
+        return interpreterStack[interpreterStack.length - 1];
+    }
+
+    function getInterpreterState(interpreter) {
+        if (!interpreter) {
+            return null;
+        }
+        let state = interpreterThawStates.get(interpreter);
+        if (!state || state.sessionId !== freezeSessionId) {
+            state = {
+                sessionId: freezeSessionId,
+                variables: new Map()
+            };
+            interpreterThawStates.set(interpreter, state);
+        }
+        return state;
+    }
+
+    function ensureFrozenValue(varId, fallbackValue) {
+        if (!Number.isFinite(varId)) {
+            return 0;
+        }
+        if (!Object.prototype.hasOwnProperty.call(frozenValues, varId)) {
+            if (Number.isFinite(fallbackValue)) {
+                frozenValues[varId] = fallbackValue;
+            } else if (typeof $gameVariables !== 'undefined' && $gameVariables) {
+                frozenValues[varId] = getTrueOriginalValue($gameVariables, varId);
+            } else {
+                frozenValues[varId] = 0;
+            }
+        }
+        return frozenValues[varId];
+    }
+
+    function updateTimeInitializationStatus(varId, value) {
+        if (timeDataInitialized) {
+            return;
+        }
+        if (!sentinelVariableIds.includes(varId)) {
+            return;
+        }
+        const numericValue = Number(value);
+        if (!Number.isFinite(numericValue)) {
+            return;
+        }
+        if (numericValue <= 0) {
+            return;
+        }
+        timeDataInitialized = true;
+        if (freezeCaptureRequested) {
+            requestCaptureFrozenValues();
+        }
+    }
+
+    function tryEstablishTemporaryThaw(varId, previousValue) {
+        const interpreter = getOwningInterpreter();
+        if (!interpreter) {
+            return false;
+        }
+        const state = getInterpreterState(interpreter);
+        if (!state) {
+            return false;
+        }
+        if (!state.variables.has(varId)) {
+            state.variables.set(varId, ensureFrozenValue(varId, previousValue));
+        }
+        return true;
+    }
+
+    function hasActiveThaw(varId) {
+        for (let i = interpreterStack.length - 1; i >= 0; i--) {
+            const interpreter = interpreterStack[i];
+            const state = interpreterThawStates.get(interpreter);
+            if (state && state.sessionId === freezeSessionId && state.variables.has(varId)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    function shouldReturnFrozenValue(numericId) {
+        if (!Number.isFinite(numericId)) {
+            return false;
+        }
+        if (!canEnforceTimeLock()) {
+            return false;
+        }
+        if (!trackedVariableIds.has(numericId)) {
+            return false;
+        }
+        if (!Object.prototype.hasOwnProperty.call(frozenValues, numericId)) {
+            return false;
+        }
+        return !hasActiveThaw(numericId);
+    }
+
+    function releaseInterpreterState(interpreter) {
+        const state = interpreterThawStates.get(interpreter);
+        if (!state) {
+            return;
+        }
+        interpreterThawStates.delete(interpreter);
+        if (state.sessionId !== freezeSessionId || !isFreezeEnabled()) {
+            return;
+        }
+        if (typeof $gameVariables === 'undefined' || !$gameVariables) {
+            return;
+        }
+        state.variables.forEach((baseline, varId) => {
+            if (!Number.isFinite(varId)) {
+                return;
+            }
+            const restoreValue = Number.isFinite(baseline) ? baseline : 0;
+            try {
+                callOriginal(Game_Variables.prototype, 'setValue', $gameVariables, [
+                    varId,
+                    restoreValue
+                ]);
+            } catch (error) {
+                console.error('[CabbyCodes] Failed to restore frozen variable', varId, error);
+            }
+        });
+    }
+
+    function captureTrackedValuesSnapshot() {
+        const snapshot = new Map();
+        if (typeof $gameVariables === 'undefined' || !$gameVariables) {
+            return snapshot;
+        }
+        trackedVariableIds.forEach(varId => {
+            snapshot.set(varId, getTrueOriginalValue($gameVariables, varId));
+        });
+        return snapshot;
+    }
+
+    function captureTimeSwitchSnapshot() {
+        const snapshot = new Map();
+        if (typeof $gameSwitches === 'undefined' || !$gameSwitches) {
+            return snapshot;
+        }
+        defaultTimeSwitchIds.forEach(switchId => {
+            snapshot.set(switchId, $gameSwitches.value(switchId));
+        });
+        return snapshot;
+    }
+
+    function restoreSwitchSnapshot(snapshot) {
+        if (!snapshot || snapshot.size === 0) {
+            return;
+        }
+        if (typeof $gameSwitches === 'undefined' || !$gameSwitches) {
+            return;
+        }
+        snapshot.forEach((value, switchId) => {
+            try {
+                $gameSwitches.setValue(switchId, value);
+            } catch (error) {
+                console.error('[CabbyCodes] Failed to restore switch', switchId, error);
+            }
+        });
+    }
+
+    function applySnapshot(snapshot) {
+        if (!snapshot || snapshot.size === 0) {
+            return;
+        }
+        if (typeof $gameVariables === 'undefined' || !$gameVariables) {
+            return;
+        }
+        if (snapshot.size > 0) {
+            timeDataInitialized = true;
+        }
+        snapshot.forEach((value, varId) => {
+            if (!Number.isFinite(varId)) {
+                return;
+            }
+            try {
+                callOriginal(Game_Variables.prototype, 'setValue', $gameVariables, [varId, value]);
+                frozenValues[varId] = value;
+            } catch (error) {
+                console.error('[CabbyCodes] Failed to apply freeze snapshot', varId, error);
+            }
+        });
+    }
+
+    function beginVideoGameSuspension() {
+        if (videoGameSuspension || !shouldControlVideoGameTime() || !timeDataInitialized) {
+            return;
+        }
+        const freezeWasActive = isFreezeEnabled();
+        const shouldBlock = isVideoGameCheatEnabled();
+        const snapshot = captureTrackedValuesSnapshot();
+        const switchSnapshot = captureTimeSwitchSnapshot();
+        videoGameSuspension = {
+            snapshot,
+            freezeSuspended: freezeWasActive,
+            blockActive: shouldBlock,
+            switchSnapshot,
+            freezeActivatedAt: freezeActivatedAt
+        };
+        if (shouldBlock) {
+            snapshot.forEach((value, varId) => {
+                if (Number.isFinite(varId)) {
+                    frozenValues[varId] = value;
+                }
+            });
+        }
+        if (freezeWasActive) {
+            activeSuspensions += 1;
+        }
+    }
+
+    function endVideoGameSuspension() {
+        if (!videoGameSuspension) {
+            return;
+        }
+        applySnapshot(videoGameSuspension.snapshot);
+        if (videoGameSuspension.freezeSuspended) {
+            activeSuspensions = Math.max(0, activeSuspensions - 1);
+        }
+        restoreSwitchSnapshot(videoGameSuspension.switchSnapshot);
+        videoGameSuspension = null;
+        if (isFreezeSettingActive()) {
+            captureFrozenValues();
+        }
+    }
+
+    function finalizeInterpreterSuspension(interpreter) {
+        if (interpreter && interpreter[videoGameInterpreterFlag]) {
+            delete interpreter[videoGameInterpreterFlag];
+            endVideoGameSuspension();
+        }
+    }
 
     function detectTimeVariableCandidate(varId, previousValue, newValue) {
         if (trackedVariableIds.has(varId)) {
@@ -154,10 +493,7 @@
         'value',
         function(variableId) {
             const numericId = Number(variableId);
-            if (
-                shouldBlock(variableId) &&
-                Object.prototype.hasOwnProperty.call(frozenValues, numericId)
-            ) {
+            if (shouldReturnFrozenValue(numericId)) {
                 return frozenValues[numericId];
             }
             return callOriginal(Game_Variables.prototype, 'value', this, [variableId]);
@@ -173,40 +509,101 @@
                 ? getTrueOriginalValue(this, numericId)
                 : undefined;
 
-            if (Number.isFinite(numericId) && CabbyCodes.getSetting(settingKey, false)) {
+            if (Number.isFinite(numericId) && isTrackingEnabled()) {
                 const detectionResult = detectTimeVariableCandidate(numericId, previousValue, value);
                 if (detectionResult?.newlyDetected) {
                     addTimeVariableId(numericId);
                     if (!Object.prototype.hasOwnProperty.call(frozenValues, numericId)) {
                         frozenValues[numericId] = detectionResult.captureValue;
                     }
-                    return;
+                    detectionState.hits[numericId] = 0;
+                    if (
+                        videoGameSuspension &&
+                        videoGameSuspension.snapshot &&
+                        !videoGameSuspension.snapshot.has(numericId)
+                    ) {
+                        videoGameSuspension.snapshot.set(numericId, detectionResult.captureValue);
+                    }
                 }
             }
 
-            const shouldPrevent = (() => {
-                if (!CabbyCodes.getSetting(settingKey, false)) {
-                    return false;
-                }
-                if (!Number.isFinite(numericId)) {
-                    return false;
-                }
-                return trackedVariableIds.has(numericId);
-            })();
-
-            if (shouldPrevent) {
-                if (!Object.prototype.hasOwnProperty.call(frozenValues, numericId)) {
-                    const currentValue = Number.isFinite(previousValue)
-                        ? previousValue
-                        : getTrueOriginalValue(this, numericId);
-                    frozenValues[numericId] = currentValue;
-                }
-                return;
+            if (
+                !Number.isFinite(numericId) ||
+                !canEnforceTimeLock() ||
+                !trackedVariableIds.has(numericId)
+            ) {
+                return callOriginal(Game_Variables.prototype, 'setValue', this, [
+                    variableId,
+                    value
+                ]);
             }
 
-            return callOriginal(Game_Variables.prototype, 'setValue', this, [
-                variableId,
-                value
+            ensureFrozenValue(numericId, previousValue);
+
+            if (tryEstablishTemporaryThaw(numericId, previousValue)) {
+                return callOriginal(Game_Variables.prototype, 'setValue', this, [
+                    variableId,
+                    value
+                ]);
+            }
+
+            return;
+        }
+    );
+
+    CabbyCodes.override(
+        Game_Interpreter.prototype,
+        'command117',
+        function(parameters) {
+            const result = callOriginal(Game_Interpreter.prototype, 'command117', this, [parameters]);
+            const commonEventId = Array.isArray(parameters) ? parameters[0] : undefined;
+            if (
+                commonEventId === videoGameCommonEventId &&
+                this._childInterpreter &&
+                shouldControlVideoGameTime()
+            ) {
+                beginVideoGameSuspension();
+                this._childInterpreter[videoGameInterpreterFlag] = true;
+            }
+            return result;
+        }
+    );
+
+    CabbyCodes.override(
+        Game_Interpreter.prototype,
+        'update',
+        function() {
+            interpreterStack.push(this);
+            try {
+                return callOriginal(Game_Interpreter.prototype, 'update', this, [
+                    ...arguments
+                ]);
+            } finally {
+                interpreterStack.pop();
+            }
+        }
+    );
+
+    CabbyCodes.override(
+        Game_Interpreter.prototype,
+        'terminate',
+        function() {
+            releaseInterpreterState(this);
+            finalizeInterpreterSuspension(this);
+            return callOriginal(Game_Interpreter.prototype, 'terminate', this, [
+                ...arguments
+            ]);
+        }
+    );
+
+    CabbyCodes.override(
+        Game_Interpreter.prototype,
+        'clear',
+        function() {
+            releaseInterpreterState(this);
+            finalizeInterpreterSuspension(this);
+            return callOriginal(Game_Interpreter.prototype, 'clear', this, [
+                ...arguments
             ]);
         }
     );
@@ -216,40 +613,50 @@
             return;
         }
         const originalData = instance._data;
+        instance._cabbycodesRawVariables = originalData;
         instance._data = new Proxy(originalData, {
             set(target, property, value) {
                 const propNum = Number(property);
-                if (
-                    Number.isFinite(propNum) &&
-                    CabbyCodes.getSetting(settingKey, false) &&
-                    !trackedVariableIds.has(propNum)
-                ) {
-                    const detectionResult = detectTimeVariableCandidate(propNum, target[property], value);
-                    if (detectionResult?.newlyDetected) {
-                        addTimeVariableId(propNum);
-                        if (!Object.prototype.hasOwnProperty.call(frozenValues, propNum)) {
-                            frozenValues[propNum] = detectionResult.captureValue;
+                if (Number.isFinite(propNum)) {
+                    const previousValue = target[property];
+                    if (isTrackingEnabled()) {
+                        const detectionResult = detectTimeVariableCandidate(
+                            propNum,
+                            previousValue,
+                            value
+                        );
+                        if (detectionResult?.newlyDetected) {
+                            addTimeVariableId(propNum);
+                            if (!Object.prototype.hasOwnProperty.call(frozenValues, propNum)) {
+                                frozenValues[propNum] = detectionResult.captureValue;
+                            }
+                            detectionState.hits[propNum] = 0;
+                            if (
+                                videoGameSuspension &&
+                                videoGameSuspension.snapshot &&
+                                !videoGameSuspension.snapshot.has(propNum)
+                            ) {
+                                videoGameSuspension.snapshot.set(
+                                    propNum,
+                                    detectionResult.captureValue
+                                );
+                            }
+                        }
+                    }
+
+                    if (canEnforceTimeLock() && trackedVariableIds.has(propNum)) {
+                        ensureFrozenValue(propNum, previousValue);
+                        if (tryEstablishTemporaryThaw(propNum, previousValue)) {
+                            return Reflect.set(target, property, value);
                         }
                         return true;
                     }
-                }
-                if (Number.isFinite(propNum) && shouldBlock(propNum)) {
-                    if (!Object.prototype.hasOwnProperty.call(frozenValues, propNum)) {
-                        const currentValue = target[property];
-                        frozenValues[propNum] =
-                            currentValue !== undefined && currentValue !== null ? currentValue : 0;
-                    }
-                    return true;
                 }
                 return Reflect.set(target, property, value);
             },
             get(target, property) {
                 const propNum = Number(property);
-                if (
-                    Number.isFinite(propNum) &&
-                    shouldBlock(propNum) &&
-                    Object.prototype.hasOwnProperty.call(frozenValues, propNum)
-                ) {
+                if (shouldReturnFrozenValue(propNum)) {
                     return frozenValues[propNum];
                 }
                 return Reflect.get(target, property);
@@ -258,15 +665,26 @@
         instance._cabbycodesDataProxy = true;
     }
 
+    function resetTimeInitializationState() {
+        timeDataInitialized = false;
+        freezeCaptureRequested = false;
+        if (pendingFreezeCaptureTimer !== null) {
+            clearTimeout(pendingFreezeCaptureTimer);
+            pendingFreezeCaptureTimer = null;
+        }
+    }
+
     const originalInitialize = Game_Variables.prototype.initialize;
     Game_Variables.prototype.initialize = function() {
         originalInitialize.call(this);
+        resetTimeInitializationState();
         wrapDataWithProxy(this);
     };
 
     const originalClear = Game_Variables.prototype.clear;
     Game_Variables.prototype.clear = function() {
         originalClear.call(this);
+        resetTimeInitializationState();
         wrapDataWithProxy(this);
     };
 
