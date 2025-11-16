@@ -60,6 +60,7 @@
     const interpreterStack = [];
     const interpreterThawStates = new WeakMap();
     const videoGameCommonEventId = 12;
+    const zeroTimeCommonEventIds = new Set([68, 69]); // Laptop news / social
     const videoGameInterpreterFlag = '_cabbycodesVideoGameCommonEvent';
     let timeDataInitialized = false;
     let pendingFreezeCaptureTimer = null;
@@ -161,6 +162,19 @@
 
     function isAnyTimeLockActive() {
         return isFreezeEnabled() || isVideoGameBlockActive();
+    }
+
+    function isZeroTimeInterpreter(interpreter) {
+        return Boolean(interpreter && interpreter._cabbycodesZeroTimeActive);
+    }
+
+    function markZeroTimeChild(parent, child, commonEventId) {
+        if (!child) {
+            return;
+        }
+        const parentZero = isZeroTimeInterpreter(parent);
+        child._cabbycodesZeroTimeActive =
+            zeroTimeCommonEventIds.has(commonEventId) || parentZero;
     }
 
     function shouldBlock(variableId) {
@@ -565,7 +579,26 @@
                 beginVideoGameSuspension();
                 this._childInterpreter[videoGameInterpreterFlag] = true;
             }
+            if (this._childInterpreter && Number.isFinite(commonEventId)) {
+                markZeroTimeChild(this, this._childInterpreter, Number(commonEventId));
+            }
             return result;
+        }
+    );
+
+    CabbyCodes.override(
+        Game_Interpreter.prototype,
+        'setupReservedCommonEvent',
+        function() {
+            if ($gameTemp.isCommonEventReserved()) {
+                const commonEvent = $gameTemp.retrieveCommonEvent();
+                if (commonEvent) {
+                    this.setup(commonEvent.list);
+                    markZeroTimeChild(null, this, Number(commonEvent.id));
+                    return true;
+                }
+            }
+            return false;
         }
     );
 
@@ -581,6 +614,34 @@
             } finally {
                 interpreterStack.pop();
             }
+        }
+    );
+
+    CabbyCodes.override(
+        Game_Interpreter.prototype,
+        'command122',
+        function(parameters) {
+            const zeroTimeActive = isZeroTimeInterpreter(this);
+            let minutesBefore = null;
+            if (zeroTimeActive && typeof $gameVariables !== 'undefined' && $gameVariables) {
+                const startId = Number(parameters[0]);
+                const endId = Number(parameters[1]);
+                if (
+                    Number.isFinite(startId) &&
+                    Number.isFinite(endId) &&
+                    startId <= 19 &&
+                    19 <= endId
+                ) {
+                    minutesBefore = $gameVariables.value(19);
+                }
+            }
+            const result = callOriginal(Game_Interpreter.prototype, 'command122', this, [
+                parameters
+            ]);
+            if (minutesBefore !== null && typeof $gameVariables !== 'undefined' && $gameVariables) {
+                $gameVariables.setValue(19, minutesBefore);
+            }
+            return result;
         }
     );
 
