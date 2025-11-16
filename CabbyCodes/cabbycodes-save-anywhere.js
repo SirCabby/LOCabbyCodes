@@ -32,70 +32,29 @@
     const isFeatureEnabled = () => CabbyCodes.getSetting(settingKey, false);
 
     /**
-     * Override Game_System.isSaveEnabled to always return true when feature is enabled
+     * Ensure the Save command is available in the menu when the feature is enabled,
+     * while still respecting story-based save locks handled by Game_System.
+     * We add the command only if the base game (or other plugins) didn't add it.
      */
-    CabbyCodes.override(
-        Game_System.prototype,
-        'isSaveEnabled',
-        function() {
-            if (isFeatureEnabled()) {
-                return true;
-            }
-            // Call original implementation
-            return CabbyCodes.callOriginal(Game_System.prototype, 'isSaveEnabled', this, []);
-        }
-    );
-
-    /**
-     * Override Window_SavefileList.isEnabled to always allow saving when feature is enabled
-     */
-    CabbyCodes.override(
-        Window_SavefileList.prototype,
-        'isEnabled',
-        function(savefileId) {
-            if (isFeatureEnabled() && this._mode === 'save') {
-                // Always allow saving when feature is enabled
-                return savefileId > 0;
-            }
-            // Call original implementation
-            return CabbyCodes.callOriginal(Window_SavefileList.prototype, 'isEnabled', this, [savefileId]);
-        }
-    );
-
-    /**
-     * Override Window_MenuCommand.isSaveEnabled to always enable save menu option when feature is enabled
-     */
-    CabbyCodes.override(
-        Window_MenuCommand.prototype,
-        'isSaveEnabled',
-        function() {
-            if (isFeatureEnabled()) {
-                // Always enable save menu option when feature is enabled
-                return !DataManager.isEventTest();
-            }
-            // Call original implementation
-            return CabbyCodes.callOriginal(Window_MenuCommand.prototype, 'isSaveEnabled', this, []);
-        }
-    );
-
-    /**
-     * Override Window_MenuCommand.addSaveCommand to bypass gSw(37) check when feature is enabled
-     * This ensures the save command appears in the menu even on higher difficulties
-     */
-    CabbyCodes.override(
+    CabbyCodes.after(
         Window_MenuCommand.prototype,
         'addSaveCommand',
         function() {
-            if (isFeatureEnabled()) {
-                // When feature is enabled, bypass the gSw(37) check and always add save command
-                if (this.needsCommand("save")) {
-                    const enabled = this.isSaveEnabled();
-                    this.addCommand(TextManager.save, "save", enabled);
-                }
-            } else {
-                // Call original implementation (which may include gSw(37) check from other plugins)
-                return CabbyCodes.callOriginal(Window_MenuCommand.prototype, 'addSaveCommand', this, []);
+            if (!isFeatureEnabled()) {
+                return;
             }
+
+            if (!this.needsCommand("save")) {
+                return;
+            }
+
+            const hasSaveCommand = Array.isArray(this._list) && this._list.some(command => command.symbol === 'save');
+            if (hasSaveCommand) {
+                return;
+            }
+
+            const enabled = this.isSaveEnabled();
+            this.addCommand(TextManager.save, "save", enabled);
         }
     );
 
