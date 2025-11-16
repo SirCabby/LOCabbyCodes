@@ -119,6 +119,15 @@
 
     let itemGiverPersistedFilters = null;
 
+    const ITEM_GIVER_UI_CONSTANTS = {
+        selectorHorizontalPadding: 12,
+        selectorVerticalGap: 12,
+        searchHorizontalPadding: 12,
+        searchVerticalGap: 12,
+        dropdownPadding: 10,
+        searchPadding: 10
+    };
+
     function sanitizeDatabaseName(name) {
         return typeof name === 'string' ? name.trim() : '';
     }
@@ -293,6 +302,10 @@
 
     Window_CabbyCodesDropdownButton.prototype = Object.create(Window_Selectable.prototype);
     Window_CabbyCodesDropdownButton.prototype.constructor = Window_CabbyCodesDropdownButton;
+
+    Window_CabbyCodesDropdownButton.prototype.standardPadding = function() {
+        return ITEM_GIVER_UI_CONSTANTS.dropdownPadding;
+    };
 
     Window_CabbyCodesDropdownButton.prototype.initialize = function(rect, label, placeholder) {
         Window_Selectable.prototype.initialize.call(this, rect);
@@ -1572,23 +1585,57 @@
     Scene_CabbyCodesItemGiver.prototype.createSearchWindow = function() {
         const rect = this.searchWindowRect();
         this._searchWindow = new Window_CabbyCodesItemSearch(rect);
-        this._searchWindow.visible = false;
-        this._searchWindow.opacity = 0;
         this._searchWindow.deactivate();
         this.addWindow(this._searchWindow);
     };
 
     Scene_CabbyCodesItemGiver.prototype.searchWindowRect = function() {
-        // Place the search window off-screen so it doesn't render, but still handles keyboard input.
-        return new Rectangle(0, Graphics.boxHeight + 50, Graphics.boxWidth, this.calcWindowHeight(1, false));
+        const helpHeight = this.helpAreaHeight();
+        const padding = ITEM_GIVER_UI_CONSTANTS.searchHorizontalPadding;
+        const wy = helpHeight + this.selectorAreaHeight();
+        const ww = Graphics.boxWidth - padding * 2;
+        const wh = this.searchWindowHeight();
+        return new Rectangle(padding, wy, ww, wh);
     };
 
     Scene_CabbyCodesItemGiver.prototype.dropdownButtonHeight = function() {
-        return this.calcWindowHeight(1, true);
+        const lineHeight = this._helpWindow && typeof this._helpWindow.lineHeight === 'function'
+            ? this._helpWindow.lineHeight()
+            : (typeof Window_Base !== 'undefined' && typeof Window_Base.prototype.lineHeight === 'function'
+                ? Window_Base.prototype.lineHeight()
+                : 36);
+        const padding = ITEM_GIVER_UI_CONSTANTS.dropdownPadding;
+        return lineHeight + padding * 2;
+    };
+
+    Scene_CabbyCodesItemGiver.prototype.searchWindowHeight = function() {
+        const lineHeight = this._helpWindow && typeof this._helpWindow.lineHeight === 'function'
+            ? this._helpWindow.lineHeight()
+            : (typeof Window_Base !== 'undefined' && typeof Window_Base.prototype.lineHeight === 'function'
+                ? Window_Base.prototype.lineHeight()
+                : 36);
+        const padding = ITEM_GIVER_UI_CONSTANTS.searchPadding;
+        return lineHeight + padding * 2;
+    };
+
+    Scene_CabbyCodesItemGiver.prototype.selectorAreaPadding = function() {
+        return ITEM_GIVER_UI_CONSTANTS.selectorVerticalGap;
+    };
+
+    Scene_CabbyCodesItemGiver.prototype.searchAreaPadding = function() {
+        return ITEM_GIVER_UI_CONSTANTS.searchVerticalGap;
     };
 
     Scene_CabbyCodesItemGiver.prototype.selectorAreaHeight = function() {
-        return this.dropdownButtonHeight() + 12;
+        return this.dropdownButtonHeight() + this.selectorAreaPadding();
+    };
+
+    Scene_CabbyCodesItemGiver.prototype.searchAreaHeight = function() {
+        return this.searchWindowHeight() + this.searchAreaPadding();
+    };
+
+    Scene_CabbyCodesItemGiver.prototype.filtersAreaHeight = function() {
+        return this.selectorAreaHeight() + this.searchAreaHeight();
     };
 
     Scene_CabbyCodesItemGiver.prototype.selectorPanelRect = function() {
@@ -1596,13 +1643,13 @@
         const wx = 0;
         const wy = helpHeight;
         const ww = Graphics.boxWidth;
-        const wh = this.selectorAreaHeight();
+        const wh = this.filtersAreaHeight();
         return new Rectangle(wx, wy, ww, wh);
     };
 
     Scene_CabbyCodesItemGiver.prototype.typeDropdownRect = function() {
         const helpHeight = this.helpAreaHeight();
-        const padding = 12;
+        const padding = ITEM_GIVER_UI_CONSTANTS.selectorHorizontalPadding;
         const wy = helpHeight + 6;
         const buttonWidth = (Graphics.boxWidth - padding * 3) / 2;
         const wh = this.dropdownButtonHeight();
@@ -1611,7 +1658,7 @@
 
     Scene_CabbyCodesItemGiver.prototype.subtypeDropdownRect = function() {
         const helpHeight = this.helpAreaHeight();
-        const padding = 12;
+        const padding = ITEM_GIVER_UI_CONSTANTS.selectorHorizontalPadding;
         const wy = helpHeight + 6;
         const buttonWidth = (Graphics.boxWidth - padding * 3) / 2;
         const wh = this.dropdownButtonHeight();
@@ -1620,14 +1667,14 @@
     };
 
     Scene_CabbyCodesItemGiver.prototype.itemWindowRect = function() {
-        const selectorHeight = this.selectorAreaHeight();
+        const filtersHeight = this.filtersAreaHeight();
         const helpHeight = this.helpAreaHeight();
         const descHeight = this.descriptionWindowHeight();
         const wx = 0;
-        const wy = helpHeight + selectorHeight;
+        const wy = helpHeight + filtersHeight;
         const ww = Graphics.boxWidth;
-        // Fill space between filter and description window at bottom
-        const availableHeight = Graphics.boxHeight - helpHeight - selectorHeight - descHeight;
+        // Fill space between filter block and description window at bottom
+        const availableHeight = Graphics.boxHeight - helpHeight - filtersHeight - descHeight;
         const minHeight = this.calcWindowHeight(4, true);
         const wh = Math.max(minHeight, availableHeight);
         return new Rectangle(wx, wy, ww, wh);
@@ -1921,7 +1968,7 @@
         });
 
         if (this._searchWindow && typeof this._searchWindow.setSearchText === 'function') {
-            this._searchWindow.setSearchText(searchText || '');
+            this._searchWindow.setSearchText(searchText || '', { syncFilters: false, forceRefresh: true });
         }
 
         if (!skipPersist) {
@@ -2058,47 +2105,8 @@
             CabbyCodes.error('[CabbyCodes] Item Giver: Stack: ' + (e?.stack || 'No stack trace'));
             // Continue to try our custom update logic
         }
-        
-        // Search is always active when item window is active
-        try {
-            if (this._searchWindow) {
-                try {
-                    let itemWindowActive = false;
-                    if (this._itemWindow) {
-                        if (typeof this._itemWindow.active !== 'undefined') {
-                            itemWindowActive = this._itemWindow.active;
-                        } else {
-                            CabbyCodes.warn('[CabbyCodes] Item Giver: _itemWindow.active is undefined');
-                        }
-                    } else {
-                        CabbyCodes.warn('[CabbyCodes] Item Giver: _itemWindow is null/undefined in update');
-                    }
-                    
-                    if (typeof this._searchWindow._active !== 'undefined') {
-                        this._searchWindow._active = itemWindowActive;
-                    } else {
-                        CabbyCodes.warn('[CabbyCodes] Item Giver: _searchWindow._active property missing');
-                    }
-                    
-                    if (this._searchWindow._active) {
-                        if (typeof this._searchWindow.refresh === 'function') {
-                            this._searchWindow.refresh();
-                        } else {
-                            CabbyCodes.warn('[CabbyCodes] Item Giver: _searchWindow.refresh is not a function');
-                        }
-                    }
-                } catch (e) {
-                    CabbyCodes.error('[CabbyCodes] Item Giver: Error updating search window: ' + (e?.message || e));
-                    CabbyCodes.error('[CabbyCodes] Item Giver: Stack: ' + (e?.stack || 'No stack trace'));
-                }
-            } else {
-                CabbyCodes.warn('[CabbyCodes] Item Giver: _searchWindow is null/undefined in update');
-            }
-        } catch (e) {
-            CabbyCodes.error('[CabbyCodes] Item Giver: Error in scene update (search window logic): ' + (e?.message || e));
-            CabbyCodes.error('[CabbyCodes] Item Giver: Stack: ' + (e?.stack || 'No stack trace'));
-            // Don't throw - try to continue
-        }
+
+        this.updateSearchWindowState();
 
     };
 
@@ -2122,6 +2130,21 @@
             SceneManager.prepareNextScene(itemData, 1, callbacks);
         } catch (e) {
             CabbyCodes.error('[CabbyCodes] Item Giver: Error opening quantity window: ' + (e?.message || e));
+            CabbyCodes.error('[CabbyCodes] Item Giver: Stack: ' + (e?.stack || 'No stack trace'));
+        }
+    };
+
+    Scene_CabbyCodesItemGiver.prototype.updateSearchWindowState = function() {
+        if (!this._searchWindow) {
+            return;
+        }
+        try {
+            const isItemWindowActive = !!(this._itemWindow && this._itemWindow.active);
+            if (typeof this._searchWindow.setTypingEnabled === 'function') {
+                this._searchWindow.setTypingEnabled(isItemWindowActive);
+            }
+        } catch (e) {
+            CabbyCodes.error('[CabbyCodes] Item Giver: Error syncing search window state: ' + (e?.message || e));
             CabbyCodes.error('[CabbyCodes] Item Giver: Stack: ' + (e?.stack || 'No stack trace'));
         }
     };
@@ -2321,12 +2344,17 @@
     Window_CabbyCodesItemSearch.prototype = Object.create(Window_Base.prototype);
     Window_CabbyCodesItemSearch.prototype.constructor = Window_CabbyCodesItemSearch;
 
+    Window_CabbyCodesItemSearch.prototype.standardPadding = function() {
+        return ITEM_GIVER_UI_CONSTANTS.searchPadding;
+    };
+
     Window_CabbyCodesItemSearch.prototype.initialize = function(rect) {
         Window_Base.prototype.initialize.call(this, rect);
         this._searchText = '';
-        this._active = false;
+        this._isTypingEnabled = false;
         this._boundKeyHandler = this.onKeyDown.bind(this);
         window.addEventListener('keydown', this._boundKeyHandler, true);
+        this.refresh();
     };
 
     Window_CabbyCodesItemSearch.prototype.destroy = function(options) {
@@ -2338,23 +2366,20 @@
         return this._searchText;
     };
 
-    Window_CabbyCodesItemSearch.prototype.setSearchText = function(text) {
-        this._searchText = text || '';
-        this.refresh();
+    Window_CabbyCodesItemSearch.prototype.setSearchText = function(text, options = {}) {
+        const normalized = typeof text === 'string' ? text : '';
+        const changed = this._searchText !== normalized;
+        this._searchText = normalized;
+        if (changed || options.forceRefresh) {
+            this.refresh();
+        }
+        if (options.syncFilters) {
+            this.syncItemWindowFilters();
+        }
     };
 
     Window_CabbyCodesItemSearch.prototype.clearSearch = function() {
-        this._searchText = '';
-        this.refresh();
-        if (this._itemWindow) {
-            const category = typeof this._itemWindow.currentCategory === 'function'
-                ? this._itemWindow.currentCategory()
-                : (this._itemWindow._category || 'all');
-            const subKey = typeof this._itemWindow.currentSubSectionKey === 'function'
-                ? this._itemWindow.currentSubSectionKey()
-                : 'all';
-            this._itemWindow.setFilters(category, '', subKey);
-        }
+        this.setSearchText('', { syncFilters: true });
     };
 
     Window_CabbyCodesItemSearch.prototype.setItemWindow = function(itemWindow) {
@@ -2362,13 +2387,24 @@
     };
 
     Window_CabbyCodesItemSearch.prototype.activate = function() {
-        this._active = true;
-        this.refresh();
+        this.setTypingEnabled(true);
     };
 
     Window_CabbyCodesItemSearch.prototype.deactivate = function() {
-        this._active = false;
+        this.setTypingEnabled(false);
+    };
+
+    Window_CabbyCodesItemSearch.prototype.setTypingEnabled = function(enabled) {
+        const next = !!enabled;
+        if (this._isTypingEnabled === next) {
+            return;
+        }
+        this._isTypingEnabled = next;
         this.refresh();
+    };
+
+    Window_CabbyCodesItemSearch.prototype.canCaptureInput = function() {
+        return !!this._isTypingEnabled;
     };
 
     Window_CabbyCodesItemSearch.prototype.refresh = function() {
@@ -2377,6 +2413,9 @@
                 this.createContents();
             } else {
                 this.contents.clear();
+            }
+            if (this.contentsBack) {
+                this.contentsBack.clear();
             }
             this.drawAllItems();
         } catch (e) {
@@ -2387,34 +2426,41 @@
 
     Window_CabbyCodesItemSearch.prototype.drawAllItems = function() {
         try {
-            if (!this.contents) {
-                this.createContents();
-            } else {
-                this.contents.clear();
-            }
             const rect = this.baseTextRect();
-            const label = 'Search: ';
+            const label = 'Filter';
+            const spacing = 12;
             const labelWidth = this.textWidth(label);
+            const hintText = this._searchText ? '(Esc to clear)' : '';
+            const hintWidth = hintText ? this.textWidth(hintText) : 0;
+            const reservedHintWidth = hintWidth ? hintWidth + spacing : 0;
+            const availableWidth = rect.width - labelWidth - spacing - reservedHintWidth;
+            const fieldWidth = Math.max(60, availableWidth);
+            const fieldRect = new Rectangle(
+                rect.x + labelWidth + spacing,
+                rect.y,
+                fieldWidth,
+                rect.height
+            );
+
+            this.changeTextColor(this.systemColor());
             this.drawText(label, rect.x, rect.y, labelWidth, 'left');
-            
-            const searchRect = new Rectangle(rect.x + labelWidth, rect.y, rect.width - labelWidth - 80, rect.height);
-            let isActive = false;
-            if (this._itemWindow) {
-                if (typeof this._itemWindow.active !== 'undefined') {
-                    isActive = this._itemWindow.active;
-                }
-            }
-            const displayText = this._searchText || (isActive ? '(Type to search)' : '');
-            const activeColor = getNormalColor(this);
-            const inactiveColor = getGaugeBackColor();
-            this.changeTextColor(isActive ? activeColor : inactiveColor);
-            this.drawText(displayText, searchRect.x, rect.y, searchRect.width, 'left');
             this.resetTextColor();
-            
-            // Draw clear hint
-            if (this._searchText) {
+
+            this.drawFilterBackground(fieldRect);
+
+            const displayText = this._searchText
+                ? this._searchText
+                : (this._isTypingEnabled ? 'Type to filter items' : 'Select the list to type');
+            const textPadding = ITEM_GIVER_UI_CONSTANTS.searchPadding;
+            const textWidth = Math.max(0, fieldRect.width - textPadding * 2);
+            this.changeTextColor(this._searchText ? getNormalColor(this) : getGaugeBackColor());
+            this.drawText(displayText, fieldRect.x + textPadding, rect.y, textWidth, 'left');
+            this.resetTextColor();
+
+            if (hintText && hintWidth > 0) {
+                const hintX = fieldRect.x + fieldRect.width + spacing;
                 this.changeTextColor(this.systemColor());
-                this.drawText('(Esc to clear)', rect.x + rect.width - 80, rect.y, 80, 'right');
+                this.drawText(hintText, hintX, rect.y, hintWidth, 'left');
                 this.resetTextColor();
             }
         } catch (e) {
@@ -2422,6 +2468,53 @@
             CabbyCodes.error('[CabbyCodes] Item Giver: Stack: ' + (e?.stack || 'No stack trace'));
             // Don't throw - just skip drawing
         }
+    };
+
+    Window_CabbyCodesItemSearch.prototype.drawFilterBackground = function(rect) {
+        const target = this.contentsBack || this.contents;
+        if (!target) {
+            return;
+        }
+        const previousOpacity = target.paintOpacity;
+        target.paintOpacity = 160;
+        target.fillRect(rect.x, rect.y, rect.width, rect.height, getGaugeBackColor());
+        target.paintOpacity = previousOpacity;
+    };
+
+    Window_CabbyCodesItemSearch.prototype.update = function() {
+        Window_Base.prototype.update.call(this);
+        this.processPointer();
+    };
+
+    Window_CabbyCodesItemSearch.prototype.processPointer = function() {
+        if (!this.visible || !this.isOpen()) {
+            return;
+        }
+        if (TouchInput.isTriggered() && this.isTouchedInsideFrame()) {
+            if (this._itemWindow && typeof this._itemWindow.activate === 'function') {
+                const wasActive = !!this._itemWindow.active;
+                this._itemWindow.activate();
+                if (typeof this._itemWindow.ensureValidSelection === 'function') {
+                    this._itemWindow.ensureValidSelection(this._itemWindow.index());
+                }
+                if (!wasActive) {
+                    SoundManager.playCursor();
+                }
+            }
+        }
+    };
+
+    Window_CabbyCodesItemSearch.prototype.syncItemWindowFilters = function() {
+        if (!this._itemWindow || typeof this._itemWindow.setFilters !== 'function') {
+            return;
+        }
+        const category = typeof this._itemWindow.currentCategory === 'function'
+            ? this._itemWindow.currentCategory()
+            : (this._itemWindow._category || 'all');
+        const subKey = typeof this._itemWindow.currentSubSectionKey === 'function'
+            ? this._itemWindow.currentSubSectionKey()
+            : 'all';
+        this._itemWindow.setFilters(category, this._searchText || '', subKey);
     };
 
     /**
@@ -2454,51 +2547,36 @@
             if (!event || !event.key) {
                 return;
             }
-            
-            // Always allow search input when item window is active
-            if (!this._itemWindow) {
+
+            if (!this.canCaptureInput()) {
                 return;
             }
-            
-            if (typeof this._itemWindow.active === 'undefined' || !this._itemWindow.active) {
+
+            if (event.ctrlKey || event.metaKey || event.altKey) {
                 return;
             }
-            
-            // Allow alphanumeric and space
-            if (event.key.length === 1 && /[a-zA-Z0-9\s]/.test(event.key)) {
-                this._searchText = (this._searchText || '') + event.key;
-                this.refresh();
-                if (this._itemWindow && typeof this._itemWindow.setFilters === 'function') {
-                    const category = typeof this._itemWindow.currentCategory === 'function'
-                        ? this._itemWindow.currentCategory()
-                        : (this._itemWindow._category || 'all');
-                    const subKey = typeof this._itemWindow.currentSubSectionKey === 'function'
-                        ? this._itemWindow.currentSubSectionKey()
-                        : 'all';
-                    this._itemWindow.setFilters(category, this._searchText, subKey);
-                }
+
+            if (event.key.length === 1) {
+                const nextValue = (this._searchText || '') + event.key;
+                this.setSearchText(nextValue, { syncFilters: true });
                 if (event.preventDefault) {
                     event.preventDefault();
                 }
             } else if (event.key === 'Backspace' || event.key === 'Delete') {
-                this._searchText = (this._searchText || '').slice(0, -1);
-                this.refresh();
-                if (this._itemWindow && typeof this._itemWindow.setFilters === 'function') {
-                    const category = typeof this._itemWindow.currentCategory === 'function'
-                        ? this._itemWindow.currentCategory()
-                        : (this._itemWindow._category || 'all');
-                    const subKey = typeof this._itemWindow.currentSubSectionKey === 'function'
-                        ? this._itemWindow.currentSubSectionKey()
-                        : 'all';
-                    this._itemWindow.setFilters(category, this._searchText, subKey);
+                if (this._searchText && this._searchText.length > 0) {
+                    this.setSearchText(this._searchText.slice(0, -1), { syncFilters: true });
+                } else {
+                    this.setSearchText('', { syncFilters: false, forceRefresh: true });
                 }
                 if (event.preventDefault) {
                     event.preventDefault();
                 }
             } else if (event.key === 'Escape') {
-                this.clearSearch();
-                if (event.preventDefault) {
-                    event.preventDefault();
+                if (this._searchText) {
+                    this.clearSearch();
+                    if (event.preventDefault) {
+                        event.preventDefault();
+                    }
                 }
             }
         } catch (e) {
