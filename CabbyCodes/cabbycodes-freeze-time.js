@@ -21,7 +21,6 @@
     }
 
     const settingKey = 'freezeTimeOfDay';
-    const videoGameSettingKey = 'videoGamesNoTimeCost';
     const defaultTimeVariableIds = [
         10, // Clock pendulum / animation state
         12, // Time display string (HH:MM)
@@ -60,13 +59,10 @@
     const interpreterStack = [];
     const interpreterThawStates = new WeakMap();
     const videoGameCommonEventId = 12;
-    const zeroTimeCommonEventIds = new Set([68, 69]); // Laptop news / social
-    const videoGameInterpreterFlag = '_cabbycodesVideoGameCommonEvent';
+    const zeroTimeCommonEventIds = new Set([68, 69, videoGameCommonEventId]);
     let timeDataInitialized = false;
     let pendingFreezeCaptureTimer = null;
     let freezeCaptureRequested = false;
-    let activeSuspensions = 0;
-    let videoGameSuspension = null;
     let freezeSessionId = 0;
 
     const initializationWindowMs = 5000;
@@ -135,33 +131,33 @@
         }
     });
 
-    CabbyCodes.registerSetting(videoGameSettingKey, 'Video Games Cost No Time', {
-        defaultValue: false,
-        order: 61
-    });
-
     function isFreezeSettingActive() {
         return CabbyCodes.getSetting(settingKey, false);
     }
 
-    function isVideoGameCheatEnabled() {
-        return CabbyCodes.getSetting(videoGameSettingKey, false);
-    }
-
     function isTrackingEnabled() {
-        return isFreezeSettingActive() || isVideoGameCheatEnabled();
-    }
-
-    function shouldControlVideoGameTime() {
-        return isFreezeSettingActive() || isVideoGameCheatEnabled();
-    }
-
-    function isVideoGameBlockActive() {
-        return Boolean(videoGameSuspension && videoGameSuspension.blockActive);
+        return isFreezeSettingActive();
     }
 
     function isAnyTimeLockActive() {
-        return isFreezeEnabled() || isVideoGameBlockActive();
+        return isFreezeEnabled();
+    }
+
+    function shouldApplyZeroTime(commonEventId) {
+        return isFreezeSettingActive() && zeroTimeCommonEventIds.has(commonEventId);
+    }
+
+    function isZeroTimeInterpreter(interpreter) {
+        return Boolean(interpreter && interpreter._cabbycodesZeroTimeActive);
+    }
+
+    function markZeroTimeChild(parentInterpreter, childInterpreter, commonEventId) {
+        if (!childInterpreter) {
+            return;
+        }
+        const inheritsZeroTime = isZeroTimeInterpreter(parentInterpreter);
+        childInterpreter._cabbycodesZeroTimeActive =
+            inheritsZeroTime || shouldApplyZeroTime(commonEventId);
     }
 
     function isZeroTimeInterpreter(interpreter) {
@@ -214,10 +210,7 @@
     })();
 
     function isFreezeEnabled() {
-        if (!isFreezeSettingActive()) {
-            return false;
-        }
-        return activeSuspensions === 0;
+        return isFreezeSettingActive();
     }
 
     function getOwningInterpreter() {
@@ -409,52 +402,9 @@
         });
     }
 
-    function beginVideoGameSuspension() {
-        if (videoGameSuspension || !shouldControlVideoGameTime() || !timeDataInitialized) {
-            return;
-        }
-        const freezeWasActive = isFreezeEnabled();
-        const shouldBlock = isVideoGameCheatEnabled();
-        const snapshot = captureTrackedValuesSnapshot();
-        const switchSnapshot = captureTimeSwitchSnapshot();
-        videoGameSuspension = {
-            snapshot,
-            freezeSuspended: freezeWasActive,
-            blockActive: shouldBlock,
-            switchSnapshot,
-            freezeActivatedAt: freezeActivatedAt
-        };
-        if (shouldBlock) {
-            snapshot.forEach((value, varId) => {
-                if (Number.isFinite(varId)) {
-                    frozenValues[varId] = value;
-                }
-            });
-        }
-        if (freezeWasActive) {
-            activeSuspensions += 1;
-        }
-    }
-
-    function endVideoGameSuspension() {
-        if (!videoGameSuspension) {
-            return;
-        }
-        applySnapshot(videoGameSuspension.snapshot);
-        if (videoGameSuspension.freezeSuspended) {
-            activeSuspensions = Math.max(0, activeSuspensions - 1);
-        }
-        restoreSwitchSnapshot(videoGameSuspension.switchSnapshot);
-        videoGameSuspension = null;
-        if (isFreezeSettingActive()) {
-            captureFrozenValues();
-        }
-    }
-
     function finalizeInterpreterSuspension(interpreter) {
-        if (interpreter && interpreter[videoGameInterpreterFlag]) {
-            delete interpreter[videoGameInterpreterFlag];
-            endVideoGameSuspension();
+        if (interpreter && interpreter._cabbycodesZeroTimeActive) {
+            delete interpreter._cabbycodesZeroTimeActive;
         }
     }
 
@@ -531,13 +481,6 @@
                         frozenValues[numericId] = detectionResult.captureValue;
                     }
                     detectionState.hits[numericId] = 0;
-                    if (
-                        videoGameSuspension &&
-                        videoGameSuspension.snapshot &&
-                        !videoGameSuspension.snapshot.has(numericId)
-                    ) {
-                        videoGameSuspension.snapshot.set(numericId, detectionResult.captureValue);
-                    }
                 }
             }
 
@@ -571,14 +514,6 @@
         function(parameters) {
             const result = callOriginal(Game_Interpreter.prototype, 'command117', this, [parameters]);
             const commonEventId = Array.isArray(parameters) ? parameters[0] : undefined;
-            if (
-                commonEventId === videoGameCommonEventId &&
-                this._childInterpreter &&
-                shouldControlVideoGameTime()
-            ) {
-                beginVideoGameSuspension();
-                this._childInterpreter[videoGameInterpreterFlag] = true;
-            }
             if (this._childInterpreter && Number.isFinite(commonEventId)) {
                 markZeroTimeChild(this, this._childInterpreter, Number(commonEventId));
             }
@@ -692,16 +627,6 @@
                                 frozenValues[propNum] = detectionResult.captureValue;
                             }
                             detectionState.hits[propNum] = 0;
-                            if (
-                                videoGameSuspension &&
-                                videoGameSuspension.snapshot &&
-                                !videoGameSuspension.snapshot.has(propNum)
-                            ) {
-                                videoGameSuspension.snapshot.set(
-                                    propNum,
-                                    detectionResult.captureValue
-                                );
-                            }
                         }
                     }
 
