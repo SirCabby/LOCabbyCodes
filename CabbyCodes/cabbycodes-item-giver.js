@@ -121,7 +121,7 @@
 
     const ITEM_GIVER_UI_CONSTANTS = {
         selectorHorizontalPadding: 12,
-        selectorVerticalGap: 12,
+        selectorVerticalGap: 6,
         searchHorizontalPadding: 12,
         searchVerticalGap: 12,
         dropdownPadding: 10,
@@ -1651,7 +1651,7 @@
         const helpHeight = this.helpAreaHeight();
         const padding = ITEM_GIVER_UI_CONSTANTS.selectorHorizontalPadding;
         const wy = helpHeight + 6;
-        const buttonWidth = (Graphics.boxWidth - padding * 3) / 2;
+        const buttonWidth = (Graphics.boxWidth - padding * 2) / 2;
         const wh = this.dropdownButtonHeight();
         return new Rectangle(padding, wy, buttonWidth, wh);
     };
@@ -1660,9 +1660,9 @@
         const helpHeight = this.helpAreaHeight();
         const padding = ITEM_GIVER_UI_CONSTANTS.selectorHorizontalPadding;
         const wy = helpHeight + 6;
-        const buttonWidth = (Graphics.boxWidth - padding * 3) / 2;
+        const buttonWidth = (Graphics.boxWidth - padding * 2) / 2;
         const wh = this.dropdownButtonHeight();
-        const wx = padding * 2 + buttonWidth;
+        const wx = padding + buttonWidth;
         return new Rectangle(wx, wy, buttonWidth, wh);
     };
 
