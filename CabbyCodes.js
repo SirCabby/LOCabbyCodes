@@ -29,6 +29,7 @@
             'cabbycodes-patches.js',
             'cabbycodes-session-state.js',
             'cabbycodes-settings.js',
+            'cabbycodes-enemy-health-bars.js',
             'cabbycodes-version-display.js',
             'cabbycodes-save-anywhere.js',
             'cabbycodes-infinite-money.js',

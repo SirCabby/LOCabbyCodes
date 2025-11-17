@@ -149,6 +149,7 @@ This is the most important step. You need to add the CabbyCodes plugin to the ga
 - **Stamina Control:** Prevents party actors from spending MP (stamina) when using skills, letting you cast freely without worrying about resource management.
 - **Infinite Consumables:** Adds an option that keeps consumable item counts (healing items, ammo, thrown objects, cooking ingredients, etc.) from decreasing. You can still pick up more, but using them no longer consumes inventory.
 - **Unbreakable Items:** Adds a toggle that stops weapons (and any other breakable gear) from losing durability when you attack or when enemies use weapon-breaking abilities. Keep your favorite equipment intact regardless of difficulty or special encounters.
+- **Enemy Health Bars:** Displays sleek HP plates above every enemy (including bosses) whenever the new "Enemy Health Bars" option is enabled. The plates animate with delayed damage trails, show precise HP totals, and remain readable even when the battle screen tone changes.
 - **Friendly Door Visitors:** Removes the pool of cursed/hostile door-knock visitors so answering the door never triggers those surprise fights. Disable the option again to restore the original encounter behavior.
 - **Send Next Door Visitor:** Adds a one-press option that immediately schedules the next queued (or freshly rolled) knock visitor so you can trigger door events on demand.
 - **Free Vending Machines:** Instantly bypass the coin slot mini-game so every vending machine interaction jumps right to the purchase menu with a price of zero.
