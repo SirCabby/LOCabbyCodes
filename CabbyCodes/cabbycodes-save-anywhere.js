@@ -23,7 +23,7 @@
 
     CabbyCodes.registerSetting(
         settingKey,
-        'Save Anywhere',
+        'Enable Saving',
         {
             defaultValue: false,
             order: 61
