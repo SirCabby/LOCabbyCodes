@@ -39,6 +39,7 @@
             'cabbycodes-unbreakable-items.js',
             'cabbycodes-friendly-door-visitors.js',
             'cabbycodes-free-vending.js',
+            'cabbycodes-free-merchants.js',
             'cabbycodes-doorbell.js',
             'cabbycodes-freeze-time.js',
             'cabbycodes-freeze-hygiene.js',

@@ -189,6 +189,11 @@
         let currentSubSection = null;
         let subsectionCounter = 0;
 
+        // SAFEGUARD: This function only collects items for display. It NEVER adds items to inventory.
+        // If $gameParty exists, verify no items are added during collection.
+        const partyBefore = typeof $gameParty !== 'undefined' && $gameParty ? 
+            JSON.stringify($gameParty._items || {}) : null;
+
         for (let i = 0; i < source.length; i++) {
             const dbEntry = source[i];
             if (!dbEntry || !sectionDef.validator(dbEntry) || !hasUsableName(dbEntry)) {
@@ -230,6 +235,16 @@
                 subSectionLabel: currentSubSection ? currentSubSection.label : null,
                 sourceIndex: i
             });
+        }
+
+        // SAFEGUARD: Verify no items were accidentally added during collection
+        if (partyBefore && typeof $gameParty !== 'undefined' && $gameParty) {
+            const partyAfter = JSON.stringify($gameParty._items || {});
+            if (partyBefore !== partyAfter) {
+                CabbyCodes.error('[CabbyCodes] Item Giver: CRITICAL BUG - Items were added during collection! This should never happen.');
+                CabbyCodes.error('[CabbyCodes] Before: ' + partyBefore);
+                CabbyCodes.error('[CabbyCodes] After: ' + partyAfter);
+            }
         }
 
         return entries;
@@ -2634,10 +2649,11 @@
         }
     };
 
-    // Register setting with formatValue to show "Press OK" instead of on/off
+    // Register setting with formatValue to show "Press" instead of on/off
     CabbyCodes.registerSetting('itemGiver', 'Give Item', {
         defaultValue: false,
-        formatValue: () => 'Press OK'
+        order: 51,
+        formatValue: () => 'Press'
     });
 
     // Hook into Window_Options to open scene when setting is selected

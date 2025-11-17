@@ -24,7 +24,10 @@
     CabbyCodes.registerSetting(
         settingKey,
         'Infinite Money',
-        false,
+        {
+            defaultValue: false,
+            order: 55
+        },
         newValue => {
             CabbyCodes.log(`[CabbyCodes] Infinite money ${newValue ? 'enabled' : 'disabled'}`);
         }

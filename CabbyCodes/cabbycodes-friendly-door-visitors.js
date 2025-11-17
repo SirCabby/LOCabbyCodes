@@ -411,7 +411,10 @@
     CabbyCodes.registerSetting(
         settingKey,
         'Friendly Door Visitors',
-        false,
+        {
+            defaultValue: false,
+            order: 60
+        },
         newValue => {
             applyFriendlyMode(newValue);
             CabbyCodes.log(

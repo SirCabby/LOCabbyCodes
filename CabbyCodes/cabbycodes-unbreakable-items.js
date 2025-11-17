@@ -23,7 +23,10 @@
     CabbyCodes.registerSetting(
         settingKey,
         'Unbreakable Items',
-        false,
+        {
+            defaultValue: false,
+            order: 58
+        },
         newValue => {
             CabbyCodes.log(
                 `[CabbyCodes] Unbreakable items ${newValue ? 'enabled' : 'disabled'}`

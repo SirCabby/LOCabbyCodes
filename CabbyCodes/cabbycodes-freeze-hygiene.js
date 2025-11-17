@@ -25,8 +25,11 @@
 
     CabbyCodes.registerSetting(
         settingKey,
-        'Freeze Hygiene Decay',
-        false,
+        'Infinite Hygiene / Breath',
+        {
+            defaultValue: false,
+            order: 57
+        },
         newValue => {
             CabbyCodes.log(
                 `[CabbyCodes] Hygiene decay ${newValue ? 'frozen' : 'restored'}`

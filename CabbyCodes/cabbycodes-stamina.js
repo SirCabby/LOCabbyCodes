@@ -22,8 +22,11 @@
 
     CabbyCodes.registerSetting(
         settingKey,
-        'Disable Stamina Drain',
-        false,
+        'Infinite Stamina',
+        {
+            defaultValue: false,
+            order: 54
+        },
         newValue => {
             CabbyCodes.log(
                 `[CabbyCodes] Stamina drain ${newValue ? 'disabled' : 'enabled'}`

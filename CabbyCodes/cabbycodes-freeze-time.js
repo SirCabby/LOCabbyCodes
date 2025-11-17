@@ -59,7 +59,13 @@
     const interpreterStack = [];
     const interpreterThawStates = new WeakMap();
     const videoGameCommonEventId = 12;
-    const zeroTimeCommonEventIds = new Set([68, 69, videoGameCommonEventId]);
+    const freezeTimeApi = (CabbyCodes.freezeTime = CabbyCodes.freezeTime || {});
+    const zeroTimeCommonEventIds =
+        freezeTimeApi.zeroTimeCommonEventIds || new Set([68, 69, videoGameCommonEventId]);
+    freezeTimeApi.zeroTimeCommonEventIds = zeroTimeCommonEventIds;
+    const zeroTimeScriptTriggers =
+        freezeTimeApi.zeroTimeScriptTriggers || new Set(['grabDoorEncounter']);
+    freezeTimeApi.zeroTimeScriptTriggers = zeroTimeScriptTriggers;
     let timeDataInitialized = false;
     let pendingFreezeCaptureTimer = null;
     let freezeCaptureRequested = false;
@@ -114,9 +120,9 @@
         return timeDataInitialized && isAnyTimeLockActive();
     }
 
-    CabbyCodes.registerSetting(settingKey, 'Freeze Time of Day', {
+    CabbyCodes.registerSetting(settingKey, 'Freeze Time', {
         defaultValue: false,
-        order: 60,
+        order: 52,
         onChange: newValue => {
             freezeSessionId += 1;
             if (newValue) {
@@ -139,12 +145,37 @@
         return isFreezeSettingActive();
     }
 
+    freezeTimeApi.registerZeroTimeEvent = function(eventId) {
+        const numericId = Number(eventId);
+        if (Number.isFinite(numericId) && numericId > 0) {
+            zeroTimeCommonEventIds.add(numericId);
+        }
+    };
+
+    freezeTimeApi.registerZeroTimeScriptTrigger = function(fragment) {
+        if (typeof fragment !== 'string') {
+            return;
+        }
+        const trimmed = fragment.trim();
+        if (trimmed.length === 0) {
+            return;
+        }
+        zeroTimeScriptTriggers.add(trimmed);
+    };
+
     function isAnyTimeLockActive() {
         return isFreezeEnabled();
     }
 
     function shouldApplyZeroTime(commonEventId) {
-        return isFreezeSettingActive() && zeroTimeCommonEventIds.has(commonEventId);
+        if (!isFreezeSettingActive()) {
+            return false;
+        }
+        const numericId = Number(commonEventId);
+        if (!Number.isFinite(numericId)) {
+            return false;
+        }
+        return zeroTimeCommonEventIds.has(numericId);
     }
 
     function isZeroTimeInterpreter(interpreter) {
@@ -160,17 +191,48 @@
             inheritsZeroTime || shouldApplyZeroTime(commonEventId);
     }
 
-    function isZeroTimeInterpreter(interpreter) {
-        return Boolean(interpreter && interpreter._cabbycodesZeroTimeActive);
+    function shouldActivateZeroTimeForScript(scriptText) {
+        if (!isFreezeSettingActive() || !scriptText) {
+            return false;
+        }
+        for (const trigger of zeroTimeScriptTriggers) {
+            if (scriptText.includes(trigger)) {
+                return true;
+            }
+        }
+        return false;
     }
 
-    function markZeroTimeChild(parent, child, commonEventId) {
-        if (!child) {
-            return;
+    function getFullScriptText(interpreter) {
+        if (!interpreter || !Array.isArray(interpreter._list)) {
+            return '';
         }
-        const parentZero = isZeroTimeInterpreter(parent);
-        child._cabbycodesZeroTimeActive =
-            zeroTimeCommonEventIds.has(commonEventId) || parentZero;
+        let scriptText = '';
+        let idx = interpreter._index;
+        let expecting655 = false;
+        while (idx < interpreter._list.length) {
+            const command = interpreter._list[idx];
+            if (!command) {
+                break;
+            }
+            const code = command.code;
+            if (!expecting655 && code !== 355) {
+                break;
+            }
+            if (expecting655 && code !== 655) {
+                break;
+            }
+            const line = command.parameters[0];
+            if (typeof line === 'string') {
+                scriptText += line;
+            }
+            scriptText += '\n';
+            idx += 1;
+            if (!expecting655) {
+                expecting655 = true;
+            }
+        }
+        return scriptText.trim();
     }
 
     function shouldBlock(variableId) {
@@ -534,6 +596,20 @@
                 }
             }
             return false;
+        }
+    );
+
+    CabbyCodes.override(
+        Game_Interpreter.prototype,
+        'command355',
+        function() {
+            const scriptText = getFullScriptText(this);
+            if (shouldActivateZeroTimeForScript(scriptText)) {
+                this._cabbycodesZeroTimeActive = true;
+            }
+            return callOriginal(Game_Interpreter.prototype, 'command355', this, [
+                ...arguments
+            ]);
         }
     );
 

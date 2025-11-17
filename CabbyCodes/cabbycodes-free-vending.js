@@ -37,7 +37,10 @@
     CabbyCodes.registerSetting(
         settingKey,
         'Free Vending Machines',
-        false,
+        {
+            defaultValue: false,
+            order: 62
+        },
         newValue => {
             CabbyCodes.log(
                 `[CabbyCodes] Free vending machines ${newValue ? 'enabled' : 'disabled'}`

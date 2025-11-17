@@ -25,7 +25,10 @@
     CabbyCodes.registerSetting(
         settingKey,
         'Infinite Consumables',
-        false,
+        {
+            defaultValue: false,
+            order: 56
+        },
         newValue => {
             CabbyCodes.log(
                 `[CabbyCodes] Infinite consumables ${newValue ? 'enabled' : 'disabled'}`

@@ -23,7 +23,10 @@
     CabbyCodes.registerSetting(
         settingKey,
         'Invincibility',
-        false,
+        {
+            defaultValue: false,
+            order: 53
+        },
         newValue => {
             CabbyCodes.log(
                 `[CabbyCodes] Invincibility ${newValue ? 'enabled' : 'disabled'}`

@@ -173,7 +173,7 @@
 
     CabbyCodes.registerSetting(settingKey, 'Send Next Door Visitor', {
         defaultValue: false,
-        order: 55,
+        order: 50,
         formatValue: () => 'Press',
         onChange: newValue => {
             if (!newValue) {

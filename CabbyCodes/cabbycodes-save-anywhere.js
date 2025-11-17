@@ -23,7 +23,10 @@
     CabbyCodes.registerSetting(
         settingKey,
         'Save Anywhere',
-        false,
+        {
+            defaultValue: false,
+            order: 61
+        },
         newValue => {
             CabbyCodes.log(`[CabbyCodes] Save anywhere ${newValue ? 'enabled' : 'disabled'}`);
         }
