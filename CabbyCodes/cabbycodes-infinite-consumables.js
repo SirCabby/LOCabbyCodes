@@ -110,6 +110,45 @@
     }
 
     /**
+     * Determines whether the provided item is one of the temporary
+     * gamemode selector tokens that the base game injects into the
+     * inventory during the new-game difficulty picker.
+     * Those items use the WD_ItemUse "gamemode" meta tag and should
+     * never be protected by the infinite consumables toggle so that
+     * the scripted cleanup can always remove them.
+     * @param {RPG.Item | RPG.Weapon | RPG.Armor} item
+     * @returns {boolean}
+     */
+    function isGamemodeSelectorItem(item) {
+        if (!item || !item.meta) {
+            return false;
+        }
+
+        const rawTag = item.meta.WD_Items;
+        if (!rawTag) {
+            return false;
+        }
+
+        const normalize = value => {
+            if (Array.isArray(value)) {
+                return value;
+            }
+            if (typeof value === 'string') {
+                return [value];
+            }
+            return [];
+        };
+
+        const tags = normalize(rawTag);
+        return tags.some(tag => {
+            if (typeof tag !== 'string') {
+                return false;
+            }
+            return tag.trim().toLowerCase() === 'gamemode';
+        });
+    }
+
+    /**
      * Determines whether the provided item is a consumable that should be
      * protected from decreasing counts.
      * @param {RPG.Item | RPG.Weapon | RPG.Armor} item
@@ -125,6 +164,10 @@
         try {
             const isRpgItem = DataManager.isItem(item);
             if (!isRpgItem) {
+                return false;
+            }
+
+            if (isGamemodeSelectorItem(item)) {
                 return false;
             }
 
