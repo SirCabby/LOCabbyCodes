@@ -19,7 +19,6 @@
     }
 
     const settingKey = 'saveAnywhere';
-    const respectStorySettingKey = 'saveAnywhereRespectStoryLocks';
 
     CabbyCodes.registerSetting(
         settingKey,
@@ -33,17 +32,7 @@
         }
     );
 
-    CabbyCodes.registerSetting(
-        respectStorySettingKey,
-        'Respect Story Save Locks',
-        {
-            defaultValue: true,
-            order: 62
-        }
-    );
-
     const isFeatureEnabled = () => CabbyCodes.getSetting(settingKey, false);
-    const shouldRespectStoryLocks = () => CabbyCodes.getSetting(respectStorySettingKey, true);
 
     const DifficultyState = {
         easySwitchId: 13,
@@ -145,14 +134,14 @@
 
             const lockType = this.determineLockType();
             if (lockType === 'story') {
-                return !shouldRespectStoryLocks();
+                return false;
             }
 
             if (lockType === 'difficulty') {
                 return true;
             }
 
-            return !shouldRespectStoryLocks();
+            return false;
         },
 
         ensureSaveCommand(menuWindow) {
