@@ -60,11 +60,62 @@
 
     const interpreterStack = [];
     const interpreterThawStates = new WeakMap();
+    const parallelCommonEventId = 2;
     const videoGameCommonEventId = 12;
+    const cookMealCommonEventId = 61;
+    const cookPrepCommonEventId = 44;
     const freezeTimeApi = (CabbyCodes.freezeTime = CabbyCodes.freezeTime || {});
+    const timePassesCommonEventId = 4;
+    const defaultZeroTimeCommonEvents = [
+        parallelCommonEventId, // Parallel (handles door timers etc)
+        timePassesCommonEventId, // Time passes
+        videoGameCommonEventId, // video game event
+        16, // screenEffects (kitchen intro)
+        cookPrepCommonEventId, // Cooking prep
+        61, // eatCookedMeal
+        68,
+        69,
+        145 // display / kitchen overlay
+    ];
     const zeroTimeCommonEventIds =
-        freezeTimeApi.zeroTimeCommonEventIds || new Set([4, 68, 69, videoGameCommonEventId]);
+        freezeTimeApi.zeroTimeCommonEventIds || new Set(defaultZeroTimeCommonEvents);
+    defaultZeroTimeCommonEvents.forEach(id => zeroTimeCommonEventIds.add(id));
     freezeTimeApi.zeroTimeCommonEventIds = zeroTimeCommonEventIds;
+    const zeroTimeCommonEventLists =
+        freezeTimeApi.zeroTimeCommonEventLists || new WeakMap();
+    freezeTimeApi.zeroTimeCommonEventLists = zeroTimeCommonEventLists;
+    const zeroTimeMapEvents = freezeTimeApi.zeroTimeMapEvents || new Map();
+    freezeTimeApi.zeroTimeMapEvents = zeroTimeMapEvents;
+
+    function zeroTimeMapEventKey(mapId, eventId) {
+        return `${mapId}:${eventId}`;
+    }
+
+    function registerZeroTimeMapEvent(mapId, eventId, commonEventId = cookMealCommonEventId) {
+        const numericMapId = Number(mapId);
+        const numericEventId = Number(eventId);
+        const numericCommonEventId = Number(commonEventId);
+        if (
+            !Number.isFinite(numericMapId) ||
+            numericMapId <= 0 ||
+            !Number.isFinite(numericEventId) ||
+            numericEventId <= 0
+        ) {
+            return;
+        }
+        zeroTimeMapEvents.set(zeroTimeMapEventKey(numericMapId, numericEventId), numericCommonEventId);
+    }
+
+    freezeTimeApi.registerZeroTimeMapEvent = registerZeroTimeMapEvent;
+
+    const frontDoorMapId = 3;
+    const frontDoorEventId = 9;
+    const doorKnockSwitchId = 24;
+
+    registerZeroTimeMapEvent(frontDoorMapId, frontDoorEventId, timePassesCommonEventId);
+    [21, 22, 46].forEach(eventId =>
+        registerZeroTimeMapEvent(frontDoorMapId, eventId, cookMealCommonEventId)
+    );
     const zeroTimeScriptTriggers =
         freezeTimeApi.zeroTimeScriptTriggers || new Set(['grabDoorEncounter']);
     freezeTimeApi.zeroTimeScriptTriggers = zeroTimeScriptTriggers;
@@ -75,9 +126,6 @@
     const explicitDoorTroopIds =
         freezeTimeApi.explicitDoorTroopIds || new Set();
     freezeTimeApi.explicitDoorTroopIds = explicitDoorTroopIds;
-    const frontDoorMapId = 3;
-    const frontDoorEventId = 9;
-    const doorKnockSwitchId = 24;
     let doorZeroTimeDepth = 0;
     let timeDataInitialized = false;
     let pendingFreezeCaptureTimer = null;
@@ -92,6 +140,88 @@
             return performance.now();
         }
         return Date.now();
+    }
+
+    function resolveCommonEventIdFromList(list) {
+        if (!Array.isArray(list)) {
+            return NaN;
+        }
+        const cachedId = zeroTimeCommonEventLists.get(list);
+        if (Number.isFinite(cachedId)) {
+            return cachedId;
+        }
+        if (!Array.isArray(window.$dataCommonEvents)) {
+            return NaN;
+        }
+        for (const event of window.$dataCommonEvents) {
+            if (event && Array.isArray(event.list)) {
+                if (event.list === list) {
+                    zeroTimeCommonEventLists.set(list, event.id);
+                    return Number(event.id);
+                }
+                if (list.length > 0 && event.list.length > 0 && list.length === event.list.length) {
+                    const firstCmd = list[0];
+                    const eventFirstCmd = event.list[0];
+                    if (firstCmd && eventFirstCmd && firstCmd.code === eventFirstCmd.code) {
+                        zeroTimeCommonEventLists.set(list, event.id);
+                        return Number(event.id);
+                    }
+                }
+            }
+        }
+        return NaN;
+    }
+
+    function primeZeroTimeCommonEventList(commonEventId) {
+        if (!Number.isFinite(commonEventId)) {
+            return;
+        }
+        if (!Array.isArray(window.$dataCommonEvents)) {
+            return;
+        }
+        const commonEvent = window.$dataCommonEvents[commonEventId];
+        if (commonEvent && Array.isArray(commonEvent.list)) {
+            zeroTimeCommonEventLists.set(commonEvent.list, commonEventId);
+        }
+    }
+
+    zeroTimeCommonEventIds.forEach(primeZeroTimeCommonEventList);
+
+    function markInterpreterZeroTimeFlag(interpreter, commonEventId, reason) {
+        if (!interpreter) {
+            return;
+        }
+        const numericId = Number(commonEventId);
+        const shouldFlag =
+            interpreter._cabbycodesZeroTimeActive ||
+            (Number.isFinite(numericId) && zeroTimeCommonEventIds.has(numericId));
+        if (!shouldFlag) {
+            return;
+        }
+        interpreter._cabbycodesZeroTimeActive = true;
+        if (Number.isFinite(numericId)) {
+            interpreter._cabbycodesCommonEventId = numericId;
+        }
+        if (reason) {
+            freezeDebugLog(
+                `Marked interpreter ${describeInterpreter(interpreter)} for zero-time (${reason}, event:${numericId})`
+            );
+        }
+    }
+
+    function tagInterpreterOwner(interpreter, mapId, eventId, eventName) {
+        if (!interpreter) {
+            return;
+        }
+        if (Number.isFinite(mapId)) {
+            interpreter._cabbycodesOwnerMapId = mapId;
+        }
+        if (Number.isFinite(eventId)) {
+            interpreter._cabbycodesOwnerEventId = eventId;
+        }
+        if (typeof eventName === 'string' && eventName.length > 0) {
+            interpreter._cabbycodesOwnerEventName = eventName;
+        }
     }
 
     function addTimeVariableId(varId) {
@@ -198,10 +328,6 @@
             );
         }
     });
-    if (CabbyCodes.getSetting(debugSettingKey, false)) {
-        CabbyCodes.setSetting(debugSettingKey, false);
-        CabbyCodes.log('[CabbyCodes][FreezeTime] Debug logging auto-disabled for this build.');
-    }
     function isFreezeDebugEnabled() {
         return Boolean(CabbyCodes.getSetting(debugSettingKey, false));
     }
@@ -212,6 +338,12 @@
         }
         CabbyCodes.log(`[CabbyCodes][FreezeTime] ${message}`);
     }
+
+    freezeDebugLog(
+        `Zero-time common events registered: ${Array.from(zeroTimeCommonEventIds)
+            .sort((a, b) => a - b)
+            .join(', ')}`
+    );
 
     function isWatchedVariable(varId) {
         return isFreezeDebugEnabled() && trackedVariableIds.has(varId);
@@ -231,9 +363,44 @@
             if (!zeroTimeCommonEventIds.has(numericId)) {
                 zeroTimeCommonEventIds.add(numericId);
                 freezeDebugLog(`Registered common event ${numericId} for zero-time handling.`);
+                primeZeroTimeCommonEventList(numericId);
             }
         }
     };
+
+    function findEventZeroTimeCommonEventId(gameEvent) {
+        if (!isFreezeSettingActive() || !gameEvent || typeof gameEvent.list !== 'function') {
+            return NaN;
+        }
+        const commands = gameEvent.list();
+        if (!Array.isArray(commands)) {
+            return NaN;
+        }
+        for (const command of commands) {
+            if (command?.code === 117) {
+                const candidateId = Number(command.parameters?.[0]);
+                if (Number.isFinite(candidateId) && zeroTimeCommonEventIds.has(candidateId)) {
+                    return candidateId;
+                }
+            }
+        }
+        return NaN;
+    }
+
+    function applyEventZeroTimeToInterpreter(gameEvent, reason) {
+        if (!gameEvent || !gameEvent._interpreter) {
+            return;
+        }
+        const eventId = Number(gameEvent._cabbycodesEventZeroTimeId);
+        if (!Number.isFinite(eventId)) {
+            return;
+        }
+        markInterpreterZeroTimeFlag(
+            gameEvent._interpreter,
+            eventId,
+            `${reason} (event:${gameEvent.eventId?.() ?? gameEvent._eventId ?? 'unknown'})`
+        );
+    }
 
     freezeTimeApi.registerZeroTimeScriptTrigger = function(fragment) {
         if (typeof fragment !== 'string') {
@@ -301,8 +468,15 @@
             return;
         }
         const inheritsZeroTime = isZeroTimeInterpreter(parentInterpreter);
-        childInterpreter._cabbycodesZeroTimeActive =
-            inheritsZeroTime || shouldApplyZeroTime(commonEventId);
+        const zeroTimeActive = inheritsZeroTime || shouldApplyZeroTime(commonEventId);
+        if (!zeroTimeActive) {
+            return;
+        }
+        markInterpreterZeroTimeFlag(
+            childInterpreter,
+            Number.isFinite(commonEventId) ? Number(commonEventId) : NaN,
+            'markZeroTimeChild'
+        );
     }
 
     function shouldActivateZeroTimeForScript(scriptText) {
@@ -401,14 +575,25 @@
             return 'none';
         }
         const parts = [];
-        if (typeof interpreter._eventId !== 'undefined') {
-            parts.push(`event:${interpreter._eventId ?? 'null'}`);
+        const ownerEventId =
+            typeof interpreter._eventId !== 'undefined'
+                ? interpreter._eventId
+                : interpreter._cabbycodesOwnerEventId;
+        if (typeof ownerEventId !== 'undefined') {
+            parts.push(`event:${ownerEventId ?? 'null'}`);
         }
-        if (typeof interpreter._mapId !== 'undefined') {
-            parts.push(`map:${interpreter._mapId ?? 'null'}`);
+        if (interpreter._cabbycodesOwnerEventName) {
+            parts.push(`label:${interpreter._cabbycodesOwnerEventName}`);
         }
-        if (typeof interpreter._commonEventId !== 'undefined') {
-            parts.push(`common:${interpreter._commonEventId ?? 'null'}`);
+        const ownerMapId =
+            typeof interpreter._mapId !== 'undefined'
+                ? interpreter._mapId
+                : interpreter._cabbycodesOwnerMapId;
+        if (typeof ownerMapId !== 'undefined') {
+            parts.push(`map:${ownerMapId ?? 'null'}`);
+        }
+        if (typeof interpreter._cabbycodesCommonEventId !== 'undefined') {
+            parts.push(`common:${interpreter._cabbycodesCommonEventId ?? 'null'}`);
         }
         parts.push(`index:${interpreter._index ?? 'n/a'}`);
         parts.push(`depth:${interpreterStack.length}`);
@@ -860,14 +1045,104 @@
         Game_Interpreter.prototype,
         'command117',
         function(parameters) {
-            const result = callOriginal(Game_Interpreter.prototype, 'command117', this, [parameters]);
-            const commonEventId = Array.isArray(parameters) ? parameters[0] : undefined;
+            const commonEventId = Array.isArray(parameters) ? Number(parameters[0]) : NaN;
+            freezeDebugLog(`command117 called with commonEventId=${commonEventId}, isZeroTime=${Number.isFinite(commonEventId) && zeroTimeCommonEventIds.has(commonEventId)}`);
+            if (
+                Number.isFinite(commonEventId) &&
+                zeroTimeCommonEventIds.has(commonEventId) &&
+                Array.isArray(window.$dataCommonEvents)
+            ) {
+                const commonEvent = window.$dataCommonEvents[commonEventId];
+                if (commonEvent && Array.isArray(commonEvent.list)) {
+                    zeroTimeCommonEventLists.set(commonEvent.list, commonEventId);
+                    freezeDebugLog(`command117: primed list for common event ${commonEventId}`);
+                }
+            }
+            if (Number.isFinite(commonEventId)) {
+                this._cabbycodesPendingZeroTimeCommonEventId = commonEventId;
+            }
+            let result;
+            try {
+                result = callOriginal(Game_Interpreter.prototype, 'command117', this, [parameters]);
+            } finally {
+                this._cabbycodesPendingZeroTimeCommonEventId = undefined;
+            }
             if (this._childInterpreter && Number.isFinite(commonEventId)) {
-                markZeroTimeChild(this, this._childInterpreter, Number(commonEventId));
+                freezeDebugLog(`command117: child interpreter created, marking with commonEventId ${commonEventId}`);
+                markZeroTimeChild(this, this._childInterpreter, commonEventId);
+            } else if (this._childInterpreter) {
+                freezeDebugLog(`command117: child interpreter created but no valid commonEventId`);
+            } else {
+                freezeDebugLog(`command117: no child interpreter created yet`);
             }
             return result;
         }
     );
+
+    CabbyCodes.override(
+        Game_Interpreter.prototype,
+        'setupChild',
+        function(list, eventId) {
+            let commonEventId = Number(this._cabbycodesPendingZeroTimeCommonEventId);
+            this._cabbycodesPendingZeroTimeCommonEventId = undefined;
+            freezeDebugLog(`setupChild called: pendingId=${commonEventId}, list.length=${Array.isArray(list) ? list.length : 'N/A'}`);
+            if (!Number.isFinite(commonEventId) && typeof this.currentCommand === 'function') {
+                const current = this.currentCommand();
+                if (current && current.code === 117) {
+                    commonEventId = Number(current.parameters?.[0]);
+                    freezeDebugLog(`setupChild: extracted commonEventId ${commonEventId} from currentCommand`);
+                }
+            }
+            if (!Number.isFinite(commonEventId)) {
+                commonEventId = resolveCommonEventIdFromList(list);
+                freezeDebugLog(`setupChild: resolved commonEventId ${commonEventId} from list`);
+            }
+            const result = callOriginal(Game_Interpreter.prototype, 'setupChild', this, [
+                list,
+                eventId
+            ]);
+            if (this._childInterpreter && Number.isFinite(commonEventId)) {
+                freezeDebugLog(`setupChild: marking child interpreter with commonEventId ${commonEventId}`);
+                markZeroTimeChild(this, this._childInterpreter, commonEventId);
+            } else if (this._childInterpreter) {
+                const fallbackId = resolveCommonEventIdFromList(list);
+                freezeDebugLog(`setupChild: fallback marking child interpreter with resolvedId ${fallbackId}`);
+                markInterpreterZeroTimeFlag(
+                    this._childInterpreter,
+                    fallbackId,
+                    'setupChild-fallback'
+                );
+            } else {
+                freezeDebugLog(`setupChild: no child interpreter created yet`);
+            }
+            return result;
+        }
+    );
+
+    CabbyCodes.after(Game_Interpreter.prototype, 'setup', function(list, eventId) {
+        const numericEventId = Number(eventId);
+        this._cabbycodesOwnerEventId = Number.isFinite(numericEventId) ? numericEventId : 0;
+        this._cabbycodesOwnerMapId = Number($gameMap?.mapId?.()) || this._mapId || 0;
+        if (Number.isFinite(this._cabbycodesOwnerEventId) && this._cabbycodesOwnerEventId > 0) {
+            const mapData = typeof $dataMap !== 'undefined' ? $dataMap : null;
+            const eventData = mapData?.events?.[this._cabbycodesOwnerEventId];
+            this._cabbycodesOwnerEventName =
+                typeof eventData?.name === 'string' && eventData.name.length > 0
+                    ? eventData.name
+                    : undefined;
+        } else {
+            this._cabbycodesOwnerEventName = undefined;
+        }
+
+        if (!isFreezeSettingActive() || !Array.isArray(list)) {
+            return;
+        }
+        const associatedId = resolveCommonEventIdFromList(list);
+        if (!Number.isFinite(associatedId)) {
+            return;
+        }
+        markInterpreterZeroTimeFlag(this, associatedId, 'interpreter.setup');
+    });
 
     CabbyCodes.override(
         Game_Interpreter.prototype,
@@ -1091,23 +1366,169 @@
         if (!isFreezeSettingActive()) {
             return;
         }
-        if (!isFrontDoorEventInstance(this)) {
-            return;
+        if (typeof $gameMap !== 'undefined' && $gameMap && $gameMap._interpreter) {
+            tagInterpreterOwner(
+                $gameMap._interpreter,
+                this._mapId,
+                this.eventId?.() ?? this._eventId,
+                this.event?.().name
+            );
         }
-        const tickets = Number(this._cabbycodesDoorZeroTimeTickets || 0) + 1;
-        this._cabbycodesDoorZeroTimeTickets = tickets;
-        activateDoorZeroTime(`Front door event ${this.eventId()} started (tickets=${tickets})`);
+        if (isFrontDoorEventInstance(this)) {
+            const tickets = Number(this._cabbycodesDoorZeroTimeTickets || 0) + 1;
+            this._cabbycodesDoorZeroTimeTickets = tickets;
+            activateDoorZeroTime(`Front door event ${this.eventId()} started (tickets=${tickets})`);
+            if (this._interpreter) {
+                this._interpreter._cabbycodesZeroTimeActive = true;
+                freezeDebugLog(
+                    `Marked front door interpreter (event:${this.eventId()}) for zero-time during start.`
+                );
+            }
+        }
+
+        const eventIdentifier = this.eventId?.() ?? this._eventId ?? 0;
+        const forcedZeroTimeId = zeroTimeMapEvents.get(
+            zeroTimeMapEventKey(this._mapId, eventIdentifier)
+        );
+        let eventZeroTimeId = findEventZeroTimeCommonEventId(this);
+        if (!Number.isFinite(eventZeroTimeId) && Number.isFinite(forcedZeroTimeId)) {
+            eventZeroTimeId = forcedZeroTimeId;
+        }
+        if (Number.isFinite(eventZeroTimeId)) {
+            this._cabbycodesEventZeroTimeId = eventZeroTimeId;
+            const eventLabel = eventIdentifier || 'unknown';
+            freezeDebugLog(
+                `Event ${eventLabel} flagged for zero-time (common event ${eventZeroTimeId}${
+                    Number.isFinite(forcedZeroTimeId) ? ', registry' : ''
+                }).`
+            );
+            if (typeof $gameMap !== 'undefined' && $gameMap && $gameMap._interpreter) {
+                markInterpreterZeroTimeFlag(
+                    $gameMap._interpreter,
+                    eventZeroTimeId,
+                    `event.start(pre-setup event:${eventLabel})`
+                );
+            }
+        } else {
+            this._cabbycodesEventZeroTimeId = undefined;
+        }
     });
 
     CabbyCodes.after(Game_Event.prototype, 'unlock', function() {
         const tickets = Number(this._cabbycodesDoorZeroTimeTickets || 0);
-        if (tickets <= 0) {
+        if (tickets > 0) {
+            this._cabbycodesDoorZeroTimeTickets = tickets - 1;
+            deactivateDoorZeroTime(
+                `Front door event ${this.eventId()} unlocked (remaining=${this._cabbycodesDoorZeroTimeTickets})`
+            );
+        } else {
+            this._cabbycodesDoorZeroTimeTickets = 0;
+        }
+
+        if (this._cabbycodesEventZeroTimeId) {
+            freezeDebugLog(
+                `Event ${this.eventId?.() ?? this._eventId ?? 'unknown'} cleared zero-time flag (unlock).`
+            );
+            this._cabbycodesEventZeroTimeId = undefined;
+        }
+    });
+
+    CabbyCodes.after(Game_Map.prototype, 'setupStartingMapEvent', function() {
+        if (!isFreezeSettingActive()) {
             return;
         }
-        this._cabbycodesDoorZeroTimeTickets = tickets - 1;
-        deactivateDoorZeroTime(
-            `Front door event ${this.eventId()} unlocked (remaining=${this._cabbycodesDoorZeroTimeTickets})`
-        );
+        const interpreter = this._interpreter;
+        if (!interpreter || typeof interpreter.eventId !== 'function') {
+            return;
+        }
+        const eventId = Number(interpreter.eventId());
+        if (!Number.isFinite(eventId) || eventId <= 0) {
+            return;
+        }
+        const gameEvent = this.event?.(eventId);
+        if (!gameEvent) {
+            return;
+        }
+        tagInterpreterOwner(interpreter, this.mapId(), eventId, gameEvent.event?.().name);
+        if (!Number.isFinite(gameEvent._cabbycodesEventZeroTimeId)) {
+            gameEvent._cabbycodesEventZeroTimeId = findEventZeroTimeCommonEventId(gameEvent);
+        }
+        if (Number.isFinite(gameEvent._cabbycodesEventZeroTimeId)) {
+            markInterpreterZeroTimeFlag(
+                interpreter,
+                gameEvent._cabbycodesEventZeroTimeId,
+                `map.setupStartingMapEvent(event:${eventId})`
+            );
+        }
+    });
+
+    CabbyCodes.after(Game_Map.prototype, 'setupStartingEvent', function() {
+        if (!isFreezeSettingActive()) {
+            return;
+        }
+        const interpreter = this._interpreter;
+        if (!interpreter || isZeroTimeInterpreter(interpreter)) {
+            return;
+        }
+        const list = interpreter._list;
+        if (!Array.isArray(list)) {
+            return;
+        }
+        let predictedId = NaN;
+        if (typeof interpreter.eventId === 'function') {
+            const eventId = Number(interpreter.eventId());
+            if (Number.isFinite(eventId) && eventId > 0) {
+                const event = this.event?.(eventId);
+                if (event) {
+                    tagInterpreterOwner(
+                        interpreter,
+                        this.mapId(),
+                        eventId,
+                        event.event?.().name || event.name
+                    );
+                }
+                if (event && Number.isFinite(event._cabbycodesEventZeroTimeId)) {
+                    predictedId = event._cabbycodesEventZeroTimeId;
+                }
+            }
+        }
+        if (!Number.isFinite(predictedId)) {
+            predictedId = resolveCommonEventIdFromList(list);
+        }
+        if (Number.isFinite(predictedId)) {
+            markInterpreterZeroTimeFlag(
+                interpreter,
+                predictedId,
+                'map.setupStartingEvent(list)'
+            );
+        }
+    });
+
+    CabbyCodes.after(Game_Map.prototype, 'setupStartingMapEvent', function() {
+        if (!isFreezeSettingActive()) {
+            return;
+        }
+        if (!this._interpreter || typeof this._interpreter.eventId !== 'function') {
+            return;
+        }
+        const eventId = Number(this._interpreter.eventId());
+        if (!Number.isFinite(eventId) || eventId <= 0) {
+            return;
+        }
+        const event = this.event?.(eventId);
+        if (!event) {
+            return;
+        }
+        if (!Number.isFinite(event._cabbycodesEventZeroTimeId)) {
+            event._cabbycodesEventZeroTimeId = findEventZeroTimeCommonEventId(event);
+        }
+        if (Number.isFinite(event._cabbycodesEventZeroTimeId)) {
+            markInterpreterZeroTimeFlag(
+                this._interpreter,
+                event._cabbycodesEventZeroTimeId,
+                `map.setupStartingMapEvent(event:${eventId})`
+            );
+        }
     });
 
     CabbyCodes.after(Game_Switches.prototype, 'setValue', function(switchId, value) {
