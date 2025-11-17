@@ -65,6 +65,15 @@
     const cookMealCommonEventId = 61;
     const cookPrepCommonEventId = 44;
     const freezeTimeApi = (CabbyCodes.freezeTime = CabbyCodes.freezeTime || {});
+    const debugSettingKey = 'freezeTimeDebugLogging';
+    const ENABLE_FREEZE_TIME_DEBUG_LOGGING = false; // Set to true when debugging locally
+    const cabbyCodesSettings = CabbyCodes.settings || {};
+    if (Object.prototype.hasOwnProperty.call(cabbyCodesSettings, debugSettingKey)) {
+        delete cabbyCodesSettings[debugSettingKey];
+        if (typeof CabbyCodes.saveSettings === 'function') {
+            CabbyCodes.saveSettings();
+        }
+    }
     const timePassesCommonEventId = 4;
     const defaultZeroTimeCommonEvents = [
         parallelCommonEventId, // Parallel (handles door timers etc)
@@ -318,18 +327,8 @@
         }
     });
 
-    const debugSettingKey = 'freezeTimeDebugLogging';
-    CabbyCodes.registerSetting(debugSettingKey, 'Freeze Time Debug Logging', {
-        defaultValue: false,
-        order: 53,
-        onChange: newValue => {
-            CabbyCodes.log(
-                `[CabbyCodes][FreezeTime] Debug logging ${newValue ? 'enabled' : 'disabled'}.`
-            );
-        }
-    });
     function isFreezeDebugEnabled() {
-        return Boolean(CabbyCodes.getSetting(debugSettingKey, false));
+        return ENABLE_FREEZE_TIME_DEBUG_LOGGING;
     }
 
     function freezeDebugLog(message) {
