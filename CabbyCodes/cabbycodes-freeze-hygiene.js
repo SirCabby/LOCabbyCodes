@@ -30,6 +30,7 @@
         117 // bad breath tracker
     ]);
     const settingKey = 'freezeHygiene';
+    const FLOAT_TOLERANCE = 1e-4;
 
     CabbyCodes.registerSetting(
         settingKey,
@@ -69,30 +70,64 @@
         return undefined;
     }
 
+    function normalizeValue(value) {
+        const numeric = Number(value);
+        return Number.isFinite(numeric) ? numeric : null;
+    }
+
     /**
-     * Determines whether the incoming value change should be blocked.
+     * Determines whether the next value represents a decrease that should be blocked.
+     * @param {number} variableId
+     * @param {*} previousValue
+     * @param {*} pendingValue
+     * @returns {boolean}
+     */
+    function shouldBlockStatDecrease(variableId, previousValue, pendingValue) {
+        if (!isFeatureEnabled()) {
+            return false;
+        }
+
+        const numericId = Number(variableId);
+        if (!Number.isFinite(numericId) || !PROTECTED_VARIABLE_IDS.has(numericId)) {
+            return false;
+        }
+
+        const current = normalizeValue(previousValue);
+        const next = normalizeValue(pendingValue);
+
+        if (current === null || next === null) {
+            return false;
+        }
+
+        return next + FLOAT_TOLERANCE < current;
+    }
+
+    /**
+     * Determines whether the incoming value change should be blocked via setValue.
      * @param {number} variableId
      * @param {*} rawValue
      * @returns {boolean}
      */
     function shouldPreventDecrease(variableId, rawValue) {
-        if (!isFeatureEnabled()) {
-            return false;
-        }
-
-        if (!PROTECTED_VARIABLE_IDS.has(variableId)) {
-            return false;
-        }
-
-        if (typeof rawValue !== 'number' || Number.isNaN(rawValue)) {
+        const numericId = Number(variableId);
+        if (!Number.isFinite(numericId)) {
             return false;
         }
 
         const currentValue =
-            typeof this.value === 'function' ? this.value(variableId) : 0;
-        const pendingValue = Math.floor(rawValue);
+            typeof this.value === 'function' ? this.value(numericId) : 0;
 
-        return pendingValue < currentValue;
+        return shouldBlockStatDecrease(numericId, currentValue, rawValue);
+    }
+
+    const freezeTimeApi = CabbyCodes.freezeTime;
+    if (freezeTimeApi && typeof freezeTimeApi.registerVariableWriteInterceptor === 'function') {
+        freezeTimeApi.registerVariableWriteInterceptor((variableId, previousValue, pendingValue) => {
+            if (shouldBlockStatDecrease(variableId, previousValue, pendingValue)) {
+                return { block: true };
+            }
+            return undefined;
+        });
     }
 
     CabbyCodes.override(

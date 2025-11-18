@@ -73,6 +73,7 @@
     const videoGameCommonEventId = 12;
     const cookMealCommonEventId = 61;
     const cookPrepCommonEventId = 44;
+    const changedRoomsCommonEventId = 11;
     const freezeTimeApi = (CabbyCodes.freezeTime = CabbyCodes.freezeTime || {});
     const debugSettingKey = 'freezeTimeDebugLogging';
     const ENABLE_FREEZE_TIME_DEBUG_LOGGING = false;
@@ -84,6 +85,10 @@
         }
     }
     const timePassesCommonEventId = 4;
+    const minuteBurnCommonEventIds =
+        freezeTimeApi.minuteBurnCommonEventIds || new Set();
+    minuteBurnCommonEventIds.add(timePassesCommonEventId);
+    freezeTimeApi.minuteBurnCommonEventIds = minuteBurnCommonEventIds;
     const defaultZeroTimeCommonEvents = [
         parallelCommonEventId, // Parallel (handles door timers etc)
         timePassesCommonEventId, // Time passes
@@ -93,7 +98,8 @@
         61, // eatCookedMeal
         68,
         69,
-        145 // display / kitchen overlay
+        145, // display / kitchen overlay
+        changedRoomsCommonEventId // ChangedRooms (room transfer handler)
     ];
     const zeroTimeCommonEventIds =
         freezeTimeApi.zeroTimeCommonEventIds || new Set(defaultZeroTimeCommonEvents);
@@ -107,6 +113,41 @@
     const zeroTimeBattleTroopIds =
         freezeTimeApi.zeroTimeBattleTroopIds || new Set();
     freezeTimeApi.zeroTimeBattleTroopIds = zeroTimeBattleTroopIds;
+    const variableWriteInterceptors =
+        freezeTimeApi.variableWriteInterceptors || [];
+    freezeTimeApi.variableWriteInterceptors = variableWriteInterceptors;
+
+    function registerVariableWriteInterceptor(handler) {
+        if (typeof handler !== 'function') {
+            return;
+        }
+        if (!variableWriteInterceptors.includes(handler)) {
+            variableWriteInterceptors.push(handler);
+        }
+    }
+
+    freezeTimeApi.registerVariableWriteInterceptor = registerVariableWriteInterceptor;
+
+    function applyVariableWriteInterceptors(varId, previousValue, pendingValue, context) {
+        if (variableWriteInterceptors.length === 0) {
+            return { blocked: false, value: pendingValue };
+        }
+        let adjustedValue = pendingValue;
+        for (const handler of variableWriteInterceptors) {
+            try {
+                const result = handler(varId, previousValue, adjustedValue, context);
+                if (result === false || (result && result.block === true)) {
+                    return { blocked: true };
+                }
+                if (result && Object.prototype.hasOwnProperty.call(result, 'value')) {
+                    adjustedValue = result.value;
+                }
+            } catch (error) {
+                console.error('[CabbyCodes] Variable write interceptor error:', error);
+            }
+        }
+        return { blocked: false, value: adjustedValue };
+    }
 
     function zeroTimeMapEventKey(mapId, eventId) {
         return `${mapId}:${eventId}`;
@@ -236,6 +277,9 @@
         interpreter._cabbycodesZeroTimeActive = true;
         if (Number.isFinite(numericId)) {
             interpreter._cabbycodesCommonEventId = numericId;
+            if (minuteBurnCommonEventIds.has(numericId)) {
+                interpreter._cabbycodesAllowMinuteBurn = true;
+            }
         }
         if (reason) {
             freezeDebugLog(
@@ -503,6 +547,20 @@
             Number.isFinite(commonEventId) ? Number(commonEventId) : NaN,
             'markZeroTimeChild'
         );
+        if (
+            childInterpreter &&
+            (minuteBurnCommonEventIds.has(Number(commonEventId)) ||
+                allowsZeroTimeMinuteBurn(parentInterpreter))
+        ) {
+            childInterpreter._cabbycodesAllowMinuteBurn = true;
+        }
+    }
+
+    function allowsZeroTimeMinuteBurn(interpreter) {
+        if (!interpreter) {
+            return false;
+        }
+        return Boolean(interpreter._cabbycodesAllowMinuteBurn);
     }
 
     function shouldActivateZeroTimeForScript(scriptText) {
@@ -982,9 +1040,52 @@
         });
     }
 
+    function enforceFrozenSnapshot(reason) {
+        if (!canEnforceTimeLock()) {
+            return false;
+        }
+        if (typeof $gameVariables === 'undefined' || !$gameVariables) {
+            return false;
+        }
+        let applied = 0;
+        trackedVariableIds.forEach(varId => {
+            if (!Object.prototype.hasOwnProperty.call(frozenValues, varId)) {
+                return;
+            }
+            const targetValue = frozenValues[varId];
+            const currentValue = getTrueOriginalValue($gameVariables, varId);
+            if (Object.is(currentValue, targetValue)) {
+                return;
+            }
+            try {
+                callOriginal(Game_Variables.prototype, 'setValue', $gameVariables, [
+                    varId,
+                    targetValue
+                ]);
+                applied += 1;
+            } catch (error) {
+                console.error(
+                    '[CabbyCodes] Failed to enforce frozen variable',
+                    varId,
+                    reason || 'unknown',
+                    error
+                );
+            }
+        });
+        if (applied > 0) {
+            freezeDebugLog(
+                `Reapplied ${applied} frozen values${reason ? ` after ${reason}` : ''}.`
+            );
+        }
+        return applied > 0;
+    }
+
     function finalizeInterpreterSuspension(interpreter) {
         if (interpreter && interpreter._cabbycodesZeroTimeActive) {
             delete interpreter._cabbycodesZeroTimeActive;
+        }
+        if (interpreter && interpreter._cabbycodesAllowMinuteBurn) {
+            delete interpreter._cabbycodesAllowMinuteBurn;
         }
     }
 
@@ -1299,7 +1400,12 @@
             const result = callOriginal(Game_Interpreter.prototype, 'command122', this, [
                 parameters
             ]);
-            if (minutesBefore !== null && typeof $gameVariables !== 'undefined' && $gameVariables) {
+            const shouldRestoreMinutesImmediately =
+                minutesBefore !== null &&
+                typeof $gameVariables !== 'undefined' &&
+                $gameVariables &&
+                !allowsZeroTimeMinuteBurn(this);
+            if (shouldRestoreMinutesImmediately) {
                 $gameVariables.setValue(19, minutesBefore);
                 freezeDebugLog(
                     `Restored variable 19 to ${minutesBefore} after zero-time command122 (interpreter ${describeInterpreter(
@@ -1352,6 +1458,22 @@
                             `[Proxy] set raw var ${propNum} -> ${value} (prev=${previousValue}, enforce=${canEnforceTimeLock()})`
                         );
                     }
+                    const interceptorResult = applyVariableWriteInterceptors(
+                        propNum,
+                        previousValue,
+                        value,
+                        {
+                            source: 'proxySet',
+                            gameVariables: instance
+                        }
+                    );
+                    if (interceptorResult.blocked) {
+                        if (watchedVar) {
+                            freezeDebugLog(`[Proxy] update to var ${propNum} blocked by interceptor.`);
+                        }
+                        return true;
+                    }
+                    value = interceptorResult.value;
                     if (isTrackingEnabled()) {
                         const detectionResult = detectTimeVariableCandidate(
                             propNum,
@@ -1529,6 +1651,17 @@
             );
             this._cabbycodesEventZeroTimeId = undefined;
         }
+    });
+
+    CabbyCodes.after(Game_Map.prototype, 'setup', function(mapId) {
+        let numericMapId = Number(mapId);
+        if (!Number.isFinite(numericMapId) && this && typeof this.mapId === 'function') {
+            numericMapId = Number(this.mapId());
+        }
+        const reason = Number.isFinite(numericMapId)
+            ? `Game_Map.setup(${numericMapId})`
+            : 'Game_Map.setup';
+        enforceFrozenSnapshot(reason);
     });
 
     CabbyCodes.after(Game_Map.prototype, 'setupStartingMapEvent', function() {
