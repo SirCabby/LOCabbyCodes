@@ -453,26 +453,38 @@
         }
     }
 
+    let grabDoorEncounterPatched = false;
+
+    function tryPatchGrabDoorEncounter() {
+        if (grabDoorEncounterPatched) {
+            return;
+        }
+        if (typeof window.grabDoorEncounter !== 'function') {
+            return;
+        }
+        CabbyCodes.after(window, 'grabDoorEncounter', ensureFriendlyGrabResult);
+        grabDoorEncounterPatched = true;
+    }
+
     if (typeof window.setupDoorEncounters === 'function') {
         CabbyCodes.after(window, 'setupDoorEncounters', () => {
             if (CabbyCodes.getSetting(settingKey, false)) {
                 const enforced = enforceFriendlyList();
                 if (enforced) {
                     sanitizeDoorData();
-    if (typeof window.grabDoorEncounter === 'function') {
-        CabbyCodes.after(window, 'grabDoorEncounter', ensureFriendlyGrabResult);
-    }
-
                 }
             }
+            tryPatchGrabDoorEncounter();
         });
     } else {
         CabbyCodes.warn(
             `${logPrefix} Friendly Door Visitors could not find setupDoorEncounters(); hostile visitors may still appear.`
         );
+        tryPatchGrabDoorEncounter();
     }
 
     applyFriendlyMode();
+    tryPatchGrabDoorEncounter();
 
     CabbyCodes.log('[CabbyCodes] Friendly Door Visitors module loaded');
 })();

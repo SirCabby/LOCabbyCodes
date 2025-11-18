@@ -156,7 +156,8 @@ This is the most important step. You need to add the CabbyCodes plugin to the ga
 - **Free Merchants:** Forces every shop menu entry to show a cost of zero, allowing you to buy gear, consumables, and upgrades without spending any gold while the toggle is enabled.
 - **Freeze Time of Day:** Locks the in-game time variable so wandering, minigames, or scripted sequences no longer push the clock forward while enabled.
 - **Video Games Cost No Time:** Lets you enjoy every console game in your apartment without advancing the in-game clock. The option automatically rewinds the time-of-day variable after each gaming session so the rest of the world remains in sync.
-- **Freeze Hygiene Decay:** Stops the hygiene stat and the hidden bad-breath counter from dropping (hourly ticks, scripted penalties, etc.) while leaving showers, brushing, gum, and other increases untouched so you can stay fresh indefinitely.
+- **Freeze Hygiene / Needs:** Locks all of the hidden personal-need meters (hygiene, hunger, vigor, morale, social, calm, plus the bad-breath counter) so they can’t tick downward, while still allowing positive actions like eating or showering to raise them.
+- **Hidden Needs HUD:** Adds a "Hidden Needs HUD" press option in the CabbyCodes settings. Select it to pop open a dedicated window with every hidden meter (hunger, fatigue, hygiene, morale, calm, social, and the breath-odor tracker), then press OK/Cancel to jump right back into the game.
 
 ## Troubleshooting
 

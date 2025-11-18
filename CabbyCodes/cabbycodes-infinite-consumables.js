@@ -50,6 +50,14 @@
     const recipeIngredientKeys = ['ing1', 'ing2', 'ing3', 'ing4', 'ing5'];
 
     /**
+     * Hygiene interactions (showers, brushing teeth, etc.) consume the Soap
+     * and Toothpaste items even though they are not flagged as consumables.
+     * Hardcode their ids so they stay protected when the cheat is enabled.
+     * @type {Set<number>}
+     */
+    const ALWAYS_PROTECTED_ITEM_IDS = new Set([173, 174]);
+
+    /**
      * Parses the recipe items (IDs 551-600 in the base game) to discover which
      * ingredients they reference. We only need to do this once per session and
      * only after the database has finished loading.
@@ -149,6 +157,19 @@
     }
 
     /**
+     * Determines whether the provided item is one of the always-protected
+     * hygiene consumables (soap or toothpaste).
+     * @param {RPG.Item | RPG.Weapon | RPG.Armor} item
+     * @returns {boolean}
+     */
+    function isAlwaysProtectedItem(item) {
+        if (!item || typeof item.id !== 'number') {
+            return false;
+        }
+        return ALWAYS_PROTECTED_ITEM_IDS.has(item.id);
+    }
+
+    /**
      * Determines whether the provided item is a consumable that should be
      * protected from decreasing counts.
      * @param {RPG.Item | RPG.Weapon | RPG.Armor} item
@@ -169,6 +190,10 @@
 
             if (isGamemodeSelectorItem(item)) {
                 return false;
+            }
+
+            if (isAlwaysProtectedItem(item)) {
+                return true;
             }
 
             return !!item.consumable || isCraftingIngredient(item);

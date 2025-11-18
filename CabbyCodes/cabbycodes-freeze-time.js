@@ -45,6 +45,15 @@
     ];
     const sentinelVariableIds = [16, 17, 122];
     const trackedVariableIds = new Set(defaultTimeVariableIds);
+    const ZERO_TIME_WELLBEING_VARIABLE_IDS = new Set([
+        21, // statSocial
+        22, // statCalm
+        23, // statVigor
+        24, // statFood
+        25, // statHygiene
+        26, // statMorale
+        117 // bad breath tracker used by hygiene logic
+    ]);
     const frozenValues = {};
 
     const detectionConfig = {
@@ -66,7 +75,7 @@
     const cookPrepCommonEventId = 44;
     const freezeTimeApi = (CabbyCodes.freezeTime = CabbyCodes.freezeTime || {});
     const debugSettingKey = 'freezeTimeDebugLogging';
-    const ENABLE_FREEZE_TIME_DEBUG_LOGGING = false; // Set to true when debugging locally
+    const ENABLE_FREEZE_TIME_DEBUG_LOGGING = false;
     const cabbyCodesSettings = CabbyCodes.settings || {};
     if (Object.prototype.hasOwnProperty.call(cabbyCodesSettings, debugSettingKey)) {
         delete cabbyCodesSettings[debugSettingKey];
@@ -95,6 +104,9 @@
     freezeTimeApi.zeroTimeCommonEventLists = zeroTimeCommonEventLists;
     const zeroTimeMapEvents = freezeTimeApi.zeroTimeMapEvents || new Map();
     freezeTimeApi.zeroTimeMapEvents = zeroTimeMapEvents;
+    const zeroTimeBattleTroopIds =
+        freezeTimeApi.zeroTimeBattleTroopIds || new Set();
+    freezeTimeApi.zeroTimeBattleTroopIds = zeroTimeBattleTroopIds;
 
     function zeroTimeMapEventKey(mapId, eventId) {
         return `${mapId}:${eventId}`;
@@ -116,6 +128,18 @@
     }
 
     freezeTimeApi.registerZeroTimeMapEvent = registerZeroTimeMapEvent;
+    function registerZeroTimeBattleTroop(troopId) {
+        const numericId = Number(troopId);
+        if (!Number.isFinite(numericId) || numericId <= 0) {
+            return;
+        }
+        if (!zeroTimeBattleTroopIds.has(numericId)) {
+            zeroTimeBattleTroopIds.add(numericId);
+            freezeDebugLog(`Registered troop ${numericId} for zero-time battle handling.`);
+        }
+    }
+
+    freezeTimeApi.registerZeroTimeBattleTroop = registerZeroTimeBattleTroop;
 
     const frontDoorMapId = 3;
     const frontDoorEventId = 9;
@@ -125,6 +149,8 @@
     [21, 22, 46].forEach(eventId =>
         registerZeroTimeMapEvent(frontDoorMapId, eventId, cookMealCommonEventId)
     );
+    registerZeroTimeMapEvent(4, 6, timePassesCommonEventId);
+    registerZeroTimeMapEvent(4, 7, timePassesCommonEventId);
     const zeroTimeScriptTriggers =
         freezeTimeApi.zeroTimeScriptTriggers || new Set(['grabDoorEncounter']);
     freezeTimeApi.zeroTimeScriptTriggers = zeroTimeScriptTriggers;
@@ -423,6 +449,7 @@
             freezeDebugLog(`Registered troop ${numericId} as door encounter.`);
         }
     };
+    registerZeroTimeBattleTroop(10);
 
     function isAnyTimeLockActive() {
         return isFreezeEnabled();
@@ -520,6 +547,41 @@
             }
         }
         return scriptText.trim();
+    }
+
+    const ZERO_TIME_RESTORE_MODES = {
+        EXACT: 'exact',
+        NON_DECREASE: 'nonDecrease'
+    };
+
+    function shouldSnapshotZeroTimeVariable(varId) {
+        return ZERO_TIME_WELLBEING_VARIABLE_IDS.has(varId);
+    }
+
+    function snapshotZeroTimeVariable(varId, previousValue) {
+        if (!shouldSnapshotZeroTimeVariable(varId) || !isFreezeEnabled()) {
+            return;
+        }
+        const interpreter = getOwningInterpreter();
+        if (!isZeroTimeInterpreter(interpreter)) {
+            return;
+        }
+        const state = getInterpreterState(interpreter);
+        if (!state) {
+            return;
+        }
+        if (!state.variables.has(varId)) {
+            const baseline = Number(previousValue);
+            state.variables.set(varId, {
+                baseline: Number.isFinite(baseline) ? baseline : 0,
+                mode: ZERO_TIME_RESTORE_MODES.NON_DECREASE
+            });
+            freezeDebugLog(
+                `Captured zero-time wellbeing var ${varId} baseline ${baseline} for ${describeInterpreter(
+                    interpreter
+                )}`
+            );
+        }
     }
 
     function shouldBlock(variableId) {
@@ -705,12 +767,29 @@
         if (typeof $gameVariables === 'undefined' || !$gameVariables) {
             return;
         }
-        state.variables.forEach((baseline, varId) => {
+        state.variables.forEach((entry, varId) => {
             if (!Number.isFinite(varId)) {
                 return;
             }
-            const restoreValue = Number.isFinite(baseline) ? baseline : 0;
-            if (isWatchedVariable(varId)) {
+            let baselineValue = entry;
+            let restoreMode = ZERO_TIME_RESTORE_MODES.EXACT;
+            if (entry && typeof entry === 'object') {
+                baselineValue = entry.baseline;
+                restoreMode = entry.mode || ZERO_TIME_RESTORE_MODES.EXACT;
+            }
+            const restoreValue = Number.isFinite(baselineValue) ? baselineValue : 0;
+            if (
+                restoreMode === ZERO_TIME_RESTORE_MODES.NON_DECREASE &&
+                typeof $gameVariables !== 'undefined' &&
+                $gameVariables
+            ) {
+                const currentValue = getTrueOriginalValue($gameVariables, varId);
+                if (Number.isFinite(currentValue) && currentValue >= restoreValue) {
+                    return;
+                }
+            }
+            const watchedVar = isWatchedVariable(varId);
+            if (watchedVar) {
                 freezeDebugLog(
                     `Restoring var ${varId} back to ${restoreValue} after interpreter ${describeInterpreter(
                         interpreter
@@ -826,6 +905,10 @@
         if (!Number.isFinite(troopId) || troopId <= 0) {
             freezeDebugLog(`Door zero-time skipped for invalid troop id ${troopId}.`);
             return false;
+        }
+        if (zeroTimeBattleTroopIds.has(troopId)) {
+            freezeDebugLog(`Troop ${troopId} tagged for zero-time via registry.`);
+            return true;
         }
         if (matchesActiveDoorEncounter(troopId)) {
             freezeDebugLog(`Troop ${troopId} tagged as door encounter via active encounter.`);
@@ -1004,6 +1087,8 @@
                     detectionState.hits[numericId] = 0;
                 }
             }
+
+            snapshotZeroTimeVariable(numericId, previousValue);
 
             if (
                 !Number.isFinite(numericId) ||
@@ -1282,6 +1367,8 @@
                         }
                     }
 
+                    snapshotZeroTimeVariable(propNum, previousValue);
+
                     if (canEnforceTimeLock() && trackedVariableIds.has(propNum)) {
                         ensureFrozenValue(propNum, previousValue);
                         const thaw = tryEstablishTemporaryThaw(propNum, previousValue);
@@ -1356,7 +1443,19 @@
         if (this._interpreter) {
             this._interpreter._cabbycodesZeroTimeActive = true;
             freezeDebugLog(
-                `Activated zero-time interpreter for troop ${this._troopId ?? 'unknown'}.`
+                `Activated zero-time interpreter for troop ${this._troopId ?? 'unknown'} (pre-setup).`
+            );
+        }
+    });
+
+    CabbyCodes.after(Game_Troop.prototype, 'setupBattleEvent', function() {
+        if (!this._cabbycodesDoorZeroTime || !isFreezeSettingActive()) {
+            return;
+        }
+        if (this._interpreter) {
+            this._interpreter._cabbycodesZeroTimeActive = true;
+            freezeDebugLog(
+                `Activated zero-time interpreter for troop ${this._troopId ?? 'unknown'} (post-setup).`
             );
         }
     });

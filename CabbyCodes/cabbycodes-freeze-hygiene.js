@@ -3,13 +3,13 @@
 //=============================================================================
 /*:
  * @target MZ
- * @plugindesc CabbyCodes Freeze Hygiene - Prevent hygiene from decreasing
+ * @plugindesc CabbyCodes Freeze Hygiene - Prevent personal need stats from decreasing
  * @author CabbyCodes
  * @help
- * Adds an Options menu toggle that stops the hygiene variable from dropping.
- * Any increases (showering, brushing teeth, items, etc.) still apply normally,
- * but hourly decay or scripted penalties no longer reduce hygiene while the
- * toggle is enabled.
+ * Adds an Options menu toggle that stops the hidden personal need meters from
+ * dropping. Hygiene, hunger, vigor, morale, social, and calm (along with the
+ * separate bad-breath counter) are all prevented from decreasing while the
+ * toggle is enabled, but positive sources such as eating or resting still work.
  */
 
 (() => {
@@ -20,19 +20,27 @@
         return;
     }
 
-    const PROTECTED_VARIABLE_IDS = new Set([25, 117]); // Hygiene & bad breath
+    const PROTECTED_VARIABLE_IDS = new Set([
+        21, // statSocial (prevents Lonely)
+        22, // statCalm  (covers stress-related events)
+        23, // statVigor (prevents Tired / Exhausted)
+        24, // statFood  (prevents Hungry / Starving)
+        25, // statHygiene
+        26, // statMorale (prevents Depressed)
+        117 // bad breath tracker
+    ]);
     const settingKey = 'freezeHygiene';
 
     CabbyCodes.registerSetting(
         settingKey,
-        'Infinite Hygiene / Breath',
+        'Freeze Needs / Hygiene',
         {
             defaultValue: false,
             order: 57
         },
         newValue => {
             CabbyCodes.log(
-                `[CabbyCodes] Hygiene decay ${newValue ? 'frozen' : 'restored'}`
+                `[CabbyCodes] Personal need decay ${newValue ? 'frozen' : 'restored'}`
             );
         }
     );

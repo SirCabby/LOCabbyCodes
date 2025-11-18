@@ -31,6 +31,7 @@
             'cabbycodes-settings.js',
             'cabbycodes-enemy-health-bars.js',
             'cabbycodes-version-display.js',
+            'cabbycodes-hidden-stats-display.js',
             'cabbycodes-save-anywhere.js',
             'cabbycodes-infinite-money.js',
             'cabbycodes-invincibility.js',
