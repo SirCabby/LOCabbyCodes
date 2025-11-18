@@ -47,7 +47,11 @@
             minValue: 0,
             maxValue: 100,
             description: 'Higher values mean you are fuller.',
-            order: 10
+            order: 10,
+            statusNames: {
+                warning: 'Hungry',
+                danger: 'Starving'
+            }
         },
         {
             key: 'vigor',
@@ -56,7 +60,11 @@
             minValue: 0,
             maxValue: 100,
             description: 'Higher values mean you are rested.',
-            order: 20
+            order: 20,
+            statusNames: {
+                warning: 'Tired',
+                danger: 'Exhausted'
+            }
         },
         {
             key: 'hygiene',
@@ -65,7 +73,11 @@
             minValue: 0,
             maxValue: 100,
             description: 'Tracks how clean you feel.',
-            order: 30
+            order: 30,
+            statusNames: {
+                warning: 'Smelly',
+                danger: 'Smelly'
+            }
         },
         {
             key: 'morale',
@@ -74,7 +86,11 @@
             minValue: 0,
             maxValue: 100,
             description: 'Impacts mood events.',
-            order: 40
+            order: 40,
+            statusNames: {
+                warning: 'Depressed',
+                danger: 'Depressed'
+            }
         },
         {
             key: 'calm',
@@ -83,7 +99,11 @@
             minValue: 0,
             maxValue: 100,
             description: 'Higher values mean lower stress.',
-            order: 50
+            order: 50,
+            statusNames: {
+                warning: 'Listless',
+                danger: 'Listless'
+            }
         },
         {
             key: 'social',
@@ -92,7 +112,11 @@
             minValue: 0,
             maxValue: 100,
             description: 'Tracks loneliness related events.',
-            order: 60
+            order: 60,
+            statusNames: {
+                warning: 'Lonely',
+                danger: 'Lonely'
+            }
         },
         {
             key: 'breath',
@@ -135,7 +159,7 @@
 
     CabbyCodes.registerSetting(settingKey, 'Hidden Needs HUD', {
         defaultValue: false,
-        order: 62,
+        order: 52,
         formatValue: () => 'Press',
         onChange: newValue => {
             if (!newValue) {
@@ -233,9 +257,10 @@
             severity = 'danger';
         }
         const labels = stat.labels || {};
+        const statusNames = stat.statusNames || {};
         const defaultLabels = {
-            great: 'Great',
-            good: 'Stable',
+            great: 'Fine',
+            good: 'Fine',
             warning: 'Low',
             danger: 'Critical'
         };
@@ -243,7 +268,10 @@
             value: clamped,
             fillRatio: effectiveness,
             severity,
-            severityLabel: labels[severity] || defaultLabels[severity],
+            severityLabel:
+                statusNames[severity] ||
+                labels[severity] ||
+                defaultLabels[severity],
             color: STATUS_COLORS[severity] || '#ffffff'
         };
     }
