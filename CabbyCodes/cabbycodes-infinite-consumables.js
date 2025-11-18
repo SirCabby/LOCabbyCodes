@@ -1,9 +1,9 @@
 //=============================================================================
-// CabbyCodes Infinite Consumables
+// CabbyCodes Infinite Items
 //=============================================================================
 /*:
  * @target MZ
- * @plugindesc CabbyCodes Infinite Consumables - Prevents consumable item loss
+ * @plugindesc CabbyCodes Infinite Items - Prevents consumable item loss
  * @author CabbyCodes
  * @help
  * Adds an Options menu toggle that keeps consumable item counts from
@@ -16,7 +16,7 @@
     'use strict';
 
     if (typeof window.CabbyCodes === 'undefined') {
-        console.warn('[CabbyCodes] Infinite Consumables requires CabbyCodes core.');
+        console.warn('[CabbyCodes] Infinite Items requires CabbyCodes core.');
         return;
     }
 
@@ -24,14 +24,14 @@
 
     CabbyCodes.registerSetting(
         settingKey,
-        'Infinite Consumables',
+        'Infinite Items',
         {
             defaultValue: false,
             order: 56
         },
         newValue => {
             CabbyCodes.log(
-                `[CabbyCodes] Infinite consumables ${newValue ? 'enabled' : 'disabled'}`
+                `[CabbyCodes] Infinite items ${newValue ? 'enabled' : 'disabled'}`
             );
         }
     );
@@ -239,7 +239,7 @@
         }
     );
 
-    CabbyCodes.log('[CabbyCodes] Infinite Consumables module loaded');
+    CabbyCodes.log('[CabbyCodes] Infinite Items module loaded');
 })();
 
 

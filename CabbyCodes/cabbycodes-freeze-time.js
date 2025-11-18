@@ -85,10 +85,9 @@
         }
     }
     const timePassesCommonEventId = 4;
-    const minuteBurnCommonEventIds =
-        freezeTimeApi.minuteBurnCommonEventIds || new Set();
-    minuteBurnCommonEventIds.add(timePassesCommonEventId);
-    freezeTimeApi.minuteBurnCommonEventIds = minuteBurnCommonEventIds;
+    const minuteBurnScopeCommonEventIds =
+        freezeTimeApi.minuteBurnScopeCommonEventIds || new Set([videoGameCommonEventId]);
+    freezeTimeApi.minuteBurnScopeCommonEventIds = minuteBurnScopeCommonEventIds;
     const defaultZeroTimeCommonEvents = [
         parallelCommonEventId, // Parallel (handles door timers etc)
         timePassesCommonEventId, // Time passes
@@ -277,8 +276,8 @@
         interpreter._cabbycodesZeroTimeActive = true;
         if (Number.isFinite(numericId)) {
             interpreter._cabbycodesCommonEventId = numericId;
-            if (minuteBurnCommonEventIds.has(numericId)) {
-                interpreter._cabbycodesAllowMinuteBurn = true;
+            if (minuteBurnScopeCommonEventIds.has(numericId)) {
+                interpreter._cabbycodesMinuteBurnScope = true;
             }
         }
         if (reason) {
@@ -437,6 +436,14 @@
         }
     };
 
+    freezeTimeApi.registerMinuteBurnScopeEvent = function(eventId) {
+        const numericId = Number(eventId);
+        if (Number.isFinite(numericId) && numericId > 0 && !minuteBurnScopeCommonEventIds.has(numericId)) {
+            minuteBurnScopeCommonEventIds.add(numericId);
+            freezeDebugLog(`Registered common event ${numericId} for minute-burn scope inheritance.`);
+        }
+    };
+
     function findEventZeroTimeCommonEventId(gameEvent) {
         if (!isFreezeSettingActive() || !gameEvent || typeof gameEvent.list !== 'function') {
             return NaN;
@@ -533,6 +540,17 @@
         return false;
     }
 
+    function isMinuteBurnScopeInterpreter(interpreter) {
+        if (!interpreter) {
+            return false;
+        }
+        if (interpreter._cabbycodesMinuteBurnScope) {
+            return true;
+        }
+        const numericId = Number(interpreter._cabbycodesCommonEventId);
+        return Number.isFinite(numericId) && minuteBurnScopeCommonEventIds.has(numericId);
+    }
+
     function markZeroTimeChild(parentInterpreter, childInterpreter, commonEventId) {
         if (!childInterpreter) {
             return;
@@ -547,20 +565,15 @@
             Number.isFinite(commonEventId) ? Number(commonEventId) : NaN,
             'markZeroTimeChild'
         );
+        if (!childInterpreter) {
+            return;
+        }
         if (
-            childInterpreter &&
-            (minuteBurnCommonEventIds.has(Number(commonEventId)) ||
-                allowsZeroTimeMinuteBurn(parentInterpreter))
+            isMinuteBurnScopeInterpreter(parentInterpreter) ||
+            minuteBurnScopeCommonEventIds.has(Number(commonEventId))
         ) {
-            childInterpreter._cabbycodesAllowMinuteBurn = true;
+            childInterpreter._cabbycodesMinuteBurnScope = true;
         }
-    }
-
-    function allowsZeroTimeMinuteBurn(interpreter) {
-        if (!interpreter) {
-            return false;
-        }
-        return Boolean(interpreter._cabbycodesAllowMinuteBurn);
     }
 
     function shouldActivateZeroTimeForScript(scriptText) {
@@ -1084,8 +1097,8 @@
         if (interpreter && interpreter._cabbycodesZeroTimeActive) {
             delete interpreter._cabbycodesZeroTimeActive;
         }
-        if (interpreter && interpreter._cabbycodesAllowMinuteBurn) {
-            delete interpreter._cabbycodesAllowMinuteBurn;
+        if (interpreter && interpreter._cabbycodesMinuteBurnScope) {
+            delete interpreter._cabbycodesMinuteBurnScope;
         }
     }
 
@@ -1232,6 +1245,18 @@
         function(parameters) {
             const commonEventId = Array.isArray(parameters) ? Number(parameters[0]) : NaN;
             freezeDebugLog(`command117 called with commonEventId=${commonEventId}, isZeroTime=${Number.isFinite(commonEventId) && zeroTimeCommonEventIds.has(commonEventId)}`);
+            if (
+                Number.isFinite(commonEventId) &&
+                commonEventId === timePassesCommonEventId &&
+                isMinuteBurnScopeInterpreter(this)
+            ) {
+                freezeDebugLog(
+                    `command117: skipping timePasses common event ${commonEventId} for interpreter ${describeInterpreter(
+                        this
+                    )} (minute-burn scope).`
+                );
+                return true;
+            }
             if (
                 Number.isFinite(commonEventId) &&
                 zeroTimeCommonEventIds.has(commonEventId) &&
@@ -1400,12 +1425,7 @@
             const result = callOriginal(Game_Interpreter.prototype, 'command122', this, [
                 parameters
             ]);
-            const shouldRestoreMinutesImmediately =
-                minutesBefore !== null &&
-                typeof $gameVariables !== 'undefined' &&
-                $gameVariables &&
-                !allowsZeroTimeMinuteBurn(this);
-            if (shouldRestoreMinutesImmediately) {
+            if (minutesBefore !== null && typeof $gameVariables !== 'undefined' && $gameVariables) {
                 $gameVariables.setValue(19, minutesBefore);
                 freezeDebugLog(
                     `Restored variable 19 to ${minutesBefore} after zero-time command122 (interpreter ${describeInterpreter(

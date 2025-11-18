@@ -32,6 +32,7 @@
             'cabbycodes-enemy-health-bars.js',
             'cabbycodes-version-display.js',
             'cabbycodes-hidden-stats-display.js',
+            'cabbycodes-refill-status.js',
             'cabbycodes-save-anywhere.js',
             'cabbycodes-infinite-money.js',
             'cabbycodes-invincibility.js',
@@ -45,7 +46,8 @@
             'cabbycodes-doorbell.js',
             'cabbycodes-freeze-time.js',
             'cabbycodes-freeze-hygiene.js',
-            'cabbycodes-item-giver.js'
+            'cabbycodes-item-giver.js',
+            'cabbycodes-max-cooking.js'
         ];
         
         scripts.forEach((scriptName) => {

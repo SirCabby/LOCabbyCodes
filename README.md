@@ -158,6 +158,8 @@ This is the most important step. You need to add the CabbyCodes plugin to the ga
 - **Video Games Cost No Time:** Lets you enjoy every console game in your apartment without advancing the in-game clock. The option automatically rewinds the time-of-day variable after each gaming session so the rest of the world remains in sync.
 - **Freeze Hygiene / Needs:** Locks all of the hidden personal-need meters (hygiene, hunger, vigor, morale, social, calm, plus the bad-breath counter) so they can’t tick downward, while still allowing positive actions like eating or showering to raise them.
 - **Hidden Needs HUD:** Adds a "Hidden Needs HUD" press option in the CabbyCodes settings. Select it to pop open a dedicated window with every hidden meter (hunger, fatigue, hygiene, morale, calm, social, and the breath-odor tracker), then press OK/Cancel to jump right back into the game.
+- **Refill Status:** Adds a press-style option that immediately tops up every party member’s HP/MP and maxes out all hidden need meters (hunger, energy, hygiene, morale, calm, social, and breath odor) whenever you select it.
+- **Max Cooking Skill:** Adds a press-style option that, after an explicit warning, permanently sets your Cooking skill to the game’s top rank (currently Level 8, Amateur Chef) so you can skip the recipe grind.
 
 ## Troubleshooting
 
