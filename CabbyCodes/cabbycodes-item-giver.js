@@ -121,11 +121,17 @@
 
     const ITEM_GIVER_UI_CONSTANTS = {
         selectorHorizontalPadding: 12,
+        selectorHorizontalPaddingRight: 24,
         selectorVerticalGap: 6,
         searchHorizontalPadding: 12,
         searchVerticalGap: 12,
         dropdownPadding: 10,
-        searchPadding: 10
+        dropdownContentPadding: 0,
+        dropdownTextHorizontalPadding: 14,
+        dropdownLabelValueSpacing: 12,
+        selectorCombinedWidthBonus: 20,
+        searchPadding: 10,
+        dropdownValueRightInset: 16
     };
 
     function sanitizeDatabaseName(name) {
@@ -319,9 +325,34 @@
     Window_CabbyCodesDropdownButton.prototype.constructor = Window_CabbyCodesDropdownButton;
 
     Window_CabbyCodesDropdownButton.prototype.standardPadding = function() {
+        const contentPadding = ITEM_GIVER_UI_CONSTANTS.dropdownContentPadding;
+        if (typeof contentPadding === 'number') {
+            return Math.max(0, contentPadding);
+        }
         const outerPadding = ITEM_GIVER_UI_CONSTANTS.dropdownPadding;
         // Give the contents a little less padding than the outer frame so text can center
         return Math.max(0, outerPadding - 4);
+    };
+
+    Window_CabbyCodesDropdownButton.prototype.textHorizontalPadding = function() {
+        const customPadding = ITEM_GIVER_UI_CONSTANTS.dropdownTextHorizontalPadding;
+        if (typeof customPadding === 'number') {
+            return Math.max(0, customPadding);
+        }
+        const outerPadding = ITEM_GIVER_UI_CONSTANTS.dropdownPadding;
+        return Math.max(0, outerPadding - 4);
+    };
+
+    Window_CabbyCodesDropdownButton.prototype.itemPadding = function() {
+        return 0;
+    };
+
+    Window_CabbyCodesDropdownButton.prototype.labelValueSpacing = function() {
+        const spacing = ITEM_GIVER_UI_CONSTANTS.dropdownLabelValueSpacing;
+        if (typeof spacing === 'number') {
+            return Math.max(0, spacing);
+        }
+        return 12;
     };
 
     Window_CabbyCodesDropdownButton.prototype.initialize = function(rect, label, placeholder) {
@@ -375,18 +406,42 @@
     Window_CabbyCodesDropdownButton.prototype.drawItem = function(index) {
         const rect = this.baseRect();
         const textY = rect.y + this._verticalTextOffset();
-        const horizontalPadding = this.standardPadding();
-        const textWidth = Math.max(0, rect.width - horizontalPadding * 2);
-        const labelX = rect.x + horizontalPadding;
+        const labelPadding = this.textHorizontalPadding();
+        const valueRightInset = ITEM_GIVER_UI_CONSTANTS.dropdownValueRightInset || 0;
+        const labelValueSpacing = this.labelValueSpacing();
+        // Use innerWidth for text positioning (not the extended width from baseRect)
+        // The extended width is only for the background to cover the dropdown indicator area
+        const textAreaWidth = this.innerWidth;
+        const labelX = rect.x + labelPadding;
+        const labelText = `${this._label}:`;
+        const maxLabelWidth = Math.max(0, textAreaWidth - labelPadding - valueRightInset);
+        const measuredLabelWidth = Math.min(maxLabelWidth, this.textWidth(labelText));
+        const valueAreaStart = Math.min(
+            rect.x + textAreaWidth - valueRightInset,
+            labelX + measuredLabelWidth + labelValueSpacing
+        );
+        const valueWidth = Math.max(0, rect.x + textAreaWidth - valueRightInset - valueAreaStart);
         this.drawBackground();
         this.resetTextColor();
         this.changeTextColor(this.systemColor());
-        this.drawText(`${this._label}:`, labelX, textY, textWidth, 'left');
+        this.drawText(labelText, labelX, textY, maxLabelWidth, 'left');
         this.resetTextColor();
         this.changePaintOpacity(!this._disabled);
         const text = this._valueText || this._placeholder;
-        this.drawText(text, labelX, textY, textWidth, 'right');
+        this.drawText(text, valueAreaStart, textY, valueWidth, 'right');
         this.changePaintOpacity(true);
+        
+        // Debug: Log text positioning
+        console.log('[CabbyCodes] Item Giver: drawItem text positioning', {
+            label: this._label,
+            textAreaWidth: textAreaWidth,
+            rectWidth: rect.width,
+            innerWidth: this.innerWidth,
+            valueRightInset: valueRightInset,
+            valueAreaStart: valueAreaStart,
+            valueWidth: valueWidth,
+            text: text
+        });
     };
 
     Window_CabbyCodesDropdownButton.prototype.processOk = function() {
@@ -420,14 +475,57 @@
     Window_CabbyCodesDropdownButton.prototype.drawBackground = function() {
         if (this.contentsBack) {
             const rect = this.baseRect();
+            const valueRightInset = ITEM_GIVER_UI_CONSTANTS.dropdownValueRightInset || 0;
+            // The background should extend to cover the area where the text is drawn
+            // Since we override contentsWidth to add valueRightInset, contentsBack is now wider
+            // We can draw the background to cover the full extended width
+            const extendedWidth = this.contentsWidth();
+            const backgroundWidth = extendedWidth;
+            
+            // Debug: Log background dimensions (always show, no conditional)
+            console.log('[CabbyCodes] Item Giver: drawBackground', {
+                label: this._label,
+                baseRect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
+                valueRightInset: valueRightInset,
+                backgroundWidth: backgroundWidth,
+                innerWidth: this.innerWidth,
+                extendedWidth: extendedWidth,
+                windowWidth: this.width,
+                padding: this.padding,
+                contentsBackWidth: this.contentsBack ? this.contentsBack.width : 'N/A',
+                textAreaEnd: this.innerWidth - valueRightInset
+            });
+            
             this.contentsBack.paintOpacity = 64;
-            this.contentsBack.fillRect(rect.x, rect.y, rect.width, rect.height, getGaugeBackColor());
+            // Draw background covering the full innerWidth
+            this.contentsBack.fillRect(rect.x, rect.y, backgroundWidth, rect.height, getGaugeBackColor());
+            this.contentsBack.paintOpacity = 255;
+            
+            // Debug: Draw visual indicators for background boundaries (always show)
+            // Draw red line at the point where text area ends (rect.width - valueRightInset)
+            this.contentsBack.paintOpacity = 200;
+            const textAreaEnd = rect.width - valueRightInset;
+            this.contentsBack.fillRect(rect.x + textAreaEnd, rect.y, 1, rect.height, '#ff0000');
+            // Draw green line at background width boundary (should be at innerWidth)
+            this.contentsBack.fillRect(rect.x + backgroundWidth - 1, rect.y, 1, rect.height, '#00ff00');
+            // Draw blue line at innerWidth boundary (should match green line)
+            this.contentsBack.fillRect(rect.x + this.innerWidth - 1, rect.y, 1, rect.height, '#0000ff');
             this.contentsBack.paintOpacity = 255;
         }
     };
 
+    // Override contentsWidth to add space for the right inset (dropdown indicator)
+    // This makes the contentsBack bitmap wider, allowing the background to extend further right
+    Window_CabbyCodesDropdownButton.prototype.contentsWidth = function() {
+        const valueRightInset = ITEM_GIVER_UI_CONSTANTS.dropdownValueRightInset || 0;
+        // Add the right inset to innerWidth so the background can cover the dropdown indicator area
+        return this.innerWidth + valueRightInset;
+    };
+    
     Window_CabbyCodesDropdownButton.prototype.baseRect = function() {
-        return new Rectangle(0, 0, this.innerWidth, this.innerHeight);
+        // baseRect should use the extended width from contentsWidth
+        const extendedWidth = this.contentsWidth();
+        return new Rectangle(0, 0, extendedWidth, this.innerHeight);
     };
 
     Window_CabbyCodesDropdownButton.prototype._verticalTextOffset = function() {
@@ -1712,20 +1810,60 @@
 
     Scene_CabbyCodesItemGiver.prototype.typeDropdownRect = function() {
         const helpHeight = this.helpAreaHeight();
-        const padding = ITEM_GIVER_UI_CONSTANTS.selectorHorizontalPadding;
+        const paddingLeft = ITEM_GIVER_UI_CONSTANTS.selectorHorizontalPadding;
+        const paddingRight = typeof ITEM_GIVER_UI_CONSTANTS.selectorHorizontalPaddingRight === 'number'
+            ? ITEM_GIVER_UI_CONSTANTS.selectorHorizontalPaddingRight
+            : paddingLeft;
+        const widthBonus = ITEM_GIVER_UI_CONSTANTS.selectorCombinedWidthBonus || 0;
         const wy = helpHeight + 6;
-        const buttonWidth = (Graphics.boxWidth - padding * 2) / 2;
+        const availableWidth = Math.max(
+            paddingLeft + paddingRight + 2,
+            Graphics.boxWidth - paddingLeft - paddingRight + widthBonus
+        );
+        const buttonWidth = availableWidth / 2;
         const wh = this.dropdownButtonHeight();
-        return new Rectangle(padding, wy, buttonWidth, wh);
+        
+        // Debug: Log rect calculation
+        console.log('[CabbyCodes] Item Giver: typeDropdownRect', {
+            paddingLeft: paddingLeft,
+            paddingRight: paddingRight,
+            widthBonus: widthBonus,
+            availableWidth: availableWidth,
+            buttonWidth: buttonWidth,
+            wh: wh
+        });
+        
+        return new Rectangle(paddingLeft, wy, buttonWidth, wh);
     };
 
     Scene_CabbyCodesItemGiver.prototype.subtypeDropdownRect = function() {
         const helpHeight = this.helpAreaHeight();
-        const padding = ITEM_GIVER_UI_CONSTANTS.selectorHorizontalPadding;
+        const paddingLeft = ITEM_GIVER_UI_CONSTANTS.selectorHorizontalPadding;
+        const paddingRight = typeof ITEM_GIVER_UI_CONSTANTS.selectorHorizontalPaddingRight === 'number'
+            ? ITEM_GIVER_UI_CONSTANTS.selectorHorizontalPaddingRight
+            : paddingLeft;
+        const widthBonus = ITEM_GIVER_UI_CONSTANTS.selectorCombinedWidthBonus || 0;
         const wy = helpHeight + 6;
-        const buttonWidth = (Graphics.boxWidth - padding * 2) / 2;
+        const availableWidth = Math.max(
+            paddingLeft + paddingRight + 2,
+            Graphics.boxWidth - paddingLeft - paddingRight + widthBonus
+        );
+        const buttonWidth = availableWidth / 2;
         const wh = this.dropdownButtonHeight();
-        const wx = padding + buttonWidth;
+        const wx = paddingLeft + buttonWidth;
+        
+        // Debug: Log rect calculation
+        console.log('[CabbyCodes] Item Giver: subtypeDropdownRect', {
+            paddingLeft: paddingLeft,
+            paddingRight: paddingRight,
+            widthBonus: widthBonus,
+            availableWidth: availableWidth,
+            buttonWidth: buttonWidth,
+            wx: wx,
+            wh: wh,
+            typeButtonEnd: paddingLeft + buttonWidth
+        });
+        
         return new Rectangle(wx, wy, buttonWidth, wh);
     };
 
@@ -2147,6 +2285,31 @@
     };
 
     Scene_CabbyCodesItemGiver.prototype.onItemCancel = function() {
+        if (this._searchWindow) {
+            if (typeof this._searchWindow.consumePendingEscapeClear === 'function' &&
+                this._searchWindow.consumePendingEscapeClear()) {
+                if (this._itemWindow) {
+                    this._itemWindow.activate();
+                    if (typeof this._itemWindow.ensureValidSelection === 'function') {
+                        this._itemWindow.ensureValidSelection(this._itemWindow.index());
+                    }
+                }
+                return;
+            }
+            if (typeof this._searchWindow.searchText === 'function') {
+                const searchText = this._searchWindow.searchText();
+                if (searchText && searchText.length > 0) {
+                    this._searchWindow.clearSearch();
+                    if (this._itemWindow) {
+                        this._itemWindow.activate();
+                        if (typeof this._itemWindow.ensureValidSelection === 'function') {
+                            this._itemWindow.ensureValidSelection(this._itemWindow.index());
+                        }
+                    }
+                    return;
+                }
+            }
+        }
         this.clearPersistedFilters();
         this.popScene();
     };
@@ -2415,6 +2578,7 @@
         Window_Base.prototype.initialize.call(this, rect);
         this._searchText = '';
         this._isTypingEnabled = false;
+        this._pendingEscapeClear = false;
         this._boundKeyHandler = this.onKeyDown.bind(this);
         window.addEventListener('keydown', this._boundKeyHandler, true);
         this.refresh();
@@ -2447,6 +2611,29 @@
 
     Window_CabbyCodesItemSearch.prototype.setItemWindow = function(itemWindow) {
         this._itemWindow = itemWindow;
+    };
+
+    Window_CabbyCodesItemSearch.prototype.consumeKeyboardEvent = function(event) {
+        if (!event) {
+            return;
+        }
+        if (typeof event.preventDefault === 'function') {
+            event.preventDefault();
+        }
+        if (typeof event.stopPropagation === 'function') {
+            event.stopPropagation();
+        }
+        if (typeof event.stopImmediatePropagation === 'function') {
+            event.stopImmediatePropagation();
+        }
+    };
+
+    Window_CabbyCodesItemSearch.prototype.consumePendingEscapeClear = function() {
+        if (this._pendingEscapeClear) {
+            this._pendingEscapeClear = false;
+            return true;
+        }
+        return false;
     };
 
     Window_CabbyCodesItemSearch.prototype.activate = function() {
@@ -2622,24 +2809,19 @@
             if (event.key.length === 1) {
                 const nextValue = (this._searchText || '') + event.key;
                 this.setSearchText(nextValue, { syncFilters: true });
-                if (event.preventDefault) {
-                    event.preventDefault();
-                }
+                this.consumeKeyboardEvent(event);
             } else if (event.key === 'Backspace' || event.key === 'Delete') {
                 if (this._searchText && this._searchText.length > 0) {
                     this.setSearchText(this._searchText.slice(0, -1), { syncFilters: true });
                 } else {
                     this.setSearchText('', { syncFilters: false, forceRefresh: true });
                 }
-                if (event.preventDefault) {
-                    event.preventDefault();
-                }
+                this.consumeKeyboardEvent(event);
             } else if (event.key === 'Escape') {
                 if (this._searchText) {
                     this.clearSearch();
-                    if (event.preventDefault) {
-                        event.preventDefault();
-                    }
+                    this._pendingEscapeClear = true;
+                    this.consumeKeyboardEvent(event);
                 }
             }
         } catch (e) {

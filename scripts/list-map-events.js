@@ -18,3 +18,4 @@ mapData.events
         console.log(`${event.id}: ${event.name || ''}`);
     });
 
+
