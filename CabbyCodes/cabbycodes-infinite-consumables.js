@@ -52,10 +52,12 @@
     /**
      * Hygiene interactions (showers, brushing teeth, etc.) consume the Soap
      * and Toothpaste items even though they are not flagged as consumables.
-     * Hardcode their ids so they stay protected when the cheat is enabled.
+     * Simple Keys are removed by locked door events even though they are not
+     * flagged as consumables. Hardcode their ids so they stay protected when
+     * the cheat is enabled.
      * @type {Set<number>}
      */
-    const ALWAYS_PROTECTED_ITEM_IDS = new Set([173, 174]);
+    const ALWAYS_PROTECTED_ITEM_IDS = new Set([173, 174, 320]);
 
     /**
      * Parses the recipe items (IDs 551-600 in the base game) to discover which
