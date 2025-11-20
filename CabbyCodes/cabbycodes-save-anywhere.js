@@ -84,8 +84,9 @@
         );
 
         // Override addSaveCommand to ensure save option always exists in the menu
-        // The game's addSaveCommand might skip it in certain conditions (like first day via switch 37)
-        // We ensure it's always added if needsCommand('save') is true, but respect enable/disable state
+        // When the feature is enabled, we bypass needsCommand('save') check which may be false
+        // for higher difficulties, ensuring the save option is always added to the menu
+        // Note: We don't pass settingKey here so the override is always active and can check dynamically
         CabbyCodes.override(
             Window_MenuCommand.prototype,
             'addSaveCommand',
@@ -94,20 +95,22 @@
                 const commandList = Array.isArray(this._list) ? this._list : [];
                 const existingCommand = commandList.find(command => command && command.symbol === 'save');
 
-                // If save command should exist, ensure it's in the menu
-                if (this.needsCommand('save')) {
+                // If feature is enabled, always add save command regardless of needsCommand('save')
+                // Otherwise, use normal behavior (check needsCommand('save'))
+                const shouldAddSave = isFeatureEnabled() || this.needsCommand('save');
+
+                if (shouldAddSave) {
                     if (!existingCommand) {
                         // Command doesn't exist, add it with proper enabled state
                         const enabled = this.isSaveEnabled();
                         this.addCommand(TextManager.save, 'save', enabled);
-                    } else if (isFeatureEnabled()) {
+                    } else {
                         // Command exists, update enabled state based on our override
                         const enabled = this.isSaveEnabled();
                         existingCommand.enabled = enabled;
                     }
                 }
-            },
-            settingKey
+            }
         );
 
         // Also override Window_SavefileList.isEnabled to bypass difficulty restrictions
