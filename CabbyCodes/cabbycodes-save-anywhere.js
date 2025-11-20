@@ -34,155 +34,115 @@
 
     const isFeatureEnabled = () => CabbyCodes.getSetting(settingKey, false);
 
-    const DifficultyState = {
-        easySwitchId: 13,
-        normalSwitchId: 31,
-        hardSwitchId: 8,
-
-        getSwitchValue(switchId) {
-            if (typeof switchId !== 'number' || switchId < 1) {
-                return false;
-            }
-
-            try {
-                if (typeof window.gSw === 'function') {
-                    return Boolean(window.gSw(switchId));
-                }
-
-                if (typeof $gameSwitches !== 'undefined' && typeof $gameSwitches.value === 'function') {
-                    return Boolean($gameSwitches.value(switchId));
-                }
-            } catch (error) {
-                console.warn('[CabbyCodes] Save Anywhere: failed to read switch', switchId, error);
-            }
-
-            return false;
-        },
-
-        isEasyMode() {
-            return this.getSwitchValue(this.easySwitchId);
-        },
-
-        isNonEasyDifficulty() {
-            if (this.isEasyMode()) {
-                return false;
-            }
-
-            const knownModes = [
-                this.normalSwitchId,
-                this.hardSwitchId
-            ].filter(id => typeof id === 'number' && id > 0);
-
-            if (knownModes.length === 0) {
-                return true;
-            }
-
-            return knownModes.some(id => this.getSwitchValue(id));
-        }
-    };
-
-    const SaveAnywhereState = {
-        canManipulate() {
-            if (typeof $gameSystem === 'undefined') {
-                return false;
-            }
-            if (typeof $gameParty === 'undefined') {
-                return false;
-            }
-            if (typeof SceneManager === 'undefined') {
-                return false;
-            }
-            if (typeof $gameParty.inBattle === 'function' && $gameParty.inBattle()) {
-                return false;
-            }
-            return true;
-        },
-
-        determineLockType() {
-            if (typeof $gameSystem === 'undefined' || typeof $gameSystem.isSaveEnabled !== 'function') {
-                return 'unknown';
-            }
-
-            try {
-                if ($gameSystem.isSaveEnabled()) {
-                    return 'none';
-                }
-            } catch (error) {
-                console.error('[CabbyCodes] Save Anywhere: failed to inspect Game_System', error);
-                return 'unknown';
-            }
-
-            if (DifficultyState.isEasyMode()) {
-                return 'story';
-            }
-
-            if (DifficultyState.isNonEasyDifficulty()) {
-                return 'difficulty';
-            }
-
-            return 'unknown';
-        },
-
-        shouldForceEnable(baseEnabled) {
-            if (baseEnabled) {
-                return false;
-            }
-
-            if (!this.canManipulate()) {
-                return false;
-            }
-
-            const lockType = this.determineLockType();
-            if (lockType === 'story') {
-                return false;
-            }
-
-            if (lockType === 'difficulty') {
-                return true;
-            }
-
-            return false;
-        },
-
-        ensureSaveCommand(menuWindow) {
-            const commandList = Array.isArray(menuWindow._list) ? menuWindow._list : [];
-            const existingCommand = commandList.find(command => command.symbol === 'save');
-            const baseEnabled = menuWindow.isSaveEnabled();
-            const forceEnable = this.shouldForceEnable(baseEnabled);
-
-            if (existingCommand) {
-                if (forceEnable && !existingCommand.enabled) {
-                    existingCommand.enabled = true;
-                } else if (!forceEnable && existingCommand.enabled !== baseEnabled) {
-                    existingCommand.enabled = baseEnabled;
-                }
-                return;
-            }
-
-            if (!forceEnable && !baseEnabled) {
-                return;
-            }
-
-            menuWindow.addCommand(TextManager.save, "save", forceEnable ? true : baseEnabled);
-        }
-    };
-
     const applySaveAnywherePatch = () => {
         if (applySaveAnywherePatch._applied) {
             return;
         }
         applySaveAnywherePatch._applied = true;
 
-        CabbyCodes.after(
+        // Override isSaveEnabled to bypass difficulty-based save restrictions
+        // The game uses $gameSystem.isSaveEnabled() to disable saving based on difficulty
+        // When the cheat is enabled, we bypass this check while respecting other mechanics
+        CabbyCodes.override(
+            Window_MenuCommand.prototype,
+            'isSaveEnabled',
+            function() {
+                const original = this._cabbycodesOriginals?.isSaveEnabled;
+                const baseResult = original ? original.call(this) : false;
+
+                // If cheat is disabled, use normal behavior
+                if (!isFeatureEnabled()) {
+                    return baseResult;
+                }
+
+                // If base result is true, saving is already enabled - use it
+                if (baseResult) {
+                    return baseResult;
+                }
+
+                // Base result is false - check if $gameSystem.isSaveEnabled() is the reason
+                // The original isSaveEnabled checks: !DataManager.isEventTest() && $gameSystem.isSaveEnabled()
+                // If $gameSystem.isSaveEnabled() is false, bypass it (difficulty restriction)
+                // Other checks (like DataManager.isEventTest()) are still respected
+                if (typeof $gameSystem !== 'undefined' && typeof $gameSystem.isSaveEnabled === 'function') {
+                    if (!$gameSystem.isSaveEnabled()) {
+                        // Save is disabled via $gameSystem - bypass the difficulty restriction
+                        // But still respect other checks like event test mode
+                        if (typeof DataManager !== 'undefined' && typeof DataManager.isEventTest === 'function') {
+                            if (DataManager.isEventTest()) {
+                                return false; // Still respect event test mode
+                            }
+                        }
+                        return true; // Bypass difficulty restriction
+                    }
+                }
+
+                // Fall back to base result for any other case
+                return baseResult;
+            },
+            settingKey
+        );
+
+        // Override addSaveCommand to ensure save option always exists in the menu
+        // The game's addSaveCommand might skip it in certain conditions (like first day via switch 37)
+        // We ensure it's always added if needsCommand('save') is true, but respect enable/disable state
+        CabbyCodes.override(
             Window_MenuCommand.prototype,
             'addSaveCommand',
             function() {
+                // Check if save command already exists
+                const commandList = Array.isArray(this._list) ? this._list : [];
+                const existingCommand = commandList.find(command => command && command.symbol === 'save');
+
+                // If save command should exist, ensure it's in the menu
+                if (this.needsCommand('save')) {
+                    if (!existingCommand) {
+                        // Command doesn't exist, add it with proper enabled state
+                        const enabled = this.isSaveEnabled();
+                        this.addCommand(TextManager.save, 'save', enabled);
+                    } else if (isFeatureEnabled()) {
+                        // Command exists, update enabled state based on our override
+                        const enabled = this.isSaveEnabled();
+                        existingCommand.enabled = enabled;
+                    }
+                }
+            },
+            settingKey
+        );
+
+        // Also override Window_SavefileList.isEnabled to bypass difficulty restrictions
+        // This ensures that when actually trying to save, the savefile is considered enabled
+        CabbyCodes.override(
+            Window_SavefileList.prototype,
+            'isEnabled',
+            function(savefileId) {
+                const original = this._cabbycodesOriginals?.isEnabled;
+                const baseResult = original ? original.call(this, savefileId) : false;
+
+                // If cheat is disabled, use normal behavior
                 if (!isFeatureEnabled()) {
-                    return;
+                    return baseResult;
                 }
 
-                SaveAnywhereState.ensureSaveCommand(this);
-            }
+                // If we're in save mode and base result would be false,
+                // check if it's due to difficulty restrictions
+                if (this._mode === 'save') {
+                    // The normal check is just savefileId > 0, so baseResult should be true if valid
+                    // But if $gameSystem.isSaveEnabled() is false, the window might disable it
+                    // So we bypass the difficulty check here
+                    if (typeof $gameSystem !== 'undefined' && typeof $gameSystem.isSaveEnabled === 'function') {
+                        if (!$gameSystem.isSaveEnabled() && savefileId > 0) {
+                            // Save is disabled via $gameSystem (difficulty) but savefileId is valid
+                            // Bypass the difficulty restriction
+                            return true;
+                        }
+                    }
+                }
+
+                // Fall back to base result
+                return baseResult;
+            },
+            settingKey
         );
     };
 
