@@ -2731,6 +2731,12 @@
         target.paintOpacity = previousOpacity;
     };
 
+    Window_CabbyCodesItemSearch.prototype.isTouchedInsideFrame = function() {
+        const touchPos = new Point(TouchInput.x, TouchInput.y);
+        const localPos = this.worldTransform.applyInverse(touchPos);
+        return this.innerRect.contains(localPos.x, localPos.y);
+    };
+
     Window_CabbyCodesItemSearch.prototype.update = function() {
         Window_Base.prototype.update.call(this);
         this.processPointer();

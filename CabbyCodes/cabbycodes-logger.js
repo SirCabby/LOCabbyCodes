@@ -52,23 +52,72 @@
 
     const logPath = path.join(rootDir, 'CabbyCodes.log');
 
-    function formatLine(level, message) {
+    /**
+     * Log levels: DEBUG < INFO < WARN < ERROR
+     * By default, only WARN and ERROR are logged.
+     */
+    const LOG_LEVELS = {
+        DEBUG: 0,
+        INFO: 1,
+        WARN: 2,
+        ERROR: 3
+    };
+    
+    /**
+     * Get the current minimum log level based on debugLoggingEnabled setting.
+     * @returns {number} Minimum log level (WARN by default, DEBUG if debug logging enabled)
+     */
+    function getMinLogLevel() {
+        return CabbyCodes.debugLoggingEnabled ? LOG_LEVELS.DEBUG : LOG_LEVELS.WARN;
+    }
+    
+    function formatLine(levelName, message) {
         const timestamp = new Date().toISOString();
-        return `[${timestamp}] [${level}] ${message}\n`;
+        return `[${timestamp}] [${levelName}] ${message}\n`;
     }
 
-    function appendLine(level, message) {
-        const line = formatLine(level, message);
+    function appendLine(level, levelName, message, includeStackTrace = false) {
+        const minLevel = getMinLogLevel();
+        if (level < minLevel) {
+            return; // Don't log if below minimum level
+        }
+        
         try {
+            const line = formatLine(levelName, message);
             fs.appendFileSync(logPath, line, { encoding: 'utf8' });
+            
+            // For errors, always include stack trace
+            if (includeStackTrace || level === LOG_LEVELS.ERROR) {
+                let stackTrace = '';
+                if (message instanceof Error && message.stack) {
+                    stackTrace = message.stack;
+                } else {
+                    // Create an Error to get stack trace
+                    const error = new Error(message);
+                    if (error.stack) {
+                        stackTrace = error.stack;
+                    }
+                }
+                
+                if (stackTrace) {
+                    // Indent stack trace lines
+                    const stackLines = stackTrace.split('\n').map(line => `    ${line}`).join('\n');
+                    fs.appendFileSync(logPath, stackLines + '\n', { encoding: 'utf8' });
+                }
+            }
         } catch (e) {
             console.error(`[CabbyCodes] Failed to write log file: ${e?.message || e}`);
         }
     }
 
-    function wrapLogger(originalFn, level) {
+    function wrapLogger(originalFn, level, levelName) {
         return function(message) {
-            appendLine(level, message);
+            // Check if we should log this level
+            const minLevel = getMinLogLevel();
+            if (level >= minLevel) {
+                appendLine(level, levelName, message, level === LOG_LEVELS.ERROR);
+            }
+            
             if (typeof originalFn === 'function') {
                 originalFn.call(CabbyCodes, message);
             }
@@ -79,9 +128,14 @@
         return logPath;
     };
 
-    CabbyCodes.log = wrapLogger(CabbyCodes.log, 'INFO');
-    CabbyCodes.warn = wrapLogger(CabbyCodes.warn, 'WARN');
-    CabbyCodes.error = wrapLogger(CabbyCodes.error, 'ERROR');
+    // Store original functions before wrapping
+    const originalLog = CabbyCodes.log;
+    const originalWarn = CabbyCodes.warn;
+    const originalError = CabbyCodes.error;
+
+    CabbyCodes.log = wrapLogger(originalLog, LOG_LEVELS.INFO, 'INFO');
+    CabbyCodes.warn = wrapLogger(originalWarn, LOG_LEVELS.WARN, 'WARN');
+    CabbyCodes.error = wrapLogger(originalError, LOG_LEVELS.ERROR, 'ERROR');
 
     CabbyCodes.log('[CabbyCodes] Logger initialized');
 })();
