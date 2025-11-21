@@ -22,6 +22,7 @@
 
     const moduleApi = (CabbyCodes.cookbook = CabbyCodes.cookbook || {});
     const bookUi = CabbyCodes.bookUi || null;
+    const bookUiDefaults = (bookUi && bookUi.defaults) || {};
     const settingKey = 'cookbook';
     const COOKING_COMMON_EVENT_NAME = 'Cooking';
     const COOKED_MEAL_EVENT_NAME = 'eatCookedMeal';
@@ -34,7 +35,16 @@
     let dishNameMapCache = null;
 
     // Window constants
-    const WINDOW_WIDTH = bookUi?.defaults?.windowWidth ?? 640;
+    const WINDOW_WIDTH = Number.isFinite(bookUiDefaults.windowWidth)
+        ? bookUiDefaults.windowWidth
+        : null;
+    const MIN_WINDOW_WIDTH = Number.isFinite(bookUiDefaults.minWindowWidth)
+        ? bookUiDefaults.minWindowWidth
+        : 320;
+    const WINDOW_HORIZONTAL_PADDING = Number.isFinite(bookUiDefaults.windowHorizontalPadding)
+        ? bookUiDefaults.windowHorizontalPadding
+        : 0;
+    const STRETCH_TO_FULL_WIDTH = bookUiDefaults.stretchToFullWidth !== false;
     const ROW_HEIGHT = bookUi?.defaults?.rowHeight ?? 24;  // Tight vertical spacing
     const ROW_SPACING = bookUi?.defaults?.rowSpacing ?? 2;
     const REFRESH_INTERVAL_FRAMES = 30;
@@ -753,12 +763,12 @@
         if (this._cookbookLayout) {
             return this._cookbookLayout;
         }
-        const ww = Math.min(WINDOW_WIDTH, Graphics.boxWidth - 48);
+        const ww = calculateWindowWidth();
         const headerHeight = this.headerWindowHeight();
         const gap = this.windowGap();
         const listHeight = this.listWindowHeight(headerHeight, gap);
         const totalHeight = headerHeight + gap + listHeight;
-        const wx = (Graphics.boxWidth - ww) / 2;
+        const wx = Math.max(0, Math.floor((Graphics.boxWidth - ww) / 2));
         const headerY = Math.max(24, (Graphics.boxHeight - totalHeight) / 2);
         const listY = headerY + headerHeight + gap;
         this._cookbookLayout = { ww, headerHeight, listHeight, headerY, listY, wx };
@@ -792,6 +802,17 @@
             ? Window_Base.prototype.standardPadding.call(Window_Base.prototype)
             : 12;
     };
+
+    function calculateWindowWidth() {
+        const availableWidth = Math.max(
+            MIN_WINDOW_WIDTH,
+            Graphics.boxWidth - WINDOW_HORIZONTAL_PADDING * 2
+        );
+        if (STRETCH_TO_FULL_WIDTH || !Number.isFinite(WINDOW_WIDTH) || WINDOW_WIDTH >= availableWidth) {
+            return availableWidth;
+        }
+        return Math.max(MIN_WINDOW_WIDTH, Math.min(WINDOW_WIDTH, availableWidth));
+    }
 
     const CookbookHeaderBase = bookUi && bookUi.BookHeaderWindow ? bookUi.BookHeaderWindow : null;
 
