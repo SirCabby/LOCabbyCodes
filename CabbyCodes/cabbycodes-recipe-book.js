@@ -47,6 +47,8 @@
     const CHECKBOX_CHECKED_COLOR = '#68ffd1';
     const CHECKBOX_UNCHECKED_COLOR = 'rgba(255, 255, 255, 0.3)';
     const CHECKBOX_BORDER_COLOR = '#ffffff';
+    const RECIPE_INGREDIENT_KEYS = ['ing1', 'ing2', 'ing3', 'ing4', 'ing5'];
+    const UNKNOWN_INGREDIENT_TEXT = 'Ingredients unknown';
 
     CabbyCodes.registerSetting(settingKey, 'Recipe Book', {
         defaultValue: false,
@@ -101,10 +103,13 @@
         for (let id = RECIPE_MIN_ID; id <= RECIPE_MAX_ID; id++) {
             const item = $dataItems[id];
             if (item && item.name) {
+                const ingredients = getRecipeIngredients(item);
                 recipes.push({
                     id: id,
                     name: item.name,
-                    discovered: checkRecipe(id)
+                    discovered: checkRecipe(id),
+                    ingredients,
+                    combinationText: formatIngredientList(ingredients)
                 });
             }
         }
@@ -115,6 +120,46 @@
         });
         
         return recipes;
+    }
+
+    function getRecipeIngredients(item) {
+        if (!item || !item.meta) {
+            return [];
+        }
+        const ingredients = [];
+        for (const key of RECIPE_INGREDIENT_KEYS) {
+            if (!Object.prototype.hasOwnProperty.call(item.meta, key)) {
+                continue;
+            }
+            const rawValue = item.meta[key];
+            const ingredientId = Number(rawValue);
+            if (!Number.isFinite(ingredientId) || ingredientId <= 0) {
+                continue;
+            }
+            ingredients.push({
+                id: ingredientId,
+                name: resolveItemName(ingredientId)
+            });
+        }
+        return ingredients;
+    }
+
+    function resolveItemName(itemId) {
+        if (typeof $dataItems === 'undefined' || !$dataItems) {
+            return `Item ${itemId}`;
+        }
+        const item = $dataItems[itemId];
+        if (item && item.name) {
+            return item.name;
+        }
+        return `Item ${itemId}`;
+    }
+
+    function formatIngredientList(ingredients) {
+        if (!Array.isArray(ingredients) || ingredients.length === 0) {
+            return UNKNOWN_INGREDIENT_TEXT;
+        }
+        return ingredients.map(ingredient => ingredient.name).join(' + ');
     }
 
     /**
@@ -286,7 +331,12 @@
             return false;
         }
         for (let i = 0; i < a.length; i++) {
-            if (a[i].id !== b[i].id || a[i].discovered !== b[i].discovered) {
+            if (
+                a[i].id !== b[i].id ||
+                a[i].discovered !== b[i].discovered ||
+                a[i].name !== b[i].name ||
+                a[i].combinationText !== b[i].combinationText
+            ) {
                 return false;
             }
         }
@@ -367,12 +417,25 @@
         this.drawCheckbox(checkboxX, checkboxY, recipe.discovered);
 
         // Draw recipe name
-        this.changeTextColor(
-            recipe.discovered 
-                ? ColorManager.normalColor() 
-                : ColorManager.textColor(6)
-        );
-        this.drawText(recipe.name, nameX, textY, nameWidth, 'left');
+        const nameColor = recipe.discovered
+            ? ColorManager.normalColor()
+            : ColorManager.textColor(6);
+        const comboColor = recipe.discovered
+            ? ColorManager.systemColor()
+            : ColorManager.textColor(6);
+        const combinationText = recipe.combinationText || UNKNOWN_INGREDIENT_TEXT;
+        const columnGap = 12;
+        const nameColumnWidth = Math.floor(nameWidth * 0.45);
+        const comboX = nameX + nameColumnWidth + columnGap;
+        const comboWidth = Math.max(0, nameWidth - nameColumnWidth - columnGap);
+
+        this.changeTextColor(nameColor);
+        this.drawText(recipe.name, nameX, textY, nameColumnWidth, 'left');
+
+        if (comboWidth > 0) {
+            this.changeTextColor(comboColor);
+            this.drawText(combinationText, comboX, textY, comboWidth, 'left');
+        }
     };
 
     Window_CabbyCodesRecipeBook.prototype.drawCheckbox = function(x, y, checked) {
