@@ -25,7 +25,7 @@
         'Unbreakable Items',
         {
             defaultValue: false,
-            order: 58
+            order: 75
         },
         newValue => {
             CabbyCodes.log(

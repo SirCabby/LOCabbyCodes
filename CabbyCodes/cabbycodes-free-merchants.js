@@ -37,7 +37,7 @@
         'Free Merchants',
         {
             defaultValue: false,
-            order: 63
+            order: 90
         },
         newValue => {
             CabbyCodes.log(

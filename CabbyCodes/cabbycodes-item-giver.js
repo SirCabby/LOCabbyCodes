@@ -2840,7 +2840,7 @@
     // Register setting with formatValue to show "Press" instead of on/off
     CabbyCodes.registerSetting('itemGiver', 'Give Item', {
         defaultValue: false,
-        order: 51,
+        order: 20,
         formatValue: () => 'Press'
     });
 

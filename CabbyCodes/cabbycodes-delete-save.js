@@ -657,6 +657,9 @@
         }
     );
 
+    // Store original onSavefileOk method before overriding
+    const _originalSceneSaveOnSavefileOk = Scene_Save.prototype.onSavefileOk;
+
     // Hook into Scene_Save.onSavefileOk to add confirmation for overwriting
     CabbyCodes.override(
         Scene_Save.prototype,
@@ -665,7 +668,9 @@
             const savefileId = this.savefileId();
             
             // Check if save file already exists
-            if (DataManager.savefileExists && DataManager.savefileExists(savefileId)) {
+            const fileExists = DataManager.savefileExists && DataManager.savefileExists(savefileId);
+            
+            if (fileExists) {
                 // Save file exists - show confirmation dialog
                 const savefileName = savefileId === 0 ? (TextManager.autosave || "Autosave") : (TextManager.file || "File") + " " + savefileId;
                 const confirmMessage = `Overwrite ${savefileName}?`;
@@ -675,23 +680,59 @@
                     this._listWindow.deactivate();
                 }
                 
-                // Store scene reference for callback
+                // Store scene reference and savefileId for callback
                 const scene = this;
+                const confirmedSavefileId = savefileId; // Store the ID when showing dialog
                 
                 // Show confirmation dialog
                 showConfirmDialog(confirmMessage, (confirmed) => {
-                    
                     // Reactivate list window
                     if (scene._listWindow) {
                         scene._listWindow.activate();
                     }
                     
                     if (confirmed) {
-                        // User confirmed - proceed with save by calling the original method
-                        // Call parent first (onSavefileOk), then executeSave if enabled
+                        // Ensure we're still on the correct save file
+                        if (scene.savefileId() !== confirmedSavefileId) {
+                            scene._listWindow.selectSavefile(confirmedSavefileId);
+                        }
+                        
+                        // Call the parent onSavefileOk first (required for save logic)
                         Scene_File.prototype.onSavefileOk.call(scene);
-                        if (scene.isSavefileEnabled(savefileId)) {
-                            scene.executeSave(savefileId);
+                        
+                        // Verify savefileId is still correct
+                        const currentSavefileId = scene.savefileId();
+                        
+                        // Check if save is enabled
+                        const isEnabled = scene.isSavefileEnabled(currentSavefileId);
+                        
+                        if (isEnabled) {
+                            // Execute the save directly
+                            try {
+                                // Set savefileId in game system (required before save)
+                                $gameSystem.setSavefileId(currentSavefileId);
+                                
+                                // Call onBeforeSave (required for save logic)
+                                $gameSystem.onBeforeSave();
+                                
+                                // Call DataManager.saveGame directly
+                                const savePromise = DataManager.saveGame(currentSavefileId);
+                                
+                                if (savePromise && typeof savePromise.then === 'function') {
+                                    savePromise.then(() => {
+                                        scene.onSaveSuccess();
+                                    }).catch((error) => {
+                                        CabbyCodes.error('[CabbyCodes] Save failed: ' + (error ? (error.message || error) : 'unknown'));
+                                        scene.onSaveFailure(error);
+                                    });
+                                } else {
+                                    CabbyCodes.error('[CabbyCodes] DataManager.saveGame did not return a promise');
+                                    scene.onSaveFailure();
+                                }
+                            } catch (e) {
+                                CabbyCodes.error('[CabbyCodes] Exception during save: ' + (e.message || e));
+                                scene.onSaveFailure(e);
+                            }
                         } else {
                             scene.onSaveFailure();
                         }
@@ -704,7 +745,7 @@
             }
             
             // Save file doesn't exist - call original method to proceed with save
-            CabbyCodes.callOriginal(Scene_Save.prototype, 'onSavefileOk', this, []);
+            _originalSceneSaveOnSavefileOk.call(this);
         }
     );
 

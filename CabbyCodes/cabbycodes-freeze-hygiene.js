@@ -37,7 +37,7 @@
         'Freeze Needs / Hygiene',
         {
             defaultValue: false,
-            order: 55
+            order: 50
         },
         newValue => {
             CabbyCodes.log(
@@ -144,6 +144,35 @@
             ]);
         }
     );
+
+    // Also patch operateVariable to catch subtraction operations
+    if (typeof Game_Interpreter !== 'undefined' && Game_Interpreter.prototype.operateVariable) {
+        CabbyCodes.override(
+            Game_Interpreter.prototype,
+            'operateVariable',
+            function(variableId, operationType, value) {
+                // Check if this is a subtraction operation on a protected variable
+                if (isFeatureEnabled() && operationType === 2) { // 2 = Sub
+                    const numericId = Number(variableId);
+                    if (Number.isFinite(numericId) && PROTECTED_VARIABLE_IDS.has(numericId)) {
+                        const oldValue = $gameVariables.value(numericId);
+                        const pendingValue = oldValue - value;
+                        if (shouldBlockStatDecrease(numericId, oldValue, pendingValue)) {
+                            // Block the decrease
+                            return;
+                        }
+                    }
+                }
+
+                // For other operations, let them proceed normally
+                return callOriginal(Game_Interpreter.prototype, 'operateVariable', this, [
+                    variableId,
+                    operationType,
+                    value
+                ]);
+            }
+        );
+    }
 
     CabbyCodes.log('[CabbyCodes] Freeze Hygiene module loaded');
 })();

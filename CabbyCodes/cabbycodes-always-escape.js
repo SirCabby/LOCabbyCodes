@@ -26,7 +26,7 @@
         'Always Escape Battles',
         {
             defaultValue: false,
-            order: 59
+            order: 95
         },
         newValue => {
             CabbyCodes.log(

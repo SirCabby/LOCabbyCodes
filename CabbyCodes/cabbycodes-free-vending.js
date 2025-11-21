@@ -144,7 +144,7 @@
         'Free Vending Machines',
         {
             defaultValue: false,
-            order: 62
+            order: 85
         },
         newValue => {
             CabbyCodes.log(

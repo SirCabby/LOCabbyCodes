@@ -27,7 +27,7 @@
         'Infinite Items',
         {
             defaultValue: false,
-            order: 56
+            order: 70
         },
         newValue => {
             CabbyCodes.log(

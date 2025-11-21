@@ -41,7 +41,7 @@
 
     CabbyCodes.registerSetting(settingKey, 'Refill Status', {
         defaultValue: false,
-        order: 1,
+        order: 5,
         formatValue: () => 'Press',
         onChange: newValue => {
             if (!newValue) {

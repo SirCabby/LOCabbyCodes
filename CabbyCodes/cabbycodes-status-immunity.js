@@ -26,7 +26,7 @@
         'Status Immunity',
         {
             defaultValue: false,
-            order: 54
+            order: 40
         },
         newValue => {
             CabbyCodes.log(

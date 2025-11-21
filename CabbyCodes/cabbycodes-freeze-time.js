@@ -375,7 +375,7 @@
 
     CabbyCodes.registerSetting(settingKey, 'Freeze Time', {
         defaultValue: false,
-        order: 52,
+        order: 55,
         onChange: newValue => {
             freezeSessionId += 1;
             if (newValue) {
@@ -1528,6 +1528,10 @@
                 return Reflect.set(target, property, value);
             },
             get(target, property) {
+                // Skip Symbol properties - they can't be converted to numbers and will cause errors during save
+                if (typeof property === 'symbol') {
+                    return Reflect.get(target, property);
+                }
                 const propNum = Number(property);
                 if (shouldReturnFrozenValue(propNum)) {
                     return frozenValues[propNum];

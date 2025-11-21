@@ -32,6 +32,8 @@
             'cabbycodes-enemy-health-bars.js',
             'cabbycodes-version-display.js',
             'cabbycodes-hidden-stats-display.js',
+            'cabbycodes-cookbook.js',
+            'cabbycodes-recipe-book.js',
             'cabbycodes-refill-status.js',
             'cabbycodes-save-anywhere.js',
             'cabbycodes-delete-save.js',

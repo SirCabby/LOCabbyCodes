@@ -25,7 +25,7 @@
         'Infinite Stamina',
         {
             defaultValue: false,
-            order: 54
+            order: 45
         },
         newValue => {
             CabbyCodes.log(
