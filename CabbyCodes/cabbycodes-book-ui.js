@@ -27,13 +27,27 @@
         contentPadding: 12,
         rowContentLeft: 16,
         rowContentRight: 8,
-        checkboxSize: 16,
-        checkboxCheckedColor: '#68ffd1',
-        checkboxUncheckedColor: 'rgba(255, 255, 255, 0.3)',
-        checkboxBorderColor: '#ffffff',
-        checkboxCheckColor: '#000000',
-        checkboxLineWidth: 2.5,
-        checkboxPadding: 4,
+        checkboxSize: 15,
+        checkboxCornerRadius: 2,
+        checkboxOuterBorderColor: '#050b10',
+        checkboxOuterBorderWidth: 1.5,
+        checkboxInnerBorderColor: 'rgba(255, 255, 255, 0.45)',
+        checkboxInnerBorderWidth: 1,
+        checkboxCheckedFillTop: '#c9fff3',
+        checkboxCheckedFillBottom: '#1f8d77',
+        checkboxUncheckedFillTop: '#4a5a68',
+        checkboxUncheckedFillBottom: '#212a34',
+        checkboxHighlightTop: 'rgba(255, 255, 255, 0.85)',
+        checkboxHighlightBottom: 'rgba(255, 255, 255, 0.05)',
+        checkboxHighlightHeightRatio: 0.45,
+        checkboxInnerShadowColor: 'rgba(0, 0, 0, 0.45)',
+        checkboxInnerShadowBlur: 5,
+        checkboxInnerShadowOffsetY: 1,
+        checkboxCheckColor: '#0b181c',
+        checkboxCheckShadowColor: 'rgba(0, 0, 0, 0.85)',
+        checkboxCheckGlow: 'rgba(0, 0, 0, 0.2)',
+        checkboxCheckLineWidth: 2.8,
+        checkboxPadding: 3,
         backgroundTopColor: 'rgba(12, 20, 32, 0.98)',
         backgroundBottomColor: 'rgba(8, 16, 28, 0.95)'
     };
@@ -51,6 +65,41 @@
             return target.contents;
         }
         return null;
+    }
+
+    function getBitmapAndContext(target) {
+        const bitmap = resolveBitmap(target);
+        if (!bitmap) {
+            return null;
+        }
+        const context = bitmap.context || bitmap._context || null;
+        return { bitmap, context };
+    }
+
+    function requestBitmapUpdate(bitmap) {
+        if (!bitmap) {
+            return;
+        }
+        if (bitmap._baseTexture && typeof bitmap._baseTexture.update === 'function') {
+            bitmap._baseTexture.update();
+        } else if (typeof bitmap.touch === 'function') {
+            bitmap.touch();
+        }
+    }
+
+    function roundedRectPath(ctx, x, y, width, height, radius) {
+        const r = Math.max(0, Math.min(radius, Math.min(width, height) / 2));
+        ctx.beginPath();
+        ctx.moveTo(x + r, y);
+        ctx.lineTo(x + width - r, y);
+        ctx.quadraticCurveTo(x + width, y, x + width, y + r);
+        ctx.lineTo(x + width, y + height - r);
+        ctx.quadraticCurveTo(x + width, y + height, x + width - r, y + height);
+        ctx.lineTo(x + r, y + height);
+        ctx.quadraticCurveTo(x, y + height, x, y + height - r);
+        ctx.lineTo(x, y + r);
+        ctx.quadraticCurveTo(x, y, x + r, y);
+        ctx.closePath();
     }
 
     bookUi.applyPanelBackground = function(windowInstance, overrides = {}) {
@@ -73,55 +122,252 @@
     };
 
     bookUi.drawCheckbox = function(target, x, y, checked, options = {}) {
-        const bitmap = resolveBitmap(target);
-        if (!bitmap) {
+        const contextInfo = getBitmapAndContext(target);
+        if (!contextInfo) {
             return;
         }
+        const { bitmap, context: ctx } = contextInfo;
         const size = options.size ?? defaults.checkboxSize;
-        const borderWidth = options.borderWidth ?? 2;
-        const checkedColor = options.checkedColor || defaults.checkboxCheckedColor;
-        const uncheckedColor = options.uncheckedColor || defaults.checkboxUncheckedColor;
-        const borderColor = options.borderColor || defaults.checkboxBorderColor;
-        const padding = options.padding ?? defaults.checkboxPadding;
+        const radius = options.radius ?? defaults.checkboxCornerRadius;
+        const outerColor = options.outerBorderColor || defaults.checkboxOuterBorderColor;
+        const outerWidth = options.outerBorderWidth ?? defaults.checkboxOuterBorderWidth;
+        const innerBorderColor = options.innerBorderColor || defaults.checkboxInnerBorderColor;
+        const innerBorderWidth = options.innerBorderWidth ?? defaults.checkboxInnerBorderWidth;
+        const checkedFillTop = options.checkedFillTop || defaults.checkboxCheckedFillTop;
+        const checkedFillBottom = options.checkedFillBottom || defaults.checkboxCheckedFillBottom;
+        const uncheckedFillTop = options.uncheckedFillTop || defaults.checkboxUncheckedFillTop;
+        const uncheckedFillBottom =
+            options.uncheckedFillBottom || defaults.checkboxUncheckedFillBottom;
+        const highlightTop = options.highlightTop || defaults.checkboxHighlightTop;
+        const highlightBottom = options.highlightBottom || defaults.checkboxHighlightBottom;
+        const highlightRatio =
+            options.highlightHeightRatio ?? defaults.checkboxHighlightHeightRatio;
+        const innerShadowColor = options.innerShadowColor || defaults.checkboxInnerShadowColor;
+        const innerShadowBlur = options.innerShadowBlur ?? defaults.checkboxInnerShadowBlur;
+        const innerShadowOffsetY =
+            options.innerShadowOffsetY ?? defaults.checkboxInnerShadowOffsetY;
         const checkColor = options.checkColor || defaults.checkboxCheckColor;
-        const lineWidth = options.lineWidth ?? defaults.checkboxLineWidth;
+        const checkLineWidth = options.checkLineWidth ?? defaults.checkboxCheckLineWidth;
+        const checkGlow = options.checkGlow ?? defaults.checkboxCheckGlow;
+        const checkPadding = options.padding ?? defaults.checkboxPadding;
+        const inset = options.inset ?? Math.max(outerWidth, 1);
+        const fillTop = checked ? checkedFillTop : uncheckedFillTop;
+        const fillBottom = checked ? checkedFillBottom : uncheckedFillBottom;
 
-        bitmap.fillRect(x, y, size, size, checked ? checkedColor : uncheckedColor);
-        bitmap.fillRect(x, y, size, borderWidth, borderColor);
-        bitmap.fillRect(x, y, borderWidth, size, borderColor);
-        bitmap.fillRect(x + size - borderWidth, y, borderWidth, size, borderColor);
-        bitmap.fillRect(x, y + size - borderWidth, size, borderWidth, borderColor);
+        if (!ctx) {
+            bitmap.fillRect(x, y, size, size, outerColor);
+            const innerSize = Math.max(0, size - inset * 2);
+            const innerX = x + inset;
+            const innerY = y + inset;
+            bitmap.gradientFillRect(innerX, innerY, innerSize, innerSize, fillTop, fillBottom, true);
+            const borderWidth = Math.max(1, Math.round(innerBorderWidth));
+            bitmap.fillRect(innerX, innerY, innerSize, borderWidth, innerBorderColor);
+            bitmap.fillRect(innerX, innerY, borderWidth, innerSize, innerBorderColor);
+            bitmap.fillRect(innerX + innerSize - borderWidth, innerY, borderWidth, innerSize, innerBorderColor);
+            bitmap.fillRect(innerX, innerY + innerSize - borderWidth, innerSize, borderWidth, innerBorderColor);
+            const highlightHeight = Math.max(1, Math.floor(innerSize * highlightRatio));
+            bitmap.gradientFillRect(
+                innerX + 1,
+                innerY + 1,
+                Math.max(0, innerSize - 2),
+                highlightHeight,
+                highlightTop,
+                highlightBottom,
+                true
+            );
+            if (checked) {
+                bookUi.drawCheckmark(bitmap, x, y, size, {
+                    color: checkColor,
+                    lineWidth: checkLineWidth,
+                    padding: checkPadding,
+                    glowColor: checkGlow
+                });
+            }
+            requestBitmapUpdate(bitmap);
+            return;
+        }
+
+        ctx.save();
+        roundedRectPath(ctx, x, y, size, size, radius);
+        ctx.fillStyle = outerColor;
+        ctx.fill();
+        ctx.restore();
+
+        const innerSize = Math.max(0, size - inset * 2);
+        const innerX = x + inset;
+        const innerY = y + inset;
+        const innerRadius = Math.max(0, radius - 1);
+
+        ctx.save();
+        roundedRectPath(ctx, innerX, innerY, innerSize, innerSize, innerRadius);
+        const fillGradient = ctx.createLinearGradient(innerX, innerY, innerX, innerY + innerSize);
+        fillGradient.addColorStop(0, fillTop);
+        fillGradient.addColorStop(1, fillBottom);
+        ctx.fillStyle = fillGradient;
+        ctx.fill();
+        ctx.restore();
+
+        ctx.save();
+        ctx.lineWidth = innerBorderWidth;
+        ctx.strokeStyle = innerBorderColor;
+        roundedRectPath(ctx, innerX, innerY, innerSize, innerSize, innerRadius);
+        ctx.stroke();
+        ctx.restore();
+
+        const highlightHeight = Math.max(1, innerSize * highlightRatio);
+        ctx.save();
+        roundedRectPath(
+            ctx,
+            innerX + 0.5,
+            innerY + 0.5,
+            innerSize - 1,
+            highlightHeight,
+            Math.max(0, innerRadius - 0.5)
+        );
+        const highlightGradient = ctx.createLinearGradient(
+            innerX,
+            innerY,
+            innerX,
+            innerY + highlightHeight
+        );
+        highlightGradient.addColorStop(0, highlightTop);
+        highlightGradient.addColorStop(1, highlightBottom);
+        ctx.fillStyle = highlightGradient;
+        ctx.fill();
+        ctx.restore();
+
+        if (innerShadowColor && innerShadowBlur > 0) {
+            ctx.save();
+            const shadowGradient = ctx.createLinearGradient(
+                innerX,
+                innerY + innerSize * 0.35,
+                innerX,
+                innerY + innerSize
+            );
+            shadowGradient.addColorStop(0, 'rgba(0,0,0,0)');
+            shadowGradient.addColorStop(1, innerShadowColor);
+            ctx.fillStyle = shadowGradient;
+            roundedRectPath(
+                ctx,
+                innerX + 0.5,
+                innerY + 0.5,
+                innerSize - 1,
+                innerSize - 1,
+                Math.max(0, innerRadius - 0.5)
+            );
+            ctx.shadowColor = innerShadowColor;
+            ctx.shadowBlur = innerShadowBlur;
+            ctx.shadowOffsetY = innerShadowOffsetY;
+            ctx.fill();
+            ctx.restore();
+        }
 
         if (checked) {
-            bookUi.drawCheckmark(bitmap, x, y, size, { color: checkColor, lineWidth, padding });
+            bookUi.drawCheckmark(bitmap, x, y, size, {
+                color: checkColor,
+                lineWidth: checkLineWidth,
+                padding: checkPadding,
+                glowColor: checkGlow
+            });
         }
+
+        requestBitmapUpdate(bitmap);
     };
 
     bookUi.drawCheckmark = function(target, x, y, size, options = {}) {
-        const bitmap = resolveBitmap(target);
-        if (!bitmap) {
+        const contextInfo = getBitmapAndContext(target);
+        if (!contextInfo) {
             return;
         }
+        const { bitmap, context: ctx } = contextInfo;
         const checkColor = options.color || defaults.checkboxCheckColor;
-        const lineWidth = options.lineWidth ?? defaults.checkboxLineWidth;
+        const lineWidth = options.lineWidth ?? defaults.checkboxCheckLineWidth;
         const padding = options.padding ?? defaults.checkboxPadding;
+        const glowColor = options.glowColor || defaults.checkboxCheckGlow;
+        const glowBlur = options.glowBlur ?? 2;
+        const shadowColor = options.shadowColor || defaults.checkboxCheckShadowColor;
+        const shadowOffset = options.shadowOffset ?? 0.6;
 
-        const startX = x + padding;
-        const startY = y + size - padding;
-        const midX = x + size / 2;
-        const midY = y + size / 2 + 1;
-        const endX = x + size - padding;
-        const endY = y + padding;
+        const startX = x + size * 0.22;
+        const startY = y + size * 0.62;
+        const midX = x + size * 0.38;
+        const midY = y + size * 0.79;
+        const endX = x + size * 0.78;
+        const endY = y + size * 0.25;
 
-        bookUi.drawThickLine(bitmap, startX, startY, midX, midY, lineWidth, checkColor);
-        bookUi.drawThickLine(bitmap, midX, midY, endX, endY, lineWidth, checkColor);
+        if (ctx) {
+            ctx.save();
+            ctx.lineWidth = lineWidth + 1.2;
+            ctx.lineJoin = 'round';
+            ctx.lineCap = 'round';
+            ctx.strokeStyle = shadowColor;
+            ctx.globalAlpha = 0.9;
+            ctx.beginPath();
+            ctx.moveTo(startX + shadowOffset, startY + shadowOffset);
+            ctx.lineTo(midX + shadowOffset, midY + shadowOffset);
+            ctx.lineTo(endX + shadowOffset, endY + shadowOffset);
+            ctx.stroke();
+            ctx.restore();
+
+            ctx.save();
+            ctx.lineWidth = lineWidth;
+            ctx.lineJoin = 'round';
+            ctx.lineCap = 'round';
+            ctx.strokeStyle = checkColor;
+            ctx.shadowColor = glowColor;
+            ctx.shadowBlur = glowBlur;
+            ctx.beginPath();
+            ctx.moveTo(startX, startY);
+            ctx.lineTo(midX, midY);
+            ctx.lineTo(endX, endY);
+            ctx.stroke();
+            ctx.restore();
+        } else {
+            bookUi.drawThickLine(
+                bitmap,
+                startX + shadowOffset,
+                startY + shadowOffset,
+                midX + shadowOffset,
+                midY + shadowOffset,
+                lineWidth + 1.2,
+                shadowColor
+            );
+            bookUi.drawThickLine(
+                bitmap,
+                midX + shadowOffset,
+                midY + shadowOffset,
+                endX + shadowOffset,
+                endY + shadowOffset,
+                lineWidth + 1.2,
+                shadowColor
+            );
+            bookUi.drawThickLine(bitmap, startX, startY, midX, midY, lineWidth, checkColor);
+            bookUi.drawThickLine(bitmap, midX, midY, endX, endY, lineWidth, checkColor);
+        }
+
+        requestBitmapUpdate(bitmap);
     };
 
     bookUi.drawThickLine = function(target, x1, y1, x2, y2, thickness, color) {
-        const bitmap = resolveBitmap(target);
-        if (!bitmap) {
+        const contextInfo = getBitmapAndContext(target);
+        if (!contextInfo) {
             return;
         }
+        const { bitmap, context: ctx } = contextInfo;
+        if (ctx) {
+            ctx.save();
+            ctx.strokeStyle = color;
+            ctx.lineWidth = thickness;
+            ctx.lineCap = 'round';
+            ctx.beginPath();
+            ctx.moveTo(x1, y1);
+            ctx.lineTo(x2, y2);
+            ctx.stroke();
+            ctx.restore();
+            requestBitmapUpdate(bitmap);
+            return;
+        }
+
         const dx = x2 - x1;
         const dy = y2 - y1;
         const length = Math.sqrt(dx * dx + dy * dy);

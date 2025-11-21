@@ -1,0 +1,3678 @@
+﻿{
+    "id":  44,
+    "list":  [
+                 {
+                     "code":  250,
+                     "indent":  0,
+                     "parameters":  [
+                                        {
+                                            "name":  "Cooking",
+                                            "volume":  90,
+                                            "pitch":  100,
+                                            "pan":  0
+                                        }
+                                    ]
+                 },
+                 {
+                     "code":  221,
+                     "indent":  0,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  121,
+                     "indent":  0,
+                     "parameters":  [
+                                        540,
+                                        540,
+                                        1
+                                    ]
+                 },
+                 {
+                     "code":  122,
+                     "indent":  0,
+                     "parameters":  [
+                                        136,
+                                        136,
+                                        0,
+                                        0,
+                                        15
+                                    ]
+                 },
+                 {
+                     "code":  122,
+                     "indent":  0,
+                     "parameters":  [
+                                        647,
+                                        647,
+                                        0,
+                                        0,
+                                        0
+                                    ]
+                 },
+                 {
+                     "code":  111,
+                     "indent":  0,
+                     "parameters":  [
+                                        0,
+                                        539,
+                                        0
+                                    ]
+                 },
+                 {
+                     "code":  122,
+                     "indent":  1,
+                     "parameters":  [
+                                        2,
+                                        2,
+                                        0,
+                                        2,
+                                        0,
+                                        2
+                                    ]
+                 },
+                 {
+                     "code":  111,
+                     "indent":  1,
+                     "parameters":  [
+                                        1,
+                                        2,
+                                        0,
+                                        0,
+                                        0
+                                    ]
+                 },
+                 {
+                     "code":  121,
+                     "indent":  2,
+                     "parameters":  [
+                                        540,
+                                        540,
+                                        0
+                                    ]
+                 },
+                 {
+                     "code":  0,
+                     "indent":  2,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  412,
+                     "indent":  1,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  0,
+                     "indent":  1,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  412,
+                     "indent":  0,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  111,
+                     "indent":  0,
+                     "parameters":  [
+                                        1,
+                                        75,
+                                        0,
+                                        0,
+                                        0
+                                    ]
+                 },
+                 {
+                     "code":  355,
+                     "indent":  1,
+                     "parameters":  [
+                                        "$gameParty.gainItem($dataItems[gVr(74)], -1);"
+                                    ]
+                 },
+                 {
+                     "code":  108,
+                     "indent":  1,
+                     "parameters":  [
+                                        "One-ingredient recipe"
+                                    ]
+                 },
+                 {
+                     "code":  122,
+                     "indent":  1,
+                     "parameters":  [
+                                        647,
+                                        647,
+                                        0,
+                                        0,
+                                        3
+                                    ]
+                 },
+                 {
+                     "code":  111,
+                     "indent":  1,
+                     "parameters":  [
+                                        1,
+                                        74,
+                                        0,
+                                        212,
+                                        0
+                                    ]
+                 },
+                 {
+                     "code":  122,
+                     "indent":  2,
+                     "parameters":  [
+                                        137,
+                                        137,
+                                        0,
+                                        0,
+                                        1
+                                    ]
+                 },
+                 {
+                     "code":  122,
+                     "indent":  2,
+                     "parameters":  [
+                                        647,
+                                        647,
+                                        0,
+                                        0,
+                                        0
+                                    ]
+                 },
+                 {
+                     "code":  0,
+                     "indent":  2,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  412,
+                     "indent":  1,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  111,
+                     "indent":  1,
+                     "parameters":  [
+                                        1,
+                                        74,
+                                        0,
+                                        213,
+                                        0
+                                    ]
+                 },
+                 {
+                     "code":  108,
+                     "indent":  2,
+                     "parameters":  [
+                                        "pizza"
+                                    ]
+                 },
+                 {
+                     "code":  122,
+                     "indent":  2,
+                     "parameters":  [
+                                        137,
+                                        137,
+                                        0,
+                                        0,
+                                        2
+                                    ]
+                 },
+                 {
+                     "code":  122,
+                     "indent":  2,
+                     "parameters":  [
+                                        647,
+                                        647,
+                                        0,
+                                        0,
+                                        2
+                                    ]
+                 },
+                 {
+                     "code":  111,
+                     "indent":  2,
+                     "parameters":  [
+                                        0,
+                                        540,
+                                        0
+                                    ]
+                 },
+                 {
+                     "code":  122,
+                     "indent":  3,
+                     "parameters":  [
+                                        137,
+                                        137,
+                                        0,
+                                        0,
+                                        28
+                                    ]
+                 },
+                 {
+                     "code":  0,
+                     "indent":  3,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  412,
+                     "indent":  2,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  0,
+                     "indent":  2,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  412,
+                     "indent":  1,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  111,
+                     "indent":  1,
+                     "parameters":  [
+                                        1,
+                                        74,
+                                        0,
+                                        214,
+                                        0
+                                    ]
+                 },
+                 {
+                     "code":  108,
+                     "indent":  2,
+                     "parameters":  [
+                                        "pizza bites"
+                                    ]
+                 },
+                 {
+                     "code":  122,
+                     "indent":  2,
+                     "parameters":  [
+                                        137,
+                                        137,
+                                        0,
+                                        0,
+                                        3
+                                    ]
+                 },
+                 {
+                     "code":  122,
+                     "indent":  2,
+                     "parameters":  [
+                                        647,
+                                        647,
+                                        0,
+                                        0,
+                                        0
+                                    ]
+                 },
+                 {
+                     "code":  0,
+                     "indent":  2,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  412,
+                     "indent":  1,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  111,
+                     "indent":  1,
+                     "parameters":  [
+                                        1,
+                                        74,
+                                        0,
+                                        215,
+                                        0
+                                    ]
+                 },
+                 {
+                     "code":  108,
+                     "indent":  2,
+                     "parameters":  [
+                                        "veggies"
+                                    ]
+                 },
+                 {
+                     "code":  122,
+                     "indent":  2,
+                     "parameters":  [
+                                        137,
+                                        137,
+                                        0,
+                                        0,
+                                        4
+                                    ]
+                 },
+                 {
+                     "code":  0,
+                     "indent":  2,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  412,
+                     "indent":  1,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  111,
+                     "indent":  1,
+                     "parameters":  [
+                                        1,
+                                        74,
+                                        0,
+                                        216,
+                                        0
+                                    ]
+                 },
+                 {
+                     "code":  108,
+                     "indent":  2,
+                     "parameters":  [
+                                        "fish"
+                                    ]
+                 },
+                 {
+                     "code":  122,
+                     "indent":  2,
+                     "parameters":  [
+                                        647,
+                                        647,
+                                        0,
+                                        0,
+                                        4
+                                    ]
+                 },
+                 {
+                     "code":  122,
+                     "indent":  2,
+                     "parameters":  [
+                                        137,
+                                        137,
+                                        0,
+                                        0,
+                                        5
+                                    ]
+                 },
+                 {
+                     "code":  0,
+                     "indent":  2,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  412,
+                     "indent":  1,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  111,
+                     "indent":  1,
+                     "parameters":  [
+                                        1,
+                                        74,
+                                        0,
+                                        219,
+                                        0
+                                    ]
+                 },
+                 {
+                     "code":  108,
+                     "indent":  2,
+                     "parameters":  [
+                                        "noodles"
+                                    ]
+                 },
+                 {
+                     "code":  122,
+                     "indent":  2,
+                     "parameters":  [
+                                        137,
+                                        137,
+                                        0,
+                                        0,
+                                        6
+                                    ]
+                 },
+                 {
+                     "code":  0,
+                     "indent":  2,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  412,
+                     "indent":  1,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  111,
+                     "indent":  1,
+                     "parameters":  [
+                                        1,
+                                        74,
+                                        0,
+                                        220,
+                                        0
+                                    ]
+                 },
+                 {
+                     "code":  108,
+                     "indent":  2,
+                     "parameters":  [
+                                        "stew"
+                                    ]
+                 },
+                 {
+                     "code":  122,
+                     "indent":  2,
+                     "parameters":  [
+                                        137,
+                                        137,
+                                        0,
+                                        0,
+                                        7
+                                    ]
+                 },
+                 {
+                     "code":  0,
+                     "indent":  2,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  412,
+                     "indent":  1,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  111,
+                     "indent":  1,
+                     "parameters":  [
+                                        1,
+                                        74,
+                                        0,
+                                        221,
+                                        0
+                                    ]
+                 },
+                 {
+                     "code":  108,
+                     "indent":  2,
+                     "parameters":  [
+                                        "beans"
+                                    ]
+                 },
+                 {
+                     "code":  122,
+                     "indent":  2,
+                     "parameters":  [
+                                        137,
+                                        137,
+                                        0,
+                                        0,
+                                        8
+                                    ]
+                 },
+                 {
+                     "code":  0,
+                     "indent":  2,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  412,
+                     "indent":  1,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  111,
+                     "indent":  1,
+                     "parameters":  [
+                                        1,
+                                        74,
+                                        0,
+                                        222,
+                                        0
+                                    ]
+                 },
+                 {
+                     "code":  108,
+                     "indent":  2,
+                     "parameters":  [
+                                        "rice"
+                                    ]
+                 },
+                 {
+                     "code":  122,
+                     "indent":  2,
+                     "parameters":  [
+                                        137,
+                                        137,
+                                        0,
+                                        0,
+                                        9
+                                    ]
+                 },
+                 {
+                     "code":  0,
+                     "indent":  2,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  412,
+                     "indent":  1,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  111,
+                     "indent":  1,
+                     "parameters":  [
+                                        1,
+                                        74,
+                                        0,
+                                        223,
+                                        0
+                                    ]
+                 },
+                 {
+                     "code":  108,
+                     "indent":  2,
+                     "parameters":  [
+                                        "potato"
+                                    ]
+                 },
+                 {
+                     "code":  122,
+                     "indent":  2,
+                     "parameters":  [
+                                        137,
+                                        137,
+                                        0,
+                                        0,
+                                        10
+                                    ]
+                 },
+                 {
+                     "code":  0,
+                     "indent":  2,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  412,
+                     "indent":  1,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  111,
+                     "indent":  1,
+                     "parameters":  [
+                                        1,
+                                        74,
+                                        0,
+                                        224,
+                                        0
+                                    ]
+                 },
+                 {
+                     "code":  108,
+                     "indent":  2,
+                     "parameters":  [
+                                        "tomato"
+                                    ]
+                 },
+                 {
+                     "code":  122,
+                     "indent":  2,
+                     "parameters":  [
+                                        137,
+                                        137,
+                                        0,
+                                        0,
+                                        11
+                                    ]
+                 },
+                 {
+                     "code":  0,
+                     "indent":  2,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  412,
+                     "indent":  1,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  111,
+                     "indent":  1,
+                     "parameters":  [
+                                        1,
+                                        74,
+                                        0,
+                                        227,
+                                        0
+                                    ]
+                 },
+                 {
+                     "code":  108,
+                     "indent":  2,
+                     "parameters":  [
+                                        "toast"
+                                    ]
+                 },
+                 {
+                     "code":  122,
+                     "indent":  2,
+                     "parameters":  [
+                                        647,
+                                        647,
+                                        0,
+                                        0,
+                                        0
+                                    ]
+                 },
+                 {
+                     "code":  122,
+                     "indent":  2,
+                     "parameters":  [
+                                        137,
+                                        137,
+                                        0,
+                                        0,
+                                        16
+                                    ]
+                 },
+                 {
+                     "code":  0,
+                     "indent":  2,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  412,
+                     "indent":  1,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  111,
+                     "indent":  1,
+                     "parameters":  [
+                                        1,
+                                        74,
+                                        0,
+                                        228,
+                                        0
+                                    ]
+                 },
+                 {
+                     "code":  108,
+                     "indent":  2,
+                     "parameters":  [
+                                        "ham"
+                                    ]
+                 },
+                 {
+                     "code":  122,
+                     "indent":  2,
+                     "parameters":  [
+                                        647,
+                                        647,
+                                        0,
+                                        0,
+                                        4
+                                    ]
+                 },
+                 {
+                     "code":  122,
+                     "indent":  2,
+                     "parameters":  [
+                                        137,
+                                        137,
+                                        0,
+                                        0,
+                                        12
+                                    ]
+                 },
+                 {
+                     "code":  0,
+                     "indent":  2,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  412,
+                     "indent":  1,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  111,
+                     "indent":  1,
+                     "parameters":  [
+                                        1,
+                                        74,
+                                        0,
+                                        229,
+                                        0
+                                    ]
+                 },
+                 {
+                     "code":  108,
+                     "indent":  2,
+                     "parameters":  [
+                                        "chicken"
+                                    ]
+                 },
+                 {
+                     "code":  122,
+                     "indent":  2,
+                     "parameters":  [
+                                        647,
+                                        647,
+                                        0,
+                                        0,
+                                        4
+                                    ]
+                 },
+                 {
+                     "code":  122,
+                     "indent":  2,
+                     "parameters":  [
+                                        137,
+                                        137,
+                                        0,
+                                        0,
+                                        13
+                                    ]
+                 },
+                 {
+                     "code":  0,
+                     "indent":  2,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  412,
+                     "indent":  1,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  111,
+                     "indent":  1,
+                     "parameters":  [
+                                        1,
+                                        74,
+                                        0,
+                                        230,
+                                        0
+                                    ]
+                 },
+                 {
+                     "code":  108,
+                     "indent":  2,
+                     "parameters":  [
+                                        "beef"
+                                    ]
+                 },
+                 {
+                     "code":  122,
+                     "indent":  2,
+                     "parameters":  [
+                                        647,
+                                        647,
+                                        0,
+                                        0,
+                                        4
+                                    ]
+                 },
+                 {
+                     "code":  122,
+                     "indent":  2,
+                     "parameters":  [
+                                        137,
+                                        137,
+                                        0,
+                                        0,
+                                        14
+                                    ]
+                 },
+                 {
+                     "code":  0,
+                     "indent":  2,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  412,
+                     "indent":  1,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  111,
+                     "indent":  1,
+                     "parameters":  [
+                                        1,
+                                        74,
+                                        0,
+                                        231,
+                                        0
+                                    ]
+                 },
+                 {
+                     "code":  108,
+                     "indent":  2,
+                     "parameters":  [
+                                        "eggs"
+                                    ]
+                 },
+                 {
+                     "code":  122,
+                     "indent":  2,
+                     "parameters":  [
+                                        137,
+                                        137,
+                                        0,
+                                        0,
+                                        15
+                                    ]
+                 },
+                 {
+                     "code":  0,
+                     "indent":  2,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  412,
+                     "indent":  1,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  0,
+                     "indent":  1,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  411,
+                     "indent":  0,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  108,
+                     "indent":  1,
+                     "parameters":  [
+                                        "Two-ingredient recipe"
+                                    ]
+                 },
+                 {
+                     "code":  122,
+                     "indent":  1,
+                     "parameters":  [
+                                        647,
+                                        647,
+                                        0,
+                                        0,
+                                        6
+                                    ]
+                 },
+                 {
+                     "code":  355,
+                     "indent":  1,
+                     "parameters":  [
+                                        "$gameParty.gainItem($dataItems[gVr(74)], -1);"
+                                    ]
+                 },
+                 {
+                     "code":  655,
+                     "indent":  1,
+                     "parameters":  [
+                                        "$gameParty.gainItem($dataItems[gVr(75)], -1);"
+                                    ]
+                 },
+                 {
+                     "code":  111,
+                     "indent":  1,
+                     "parameters":  [
+                                        1,
+                                        75,
+                                        1,
+                                        74,
+                                        4
+                                    ]
+                 },
+                 {
+                     "code":  122,
+                     "indent":  2,
+                     "parameters":  [
+                                        1,
+                                        1,
+                                        0,
+                                        1,
+                                        74
+                                    ]
+                 },
+                 {
+                     "code":  122,
+                     "indent":  2,
+                     "parameters":  [
+                                        74,
+                                        74,
+                                        0,
+                                        1,
+                                        75
+                                    ]
+                 },
+                 {
+                     "code":  122,
+                     "indent":  2,
+                     "parameters":  [
+                                        75,
+                                        75,
+                                        0,
+                                        1,
+                                        1
+                                    ]
+                 },
+                 {
+                     "code":  0,
+                     "indent":  2,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  412,
+                     "indent":  1,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  111,
+                     "indent":  1,
+                     "parameters":  [
+                                        1,
+                                        74,
+                                        0,
+                                        213,
+                                        0
+                                    ]
+                 },
+                 {
+                     "code":  111,
+                     "indent":  2,
+                     "parameters":  [
+                                        1,
+                                        75,
+                                        0,
+                                        215,
+                                        0
+                                    ]
+                 },
+                 {
+                     "code":  108,
+                     "indent":  3,
+                     "parameters":  [
+                                        "Veggie Pizza"
+                                    ]
+                 },
+                 {
+                     "code":  122,
+                     "indent":  3,
+                     "parameters":  [
+                                        137,
+                                        137,
+                                        0,
+                                        0,
+                                        20
+                                    ]
+                 },
+                 {
+                     "code":  111,
+                     "indent":  3,
+                     "parameters":  [
+                                        0,
+                                        540,
+                                        0
+                                    ]
+                 },
+                 {
+                     "code":  122,
+                     "indent":  4,
+                     "parameters":  [
+                                        137,
+                                        137,
+                                        0,
+                                        0,
+                                        59
+                                    ]
+                 },
+                 {
+                     "code":  0,
+                     "indent":  4,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  412,
+                     "indent":  3,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  0,
+                     "indent":  3,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  412,
+                     "indent":  2,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  111,
+                     "indent":  2,
+                     "parameters":  [
+                                        1,
+                                        75,
+                                        0,
+                                        228,
+                                        0
+                                    ]
+                 },
+                 {
+                     "code":  108,
+                     "indent":  3,
+                     "parameters":  [
+                                        "Hawaiian Pizza"
+                                    ]
+                 },
+                 {
+                     "code":  122,
+                     "indent":  3,
+                     "parameters":  [
+                                        137,
+                                        137,
+                                        0,
+                                        0,
+                                        28
+                                    ]
+                 },
+                 {
+                     "code":  111,
+                     "indent":  3,
+                     "parameters":  [
+                                        0,
+                                        540,
+                                        0
+                                    ]
+                 },
+                 {
+                     "code":  122,
+                     "indent":  4,
+                     "parameters":  [
+                                        137,
+                                        137,
+                                        0,
+                                        0,
+                                        59
+                                    ]
+                 },
+                 {
+                     "code":  0,
+                     "indent":  4,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  412,
+                     "indent":  3,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  0,
+                     "indent":  3,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  412,
+                     "indent":  2,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  111,
+                     "indent":  2,
+                     "parameters":  [
+                                        1,
+                                        75,
+                                        0,
+                                        229,
+                                        0
+                                    ]
+                 },
+                 {
+                     "code":  108,
+                     "indent":  3,
+                     "parameters":  [
+                                        "Chicken Pizza"
+                                    ]
+                 },
+                 {
+                     "code":  122,
+                     "indent":  3,
+                     "parameters":  [
+                                        137,
+                                        137,
+                                        0,
+                                        0,
+                                        29
+                                    ]
+                 },
+                 {
+                     "code":  111,
+                     "indent":  3,
+                     "parameters":  [
+                                        0,
+                                        540,
+                                        0
+                                    ]
+                 },
+                 {
+                     "code":  122,
+                     "indent":  4,
+                     "parameters":  [
+                                        137,
+                                        137,
+                                        0,
+                                        0,
+                                        59
+                                    ]
+                 },
+                 {
+                     "code":  0,
+                     "indent":  4,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  412,
+                     "indent":  3,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  0,
+                     "indent":  3,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  412,
+                     "indent":  2,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  111,
+                     "indent":  2,
+                     "parameters":  [
+                                        1,
+                                        75,
+                                        0,
+                                        230,
+                                        0
+                                    ]
+                 },
+                 {
+                     "code":  108,
+                     "indent":  3,
+                     "parameters":  [
+                                        "Meaty Pizza"
+                                    ]
+                 },
+                 {
+                     "code":  122,
+                     "indent":  3,
+                     "parameters":  [
+                                        137,
+                                        137,
+                                        0,
+                                        0,
+                                        21
+                                    ]
+                 },
+                 {
+                     "code":  111,
+                     "indent":  3,
+                     "parameters":  [
+                                        0,
+                                        540,
+                                        0
+                                    ]
+                 },
+                 {
+                     "code":  122,
+                     "indent":  4,
+                     "parameters":  [
+                                        137,
+                                        137,
+                                        0,
+                                        0,
+                                        59
+                                    ]
+                 },
+                 {
+                     "code":  0,
+                     "indent":  4,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  412,
+                     "indent":  3,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  0,
+                     "indent":  3,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  412,
+                     "indent":  2,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  0,
+                     "indent":  2,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  412,
+                     "indent":  1,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  111,
+                     "indent":  1,
+                     "parameters":  [
+                                        1,
+                                        74,
+                                        0,
+                                        215,
+                                        0
+                                    ]
+                 },
+                 {
+                     "code":  111,
+                     "indent":  2,
+                     "parameters":  [
+                                        1,
+                                        75,
+                                        0,
+                                        220,
+                                        0
+                                    ]
+                 },
+                 {
+                     "code":  108,
+                     "indent":  3,
+                     "parameters":  [
+                                        "VEG STEW"
+                                    ]
+                 },
+                 {
+                     "code":  122,
+                     "indent":  3,
+                     "parameters":  [
+                                        137,
+                                        137,
+                                        0,
+                                        0,
+                                        22
+                                    ]
+                 },
+                 {
+                     "code":  0,
+                     "indent":  3,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  412,
+                     "indent":  2,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  111,
+                     "indent":  2,
+                     "parameters":  [
+                                        1,
+                                        75,
+                                        0,
+                                        222,
+                                        0
+                                    ]
+                 },
+                 {
+                     "code":  122,
+                     "indent":  3,
+                     "parameters":  [
+                                        137,
+                                        137,
+                                        0,
+                                        0,
+                                        23
+                                    ]
+                 },
+                 {
+                     "code":  0,
+                     "indent":  3,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  412,
+                     "indent":  2,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  111,
+                     "indent":  2,
+                     "parameters":  [
+                                        1,
+                                        75,
+                                        0,
+                                        228,
+                                        0
+                                    ]
+                 },
+                 {
+                     "code":  122,
+                     "indent":  3,
+                     "parameters":  [
+                                        137,
+                                        137,
+                                        0,
+                                        0,
+                                        24
+                                    ]
+                 },
+                 {
+                     "code":  0,
+                     "indent":  3,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  412,
+                     "indent":  2,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  111,
+                     "indent":  2,
+                     "parameters":  [
+                                        1,
+                                        75,
+                                        0,
+                                        229,
+                                        0
+                                    ]
+                 },
+                 {
+                     "code":  122,
+                     "indent":  3,
+                     "parameters":  [
+                                        137,
+                                        137,
+                                        0,
+                                        0,
+                                        25
+                                    ]
+                 },
+                 {
+                     "code":  0,
+                     "indent":  3,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  412,
+                     "indent":  2,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  111,
+                     "indent":  2,
+                     "parameters":  [
+                                        1,
+                                        75,
+                                        0,
+                                        230,
+                                        0
+                                    ]
+                 },
+                 {
+                     "code":  122,
+                     "indent":  3,
+                     "parameters":  [
+                                        137,
+                                        137,
+                                        0,
+                                        0,
+                                        26
+                                    ]
+                 },
+                 {
+                     "code":  0,
+                     "indent":  3,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  412,
+                     "indent":  2,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  0,
+                     "indent":  2,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  412,
+                     "indent":  1,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  111,
+                     "indent":  1,
+                     "parameters":  [
+                                        1,
+                                        74,
+                                        0,
+                                        216,
+                                        0
+                                    ]
+                 },
+                 {
+                     "code":  111,
+                     "indent":  2,
+                     "parameters":  [
+                                        1,
+                                        75,
+                                        0,
+                                        220,
+                                        0
+                                    ]
+                 },
+                 {
+                     "code":  122,
+                     "indent":  3,
+                     "parameters":  [
+                                        137,
+                                        137,
+                                        0,
+                                        0,
+                                        27
+                                    ]
+                 },
+                 {
+                     "code":  0,
+                     "indent":  3,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  412,
+                     "indent":  2,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  0,
+                     "indent":  2,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  412,
+                     "indent":  1,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  111,
+                     "indent":  1,
+                     "parameters":  [
+                                        1,
+                                        74,
+                                        0,
+                                        219,
+                                        0
+                                    ]
+                 },
+                 {
+                     "code":  111,
+                     "indent":  2,
+                     "parameters":  [
+                                        1,
+                                        75,
+                                        0,
+                                        224,
+                                        0
+                                    ]
+                 },
+                 {
+                     "code":  122,
+                     "indent":  3,
+                     "parameters":  [
+                                        647,
+                                        647,
+                                        0,
+                                        0,
+                                        8
+                                    ]
+                 },
+                 {
+                     "code":  122,
+                     "indent":  3,
+                     "parameters":  [
+                                        137,
+                                        137,
+                                        0,
+                                        0,
+                                        40
+                                    ]
+                 },
+                 {
+                     "code":  0,
+                     "indent":  3,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  412,
+                     "indent":  2,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  111,
+                     "indent":  2,
+                     "parameters":  [
+                                        1,
+                                        75,
+                                        0,
+                                        229,
+                                        0
+                                    ]
+                 },
+                 {
+                     "code":  122,
+                     "indent":  3,
+                     "parameters":  [
+                                        137,
+                                        137,
+                                        0,
+                                        0,
+                                        41
+                                    ]
+                 },
+                 {
+                     "code":  0,
+                     "indent":  3,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  412,
+                     "indent":  2,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  0,
+                     "indent":  2,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  412,
+                     "indent":  1,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  111,
+                     "indent":  1,
+                     "parameters":  [
+                                        1,
+                                        74,
+                                        0,
+                                        220,
+                                        0
+                                    ]
+                 },
+                 {
+                     "code":  111,
+                     "indent":  2,
+                     "parameters":  [
+                                        1,
+                                        75,
+                                        0,
+                                        221,
+                                        0
+                                    ]
+                 },
+                 {
+                     "code":  122,
+                     "indent":  3,
+                     "parameters":  [
+                                        137,
+                                        137,
+                                        0,
+                                        0,
+                                        43
+                                    ]
+                 },
+                 {
+                     "code":  0,
+                     "indent":  3,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  412,
+                     "indent":  2,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  0,
+                     "indent":  2,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  412,
+                     "indent":  1,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  111,
+                     "indent":  1,
+                     "parameters":  [
+                                        1,
+                                        74,
+                                        0,
+                                        221,
+                                        0
+                                    ]
+                 },
+                 {
+                     "code":  111,
+                     "indent":  2,
+                     "parameters":  [
+                                        1,
+                                        75,
+                                        0,
+                                        222,
+                                        0
+                                    ]
+                 },
+                 {
+                     "code":  122,
+                     "indent":  3,
+                     "parameters":  [
+                                        137,
+                                        137,
+                                        0,
+                                        0,
+                                        44
+                                    ]
+                 },
+                 {
+                     "code":  0,
+                     "indent":  3,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  412,
+                     "indent":  2,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  111,
+                     "indent":  2,
+                     "parameters":  [
+                                        1,
+                                        75,
+                                        0,
+                                        224,
+                                        0
+                                    ]
+                 },
+                 {
+                     "code":  122,
+                     "indent":  3,
+                     "parameters":  [
+                                        137,
+                                        137,
+                                        0,
+                                        0,
+                                        45
+                                    ]
+                 },
+                 {
+                     "code":  0,
+                     "indent":  3,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  412,
+                     "indent":  2,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  111,
+                     "indent":  2,
+                     "parameters":  [
+                                        1,
+                                        75,
+                                        0,
+                                        228,
+                                        0
+                                    ]
+                 },
+                 {
+                     "code":  122,
+                     "indent":  3,
+                     "parameters":  [
+                                        137,
+                                        137,
+                                        0,
+                                        0,
+                                        46
+                                    ]
+                 },
+                 {
+                     "code":  0,
+                     "indent":  3,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  412,
+                     "indent":  2,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  111,
+                     "indent":  2,
+                     "parameters":  [
+                                        1,
+                                        75,
+                                        0,
+                                        227,
+                                        0
+                                    ]
+                 },
+                 {
+                     "code":  122,
+                     "indent":  3,
+                     "parameters":  [
+                                        137,
+                                        137,
+                                        0,
+                                        0,
+                                        58
+                                    ]
+                 },
+                 {
+                     "code":  111,
+                     "indent":  3,
+                     "parameters":  [
+                                        0,
+                                        540,
+                                        0
+                                    ]
+                 },
+                 {
+                     "code":  122,
+                     "indent":  4,
+                     "parameters":  [
+                                        137,
+                                        137,
+                                        0,
+                                        0,
+                                        70
+                                    ]
+                 },
+                 {
+                     "code":  0,
+                     "indent":  4,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  412,
+                     "indent":  3,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  0,
+                     "indent":  3,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  412,
+                     "indent":  2,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  0,
+                     "indent":  2,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  412,
+                     "indent":  1,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  111,
+                     "indent":  1,
+                     "parameters":  [
+                                        1,
+                                        74,
+                                        0,
+                                        222,
+                                        0
+                                    ]
+                 },
+                 {
+                     "code":  111,
+                     "indent":  2,
+                     "parameters":  [
+                                        1,
+                                        75,
+                                        0,
+                                        224,
+                                        0
+                                    ]
+                 },
+                 {
+                     "code":  122,
+                     "indent":  3,
+                     "parameters":  [
+                                        137,
+                                        137,
+                                        0,
+                                        0,
+                                        47
+                                    ]
+                 },
+                 {
+                     "code":  0,
+                     "indent":  3,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  412,
+                     "indent":  2,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  111,
+                     "indent":  2,
+                     "parameters":  [
+                                        1,
+                                        75,
+                                        0,
+                                        229,
+                                        0
+                                    ]
+                 },
+                 {
+                     "code":  122,
+                     "indent":  3,
+                     "parameters":  [
+                                        647,
+                                        647,
+                                        0,
+                                        0,
+                                        8
+                                    ]
+                 },
+                 {
+                     "code":  122,
+                     "indent":  3,
+                     "parameters":  [
+                                        137,
+                                        137,
+                                        0,
+                                        0,
+                                        48
+                                    ]
+                 },
+                 {
+                     "code":  0,
+                     "indent":  3,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  412,
+                     "indent":  2,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  111,
+                     "indent":  2,
+                     "parameters":  [
+                                        1,
+                                        75,
+                                        0,
+                                        231,
+                                        0
+                                    ]
+                 },
+                 {
+                     "code":  122,
+                     "indent":  3,
+                     "parameters":  [
+                                        647,
+                                        647,
+                                        0,
+                                        0,
+                                        8
+                                    ]
+                 },
+                 {
+                     "code":  122,
+                     "indent":  3,
+                     "parameters":  [
+                                        137,
+                                        137,
+                                        0,
+                                        0,
+                                        49
+                                    ]
+                 },
+                 {
+                     "code":  0,
+                     "indent":  3,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  412,
+                     "indent":  2,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  0,
+                     "indent":  2,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  412,
+                     "indent":  1,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  111,
+                     "indent":  1,
+                     "parameters":  [
+                                        1,
+                                        74,
+                                        0,
+                                        223,
+                                        0
+                                    ]
+                 },
+                 {
+                     "code":  111,
+                     "indent":  2,
+                     "parameters":  [
+                                        1,
+                                        75,
+                                        0,
+                                        230,
+                                        0
+                                    ]
+                 },
+                 {
+                     "code":  122,
+                     "indent":  3,
+                     "parameters":  [
+                                        647,
+                                        647,
+                                        0,
+                                        0,
+                                        8
+                                    ]
+                 },
+                 {
+                     "code":  122,
+                     "indent":  3,
+                     "parameters":  [
+                                        137,
+                                        137,
+                                        0,
+                                        0,
+                                        50
+                                    ]
+                 },
+                 {
+                     "code":  0,
+                     "indent":  3,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  412,
+                     "indent":  2,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  0,
+                     "indent":  2,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  412,
+                     "indent":  1,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  111,
+                     "indent":  1,
+                     "parameters":  [
+                                        1,
+                                        74,
+                                        0,
+                                        224,
+                                        0
+                                    ]
+                 },
+                 {
+                     "code":  111,
+                     "indent":  2,
+                     "parameters":  [
+                                        1,
+                                        75,
+                                        0,
+                                        227,
+                                        0
+                                    ]
+                 },
+                 {
+                     "code":  122,
+                     "indent":  3,
+                     "parameters":  [
+                                        647,
+                                        647,
+                                        0,
+                                        0,
+                                        5
+                                    ]
+                 },
+                 {
+                     "code":  122,
+                     "indent":  3,
+                     "parameters":  [
+                                        137,
+                                        137,
+                                        0,
+                                        0,
+                                        53
+                                    ]
+                 },
+                 {
+                     "code":  111,
+                     "indent":  3,
+                     "parameters":  [
+                                        0,
+                                        540,
+                                        0
+                                    ]
+                 },
+                 {
+                     "code":  122,
+                     "indent":  4,
+                     "parameters":  [
+                                        647,
+                                        647,
+                                        0,
+                                        0,
+                                        6
+                                    ]
+                 },
+                 {
+                     "code":  122,
+                     "indent":  4,
+                     "parameters":  [
+                                        137,
+                                        137,
+                                        0,
+                                        0,
+                                        57
+                                    ]
+                 },
+                 {
+                     "code":  0,
+                     "indent":  4,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  412,
+                     "indent":  3,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  0,
+                     "indent":  3,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  412,
+                     "indent":  2,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  0,
+                     "indent":  2,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  412,
+                     "indent":  1,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  111,
+                     "indent":  1,
+                     "parameters":  [
+                                        1,
+                                        74,
+                                        0,
+                                        227,
+                                        0
+                                    ]
+                 },
+                 {
+                     "code":  111,
+                     "indent":  2,
+                     "parameters":  [
+                                        1,
+                                        75,
+                                        0,
+                                        228,
+                                        0
+                                    ]
+                 },
+                 {
+                     "code":  122,
+                     "indent":  3,
+                     "parameters":  [
+                                        137,
+                                        137,
+                                        0,
+                                        0,
+                                        51
+                                    ]
+                 },
+                 {
+                     "code":  122,
+                     "indent":  3,
+                     "parameters":  [
+                                        647,
+                                        647,
+                                        0,
+                                        0,
+                                        5
+                                    ]
+                 },
+                 {
+                     "code":  111,
+                     "indent":  3,
+                     "parameters":  [
+                                        0,
+                                        540,
+                                        0
+                                    ]
+                 },
+                 {
+                     "code":  122,
+                     "indent":  4,
+                     "parameters":  [
+                                        647,
+                                        647,
+                                        0,
+                                        0,
+                                        6
+                                    ]
+                 },
+                 {
+                     "code":  122,
+                     "indent":  4,
+                     "parameters":  [
+                                        137,
+                                        137,
+                                        0,
+                                        0,
+                                        57
+                                    ]
+                 },
+                 {
+                     "code":  0,
+                     "indent":  4,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  412,
+                     "indent":  3,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  0,
+                     "indent":  3,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  412,
+                     "indent":  2,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  111,
+                     "indent":  2,
+                     "parameters":  [
+                                        1,
+                                        75,
+                                        0,
+                                        229,
+                                        0
+                                    ]
+                 },
+                 {
+                     "code":  122,
+                     "indent":  3,
+                     "parameters":  [
+                                        137,
+                                        137,
+                                        0,
+                                        0,
+                                        52
+                                    ]
+                 },
+                 {
+                     "code":  122,
+                     "indent":  3,
+                     "parameters":  [
+                                        647,
+                                        647,
+                                        0,
+                                        0,
+                                        5
+                                    ]
+                 },
+                 {
+                     "code":  111,
+                     "indent":  3,
+                     "parameters":  [
+                                        0,
+                                        540,
+                                        0
+                                    ]
+                 },
+                 {
+                     "code":  122,
+                     "indent":  4,
+                     "parameters":  [
+                                        137,
+                                        137,
+                                        0,
+                                        0,
+                                        57
+                                    ]
+                 },
+                 {
+                     "code":  122,
+                     "indent":  4,
+                     "parameters":  [
+                                        647,
+                                        647,
+                                        0,
+                                        0,
+                                        6
+                                    ]
+                 },
+                 {
+                     "code":  0,
+                     "indent":  4,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  412,
+                     "indent":  3,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  0,
+                     "indent":  3,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  412,
+                     "indent":  2,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  111,
+                     "indent":  2,
+                     "parameters":  [
+                                        1,
+                                        75,
+                                        0,
+                                        231,
+                                        0
+                                    ]
+                 },
+                 {
+                     "code":  122,
+                     "indent":  3,
+                     "parameters":  [
+                                        137,
+                                        137,
+                                        0,
+                                        0,
+                                        54
+                                    ]
+                 },
+                 {
+                     "code":  122,
+                     "indent":  3,
+                     "parameters":  [
+                                        647,
+                                        647,
+                                        0,
+                                        0,
+                                        5
+                                    ]
+                 },
+                 {
+                     "code":  111,
+                     "indent":  3,
+                     "parameters":  [
+                                        0,
+                                        540,
+                                        0
+                                    ]
+                 },
+                 {
+                     "code":  122,
+                     "indent":  4,
+                     "parameters":  [
+                                        137,
+                                        137,
+                                        0,
+                                        0,
+                                        57
+                                    ]
+                 },
+                 {
+                     "code":  122,
+                     "indent":  4,
+                     "parameters":  [
+                                        647,
+                                        647,
+                                        0,
+                                        0,
+                                        6
+                                    ]
+                 },
+                 {
+                     "code":  0,
+                     "indent":  4,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  412,
+                     "indent":  3,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  0,
+                     "indent":  3,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  412,
+                     "indent":  2,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  0,
+                     "indent":  2,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  412,
+                     "indent":  1,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  111,
+                     "indent":  1,
+                     "parameters":  [
+                                        1,
+                                        74,
+                                        0,
+                                        228,
+                                        0
+                                    ]
+                 },
+                 {
+                     "code":  111,
+                     "indent":  2,
+                     "parameters":  [
+                                        1,
+                                        75,
+                                        0,
+                                        231,
+                                        0
+                                    ]
+                 },
+                 {
+                     "code":  122,
+                     "indent":  3,
+                     "parameters":  [
+                                        137,
+                                        137,
+                                        0,
+                                        0,
+                                        55
+                                    ]
+                 },
+                 {
+                     "code":  122,
+                     "indent":  3,
+                     "parameters":  [
+                                        647,
+                                        647,
+                                        0,
+                                        0,
+                                        5
+                                    ]
+                 },
+                 {
+                     "code":  0,
+                     "indent":  3,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  412,
+                     "indent":  2,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  0,
+                     "indent":  2,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  412,
+                     "indent":  1,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  0,
+                     "indent":  1,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  412,
+                     "indent":  0,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  122,
+                     "indent":  0,
+                     "parameters":  [
+                                        408,
+                                        408,
+                                        0,
+                                        1,
+                                        419
+                                    ]
+                 },
+                 {
+                     "code":  122,
+                     "indent":  0,
+                     "parameters":  [
+                                        408,
+                                        408,
+                                        3,
+                                        0,
+                                        2
+                                    ]
+                 },
+                 {
+                     "code":  122,
+                     "indent":  0,
+                     "parameters":  [
+                                        408,
+                                        408,
+                                        1,
+                                        2,
+                                        0,
+                                        2
+                                    ]
+                 },
+                 {
+                     "code":  230,
+                     "indent":  0,
+                     "parameters":  [
+                                        60
+                                    ]
+                 },
+                 {
+                     "code":  205,
+                     "indent":  0,
+                     "parameters":  [
+                                        -1,
+                                        {
+                                            "list":  [
+                                                         {
+                                                             "code":  2,
+                                                             "indent":  null
+                                                         },
+                                                         {
+                                                             "code":  2,
+                                                             "indent":  null
+                                                         },
+                                                         {
+                                                             "code":  2,
+                                                             "indent":  null
+                                                         },
+                                                         {
+                                                             "code":  2,
+                                                             "indent":  null
+                                                         },
+                                                         {
+                                                             "code":  1,
+                                                             "indent":  null
+                                                         },
+                                                         {
+                                                             "code":  1,
+                                                             "indent":  null
+                                                         },
+                                                         {
+                                                             "code":  1,
+                                                             "indent":  null
+                                                         },
+                                                         {
+                                                             "code":  0
+                                                         }
+                                                     ],
+                                            "repeat":  false,
+                                            "skippable":  true,
+                                            "wait":  true
+                                        }
+                                    ]
+                 },
+                 {
+                     "code":  505,
+                     "indent":  0,
+                     "parameters":  [
+                                        {
+                                            "code":  2,
+                                            "indent":  null
+                                        }
+                                    ]
+                 },
+                 {
+                     "code":  505,
+                     "indent":  0,
+                     "parameters":  [
+                                        {
+                                            "code":  2,
+                                            "indent":  null
+                                        }
+                                    ]
+                 },
+                 {
+                     "code":  505,
+                     "indent":  0,
+                     "parameters":  [
+                                        {
+                                            "code":  2,
+                                            "indent":  null
+                                        }
+                                    ]
+                 },
+                 {
+                     "code":  505,
+                     "indent":  0,
+                     "parameters":  [
+                                        {
+                                            "code":  2,
+                                            "indent":  null
+                                        }
+                                    ]
+                 },
+                 {
+                     "code":  505,
+                     "indent":  0,
+                     "parameters":  [
+                                        {
+                                            "code":  1,
+                                            "indent":  null
+                                        }
+                                    ]
+                 },
+                 {
+                     "code":  505,
+                     "indent":  0,
+                     "parameters":  [
+                                        {
+                                            "code":  1,
+                                            "indent":  null
+                                        }
+                                    ]
+                 },
+                 {
+                     "code":  505,
+                     "indent":  0,
+                     "parameters":  [
+                                        {
+                                            "code":  1,
+                                            "indent":  null
+                                        }
+                                    ]
+                 },
+                 {
+                     "code":  121,
+                     "indent":  0,
+                     "parameters":  [
+                                        59,
+                                        59,
+                                        0
+                                    ]
+                 },
+                 {
+                     "code":  122,
+                     "indent":  0,
+                     "parameters":  [
+                                        19,
+                                        19,
+                                        1,
+                                        1,
+                                        136
+                                    ]
+                 },
+                 {
+                     "code":  122,
+                     "indent":  0,
+                     "parameters":  [
+                                        76,
+                                        76,
+                                        0,
+                                        0,
+                                        0
+                                    ]
+                 },
+                 {
+                     "code":  117,
+                     "indent":  0,
+                     "parameters":  [
+                                        4
+                                    ]
+                 },
+                 {
+                     "code":  111,
+                     "indent":  0,
+                     "parameters":  [
+                                        0,
+                                        540,
+                                        0
+                                    ]
+                 },
+                 {
+                     "code":  101,
+                     "indent":  1,
+                     "parameters":  [
+                                        "Portrait_Misc",
+                                        11,
+                                        0,
+                                        2,
+                                        "Wriggly Fred"
+                                    ]
+                 },
+                 {
+                     "code":  401,
+                     "indent":  1,
+                     "parameters":  [
+                                        "Let me help! I am cooking genius."
+                                    ]
+                 },
+                 {
+                     "code":  111,
+                     "indent":  1,
+                     "parameters":  [
+                                        1,
+                                        137,
+                                        0,
+                                        57,
+                                        0
+                                    ]
+                 },
+                 {
+                     "code":  101,
+                     "indent":  2,
+                     "parameters":  [
+                                        "",
+                                        11,
+                                        0,
+                                        2,
+                                        ""
+                                    ]
+                 },
+                 {
+                     "code":  401,
+                     "indent":  2,
+                     "parameters":  [
+                                        "Wriggly Fred takes over the kitchen and makes an enormous"
+                                    ]
+                 },
+                 {
+                     "code":  401,
+                     "indent":  2,
+                     "parameters":  [
+                                        "hoagie sandwich."
+                                    ]
+                 },
+                 {
+                     "code":  0,
+                     "indent":  2,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  411,
+                     "indent":  1,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  111,
+                     "indent":  2,
+                     "parameters":  [
+                                        1,
+                                        137,
+                                        0,
+                                        70,
+                                        0
+                                    ]
+                 },
+                 {
+                     "code":  101,
+                     "indent":  3,
+                     "parameters":  [
+                                        "",
+                                        11,
+                                        0,
+                                        2,
+                                        ""
+                                    ]
+                 },
+                 {
+                     "code":  401,
+                     "indent":  3,
+                     "parameters":  [
+                                        "Wriggly Fred takes over the kitchen and makes an enormous"
+                                    ]
+                 },
+                 {
+                     "code":  401,
+                     "indent":  3,
+                     "parameters":  [
+                                        "burrito."
+                                    ]
+                 },
+                 {
+                     "code":  0,
+                     "indent":  3,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  411,
+                     "indent":  2,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  111,
+                     "indent":  3,
+                     "parameters":  [
+                                        1,
+                                        137,
+                                        0,
+                                        59,
+                                        0
+                                    ]
+                 },
+                 {
+                     "code":  101,
+                     "indent":  4,
+                     "parameters":  [
+                                        "",
+                                        11,
+                                        0,
+                                        2,
+                                        ""
+                                    ]
+                 },
+                 {
+                     "code":  401,
+                     "indent":  4,
+                     "parameters":  [
+                                        "Wriggly Fred takes over the kitchen and shoves a bunch"
+                                    ]
+                 },
+                 {
+                     "code":  401,
+                     "indent":  4,
+                     "parameters":  [
+                                        "more stuff onto the pizza."
+                                    ]
+                 },
+                 {
+                     "code":  0,
+                     "indent":  4,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  411,
+                     "indent":  3,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  111,
+                     "indent":  4,
+                     "parameters":  [
+                                        1,
+                                        137,
+                                        0,
+                                        28,
+                                        0
+                                    ]
+                 },
+                 {
+                     "code":  101,
+                     "indent":  5,
+                     "parameters":  [
+                                        "",
+                                        11,
+                                        0,
+                                        2,
+                                        ""
+                                    ]
+                 },
+                 {
+                     "code":  401,
+                     "indent":  5,
+                     "parameters":  [
+                                        "Wriggly Fred takes over the kitchen and shoves a bunch"
+                                    ]
+                 },
+                 {
+                     "code":  401,
+                     "indent":  5,
+                     "parameters":  [
+                                        "more stuff onto the pizza."
+                                    ]
+                 },
+                 {
+                     "code":  0,
+                     "indent":  5,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  411,
+                     "indent":  4,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  101,
+                     "indent":  5,
+                     "parameters":  [
+                                        "",
+                                        11,
+                                        0,
+                                        2,
+                                        ""
+                                    ]
+                 },
+                 {
+                     "code":  401,
+                     "indent":  5,
+                     "parameters":  [
+                                        "Wriggly Fred dumps a bunch of random spices in the food."
+                                    ]
+                 },
+                 {
+                     "code":  0,
+                     "indent":  5,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  412,
+                     "indent":  4,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  0,
+                     "indent":  4,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  412,
+                     "indent":  3,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  0,
+                     "indent":  3,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  412,
+                     "indent":  2,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  0,
+                     "indent":  2,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  412,
+                     "indent":  1,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  0,
+                     "indent":  1,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  411,
+                     "indent":  0,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  111,
+                     "indent":  1,
+                     "parameters":  [
+                                        0,
+                                        642,
+                                        1
+                                    ]
+                 },
+                 {
+                     "code":  122,
+                     "indent":  2,
+                     "parameters":  [
+                                        4,
+                                        4,
+                                        0,
+                                        2,
+                                        0,
+                                        15
+                                    ]
+                 },
+                 {
+                     "code":  111,
+                     "indent":  2,
+                     "parameters":  [
+                                        1,
+                                        4,
+                                        0,
+                                        10,
+                                        0
+                                    ]
+                 },
+                 {
+                     "code":  111,
+                     "indent":  3,
+                     "parameters":  [
+                                        0,
+                                        643,
+                                        0
+                                    ]
+                 },
+                 {
+                     "code":  101,
+                     "indent":  4,
+                     "parameters":  [
+                                        "",
+                                        0,
+                                        0,
+                                        2,
+                                        ""
+                                    ]
+                 },
+                 {
+                     "code":  401,
+                     "indent":  4,
+                     "parameters":  [
+                                        "You sense Spine quietly watching you cook."
+                                    ]
+                 },
+                 {
+                     "code":  0,
+                     "indent":  4,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  411,
+                     "indent":  3,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  101,
+                     "indent":  4,
+                     "parameters":  [
+                                        "",
+                                        0,
+                                        0,
+                                        2,
+                                        ""
+                                    ]
+                 },
+                 {
+                     "code":  401,
+                     "indent":  4,
+                     "parameters":  [
+                                        "You feel watched as you work."
+                                    ]
+                 },
+                 {
+                     "code":  0,
+                     "indent":  4,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  412,
+                     "indent":  3,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  0,
+                     "indent":  3,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  412,
+                     "indent":  2,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  0,
+                     "indent":  2,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  412,
+                     "indent":  1,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  0,
+                     "indent":  1,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  412,
+                     "indent":  0,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  111,
+                     "indent":  0,
+                     "parameters":  [
+                                        1,
+                                        647,
+                                        0,
+                                        1,
+                                        1
+                                    ]
+                 },
+                 {
+                     "code":  121,
+                     "indent":  1,
+                     "parameters":  [
+                                        5,
+                                        5,
+                                        1
+                                    ]
+                 },
+                 {
+                     "code":  355,
+                     "indent":  1,
+                     "parameters":  [
+                                        "if(Array.isArray(gVr(649))==false)"
+                                    ]
+                 },
+                 {
+                     "code":  655,
+                     "indent":  1,
+                     "parameters":  [
+                                        "{"
+                                    ]
+                 },
+                 {
+                     "code":  655,
+                     "indent":  1,
+                     "parameters":  [
+                                        "console.log(\"Making 649 into an array\");"
+                                    ]
+                 },
+                 {
+                     "code":  655,
+                     "indent":  1,
+                     "parameters":  [
+                                        "var arr = [];"
+                                    ]
+                 },
+                 {
+                     "code":  655,
+                     "indent":  1,
+                     "parameters":  [
+                                        "for (var i = 1; i \u003c= 300; i++) {"
+                                    ]
+                 },
+                 {
+                     "code":  655,
+                     "indent":  1,
+                     "parameters":  [
+                                        "   arr.push(false);"
+                                    ]
+                 },
+                 {
+                     "code":  655,
+                     "indent":  1,
+                     "parameters":  [
+                                        "}"
+                                    ]
+                 },
+                 {
+                     "code":  655,
+                     "indent":  1,
+                     "parameters":  [
+                                        "sVr(649,arr);"
+                                    ]
+                 },
+                 {
+                     "code":  655,
+                     "indent":  1,
+                     "parameters":  [
+                                        "}"
+                                    ]
+                 },
+                 {
+                     "code":  655,
+                     "indent":  1,
+                     "parameters":  [
+                                        "var complexity = gVr(647);"
+                                    ]
+                 },
+                 {
+                     "code":  655,
+                     "indent":  1,
+                     "parameters":  [
+                                        "var cookArray = gVr(649);"
+                                    ]
+                 },
+                 {
+                     "code":  655,
+                     "indent":  1,
+                     "parameters":  [
+                                        "var cookedItem = gVr(137);"
+                                    ]
+                 },
+                 {
+                     "code":  655,
+                     "indent":  1,
+                     "parameters":  [
+                                        "if(!cookArray[cookedItem])"
+                                    ]
+                 },
+                 {
+                     "code":  655,
+                     "indent":  1,
+                     "parameters":  [
+                                        "{"
+                                    ]
+                 },
+                 {
+                     "code":  655,
+                     "indent":  1,
+                     "parameters":  [
+                                        " cookArray[cookedItem] = true;"
+                                    ]
+                 },
+                 {
+                     "code":  655,
+                     "indent":  1,
+                     "parameters":  [
+                                        " complexity = complexity*2;"
+                                    ]
+                 },
+                 {
+                     "code":  655,
+                     "indent":  1,
+                     "parameters":  [
+                                        " sSw(5,true);"
+                                    ]
+                 },
+                 {
+                     "code":  655,
+                     "indent":  1,
+                     "parameters":  [
+                                        " console.log(\"*New Recipe*\");"
+                                    ]
+                 },
+                 {
+                     "code":  655,
+                     "indent":  1,
+                     "parameters":  [
+                                        "}"
+                                    ]
+                 },
+                 {
+                     "code":  655,
+                     "indent":  1,
+                     "parameters":  [
+                                        "console.log(\"cooking complexity bonus +\"+ complexity*5);"
+                                    ]
+                 },
+                 {
+                     "code":  655,
+                     "indent":  1,
+                     "parameters":  [
+                                        "sVr(420,gVr(420)+complexity*5);"
+                                    ]
+                 },
+                 {
+                     "code":  111,
+                     "indent":  1,
+                     "parameters":  [
+                                        0,
+                                        5,
+                                        0
+                                    ]
+                 },
+                 {
+                     "code":  101,
+                     "indent":  2,
+                     "parameters":  [
+                                        "",
+                                        0,
+                                        0,
+                                        2,
+                                        ""
+                                    ]
+                 },
+                 {
+                     "code":  401,
+                     "indent":  2,
+                     "parameters":  [
+                                        "You cooked something new!"
+                                    ]
+                 },
+                 {
+                     "code":  0,
+                     "indent":  2,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  412,
+                     "indent":  1,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  117,
+                     "indent":  1,
+                     "parameters":  [
+                                        220
+                                    ]
+                 },
+                 {
+                     "code":  0,
+                     "indent":  1,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  412,
+                     "indent":  0,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  222,
+                     "indent":  0,
+                     "parameters":  [
+
+                                    ]
+                 },
+                 {
+                     "code":  0,
+                     "indent":  0,
+                     "parameters":  [
+
+                                    ]
+                 }
+             ],
+    "name":  "Cooking",
+    "switchId":  1,
+    "trigger":  0
+}

@@ -108,23 +108,29 @@
             CabbyCodes.warn('[CabbyCodes] Cookbook: No oven combinations detected.');
             return [];
         }
-
         const cookArray = getCookArray();
         const combinations = ovenData.map(entry => {
             const primaryItem = $dataItems[entry.primaryId];
             const secondaryItem = entry.secondaryId ? $dataItems[entry.secondaryId] : null;
-            const comboKey = `${entry.primaryId}-${entry.secondaryId || 'solo'}-${entry.dishId}`;
+            const dishIds = entry.variants.map(variant => variant.dishId);
+            const resultName = formatVariantName(entry.variants);
+            const discovered = cookArray
+                ? dishIds.some(id => !!cookArray[id])
+                : false;
             return {
-                combinationKey: comboKey,
+                combinationKey: `${entry.primaryId}-${entry.secondaryId || 'solo'}`,
                 primaryId: entry.primaryId,
                 primaryName: safeItemName(primaryItem, entry.primaryId),
                 secondaryId: entry.secondaryId,
                 secondaryName: secondaryItem ? safeItemName(secondaryItem, entry.secondaryId) : '(Solo)',
-                resultId: entry.dishId,
-                resultName: entry.dishName || `Dish ${entry.dishId}`,
-                discovered: cookArray ? !!cookArray[entry.dishId] : false
+                dishIds,
+                variantNames: entry.variants.map(v => v.dishName),
+                resultName,
+                discovered
             };
         });
+
+        debugLogCookbookSnapshot(combinations, cookArray);
 
         combinations.sort((a, b) => {
             if (a.discovered !== b.discovered) {
@@ -157,6 +163,11 @@
         return id ? `Item ${id}` : 'Unknown';
     }
 
+    function resolveDishResultName(dishId) {
+        const dishMap = getDishNameMap();
+        return dishMap.get(dishId) || `Dish ${dishId}`;
+    }
+
     function getOvenCombinationData() {
         if (ovenCombinationCache) {
             return ovenCombinationCache;
@@ -175,10 +186,8 @@
             return [];
         }
 
-        const dishNameMap = getDishNameMap();
-        const combos = [];
+        const combosByKey = new Map();
         const constraintStack = [];
-        let pendingDishName = null;
 
         for (const command of event.list) {
             trimConstraintStack(constraintStack, command.indent);
@@ -188,48 +197,32 @@
                 if (condition) {
                     constraintStack.push(condition);
                 }
-                pendingDishName = null;
-            } else if (command.code === 108) {
-                pendingDishName = command.parameters[0] || '';
-            } else if (command.code === 408 && pendingDishName) {
-                pendingDishName += `\n${command.parameters[0] || ''}`;
             } else if (command.code === 122 && isSettingCookedResult(command)) {
                 const dishId = command.parameters[4];
                 const primaryId = getConstraintValue(constraintStack, PRIMARY_VAR_ID);
                 const secondaryId = getConstraintValue(constraintStack, SECONDARY_VAR_ID);
                 if (primaryId) {
-                    const dishName =
-                        dishNameMap.get(dishId) ||
-                        extractDishNameFromComment(pendingDishName) ||
-                        `Dish ${dishId}`;
-                    combos.push({
-                        primaryId,
-                        secondaryId: secondaryId || null,
+                    const dishName = resolveDishResultName(dishId);
+                    const key = `${primaryId}-${secondaryId || 'solo'}`;
+                    let combo = combosByKey.get(key);
+                    if (!combo) {
+                        combo = {
+                            primaryId,
+                            secondaryId: secondaryId || null,
+                            variants: []
+                        };
+                        combosByKey.set(key, combo);
+                    }
+                    combo.variants.push({
                         dishId,
                         dishName
                     });
                 }
-                pendingDishName = null;
-            } else if (!IGNORED_COMMAND_CODES.has(command.code)) {
-                pendingDishName = null;
             }
         }
 
-        return deduplicateCombos(combos);
+        return Array.from(combosByKey.values());
     }
-
-    function deduplicateCombos(combos) {
-        const map = new Map();
-        for (const combo of combos) {
-            const key = `${combo.primaryId}-${combo.secondaryId || 'solo'}-${combo.dishId}`;
-            if (!map.has(key)) {
-                map.set(key, combo);
-            }
-        }
-        return Array.from(map.values());
-    }
-
-    const IGNORED_COMMAND_CODES = new Set([0, 112, 113, 117, 122, 221, 222, 223, 230, 355, 357, 412, 413, 505, 655]);
 
     function trimConstraintStack(stack, indent) {
         while (stack.length && stack[stack.length - 1].indent >= indent) {
@@ -274,17 +267,6 @@
         return null;
     }
 
-    function extractDishNameFromComment(comment) {
-        if (!comment) {
-            return null;
-        }
-        const text = comment.trim();
-        if (!text || /recipe/i.test(text)) {
-            return null;
-        }
-        return text;
-    }
-
     function getDishNameMap() {
         if (dishNameMapCache) {
             return dishNameMapCache;
@@ -322,11 +304,77 @@
             .trim();
     }
 
+    function formatVariantName(variants) {
+        if (!Array.isArray(variants) || variants.length === 0) {
+            return 'Unknown Dish';
+        }
+        const uniqueNames = [...new Set(variants.map(v => (v.dishName || '').trim()).filter(Boolean))];
+        if (uniqueNames.length === 0) {
+            return 'Unknown Dish';
+        }
+        if (uniqueNames.length === 1) {
+            return uniqueNames[0];
+        }
+        return uniqueNames.join(' / ');
+    }
+
+    function debugLogCookbookSnapshot(combos, cookArray) {
+        if (!CabbyCodes || typeof CabbyCodes.log !== 'function') {
+            return;
+        }
+        const discovered = combos.filter(c => c.discovered).length;
+        const variantCount = combos.reduce((sum, combo) => sum + (combo.dishIds ? combo.dishIds.length : 0), 0);
+        const cookArrayTrue = cookArray
+            ? cookArray.reduce((sum, value) => sum + (value ? 1 : 0), 0)
+            : 'n/a';
+        const summaryKey = `${combos.length}|${discovered}|${variantCount}|${cookArrayTrue}`;
+        if (debugLogCookbookSnapshot._lastSummary === summaryKey) {
+            return;
+        }
+        debugLogCookbookSnapshot._lastSummary = summaryKey;
+        CabbyCodes.log(
+            `[CabbyCodes] Cookbook snapshot: combos=${combos.length}, variants=${variantCount}, ` +
+            `discovered=${discovered}. cookArray entries=${cookArray ? cookArray.length : 'n/a'}, true=${cookArrayTrue}`
+        );
+        if (!cookArray) {
+            CabbyCodes.warn('[CabbyCodes] Cookbook: cookArray variable 649 is not initialised; recipes will all appear undiscovered.');
+        } else {
+            logCookbookMismatches(combos, cookArray);
+        }
+    }
+
     function findCommonEventByName(name) {
         if (typeof $dataCommonEvents === 'undefined' || !Array.isArray($dataCommonEvents)) {
             return null;
         }
         return $dataCommonEvents.find(evt => evt && evt.name === name) || null;
+    }
+
+    function logCookbookMismatches(combos, cookArray) {
+        if (logCookbookMismatches._logged || !cookArray || typeof CabbyCodes.warn !== 'function') {
+            return;
+        }
+        const mismatches = combos.filter(
+            combo => combo.dishIds && combo.dishIds.some(id => !!cookArray[id]) && !combo.discovered
+        );
+        if (mismatches.length === 0) {
+            return;
+        }
+        logCookbookMismatches._logged = true;
+        const sample = mismatches.slice(0, 8);
+        CabbyCodes.warn(
+            `[CabbyCodes] Cookbook mismatch: ${mismatches.length} combos have cooked variants but still show unchecked. Showing first ${sample.length}.`
+        );
+        for (const combo of sample) {
+            const dishStatuses = combo.dishIds
+                .map(id => `${id}:${cookArray[id] ? '✔' : '✘'}`)
+                .join(', ');
+            CabbyCodes.warn(
+                `  Combo ${combo.primaryName}` +
+                (combo.secondaryId ? ` + ${combo.secondaryName}` : '') +
+                ` -> ${combo.resultName}; variants=${dishStatuses}`
+            );
+        }
     }
 
     /**
@@ -433,11 +481,11 @@
 
     Window_CabbyCodesCookbook.prototype.update = function() {
         Window_Selectable.prototype.update.call(this);
-
+        
         if (this.active) {
             this.ensureCursorVisible(true);
         }
-
+        
         if (this._refreshTimer > 0) {
             this._refreshTimer -= 1;
         }
@@ -450,7 +498,7 @@
     Window_CabbyCodesCookbook.prototype.refreshIfNeeded = function(force) {
         const combinations = getAllCookingCombinations();
         const discoveredCount = combinations.filter(c => c.discovered).length;
-
+        
         if (
             !force &&
             this._discoveredCount === discoveredCount &&
@@ -458,7 +506,7 @@
         ) {
             return;
         }
-
+        
         this._combinations = combinations;
         this._discoveredCount = discoveredCount;
         this.paint();
@@ -547,31 +595,33 @@
         const textX = checkboxX + CHECKBOX_SIZE + CHECKBOX_PADDING * 2;
         const textWidth = Math.max(0, contentWidth - CHECKBOX_SIZE - CHECKBOX_PADDING * 2);
         const columnGap = 12;
-        const comboWidth = Math.floor(textWidth * 0.55);
-        const resultX = textX + comboWidth + columnGap;
-        const resultWidth = Math.max(0, textWidth - comboWidth - columnGap);
+        const resultWidth = Math.max(0, Math.floor(textWidth * 0.5));
+        const ingredientsX = textX + resultWidth + columnGap;
+        const ingredientsWidth = Math.max(0, textWidth - resultWidth - columnGap);
         const textY = y + Math.floor((rowHeight - this.lineHeight()) / 2);
 
         this.drawCheckbox(checkboxX, checkboxY, combination.discovered);
 
-        const pairText = combination.secondaryId
+        const resultText = combination.resultName;
+        const ingredientsText = combination.secondaryId
             ? `${combination.primaryName} + ${combination.secondaryName}`
             : `${combination.primaryName} (solo)`;
-        const resultText = `→ ${combination.resultName}`;
 
-        const pairColor = combination.discovered
-            ? ColorManager.normalColor()
-            : ColorManager.textColor(6);
         const resultColor = combination.discovered
             ? ColorManager.systemColor()
             : ColorManager.textColor(6);
-
-        this.changeTextColor(pairColor);
-        this.drawText(pairText, textX, textY, comboWidth, 'left');
+        const ingredientsColor = combination.discovered
+            ? ColorManager.normalColor()
+            : ColorManager.textColor(6);
 
         if (resultWidth > 0) {
             this.changeTextColor(resultColor);
-            this.drawText(resultText, resultX, textY, resultWidth, 'left');
+            this.drawText(resultText, textX, textY, resultWidth, 'left');
+        }
+
+        if (ingredientsWidth > 0) {
+            this.changeTextColor(ingredientsColor);
+            this.drawText(ingredientsText, ingredientsX, textY, ingredientsWidth, 'left');
         }
     };
 
@@ -583,10 +633,10 @@
         const size = CHECKBOX_SIZE;
         const borderWidth = 2;
         this.contents.fillRect(
-            x,
-            y,
-            size,
-            size,
+            x, 
+            y, 
+            size, 
+            size, 
             checked ? CHECKBOX_CHECKED_COLOR : CHECKBOX_UNCHECKED_COLOR
         );
         this.contents.fillRect(x, y, size, borderWidth, CHECKBOX_BORDER_COLOR);
