@@ -21,6 +21,7 @@
     }
 
     const moduleApi = (CabbyCodes.cookbook = CabbyCodes.cookbook || {});
+    const bookUi = CabbyCodes.bookUi || null;
     const settingKey = 'cookbook';
     const COOKING_COMMON_EVENT_NAME = 'Cooking';
     const COOKED_MEAL_EVENT_NAME = 'eatCookedMeal';
@@ -33,17 +34,19 @@
     let dishNameMapCache = null;
 
     // Window constants
-    const WINDOW_WIDTH = 640;
-    const ROW_HEIGHT = 24;  // Tight vertical spacing
-    const ROW_SPACING = 2;
+    const WINDOW_WIDTH = bookUi?.defaults?.windowWidth ?? 640;
+    const ROW_HEIGHT = bookUi?.defaults?.rowHeight ?? 24;  // Tight vertical spacing
+    const ROW_SPACING = bookUi?.defaults?.rowSpacing ?? 2;
     const REFRESH_INTERVAL_FRAMES = 30;
     const HEADER_TEXT = 'Cook Book';
-    const CHECKBOX_SIZE = 16;
+    const CHECKBOX_SIZE = bookUi?.defaults?.checkboxSize ?? 16;
     const CHECKBOX_PADDING = 4;
     const RECIPE_NAME_OFFSET = CHECKBOX_SIZE + CHECKBOX_PADDING * 2;
-    const CONTENT_PADDING = 12;
-    const FOOTER_TEXT = 'Press any button to return';
+    const CONTENT_PADDING = bookUi?.defaults?.contentPadding ?? 12;
+    const FOOTER_TEXT = '';
     const RESET_DELAY_MS = 30;
+    const ROW_CONTENT_LEFT = bookUi?.defaults?.rowContentLeft ?? 16;
+    const ROW_CONTENT_RIGHT = bookUi?.defaults?.rowContentRight ?? 8;
 
     // Checkbox colors
     const CHECKBOX_CHECKED_COLOR = '#68ffd1';
@@ -352,19 +355,21 @@
         this._combinations = [];
         this._discoveredCount = 0;
         this._refreshTimer = 0;
-        this._scrollY = 0;
-        this._headerHeight = 0;
+        this._headerWindow = null;
         this.deactivate();
         this.refreshPanelBackground();
         this.requestImmediateRefresh();
     };
 
     Window_CabbyCodesCookbook.prototype.refreshPanelBackground = function() {
+        if (bookUi && typeof bookUi.applyPanelBackground === 'function') {
+            bookUi.applyPanelBackground(this);
+            return;
+        }
         if (!this.contentsBack) {
             return;
         }
         this.contentsBack.clear();
-        // Improved styling - darker background with subtle texture
         this.contentsBack.gradientFillRect(
             0,
             0,
@@ -376,25 +381,27 @@
         );
     };
 
+    Window_CabbyCodesCookbook.prototype.setHeaderWindow = function(headerWindow) {
+        this._headerWindow = headerWindow || null;
+        if (this._headerWindow && typeof this._headerWindow.setListWindow === 'function') {
+            this._headerWindow.setListWindow(this);
+        }
+    };
+
+    Window_CabbyCodesCookbook.prototype.headerInfo = function() {
+        return {
+            discovered: this._discoveredCount || 0,
+            total: this._combinations && Array.isArray(this._combinations)
+                ? this._combinations.length
+                : 0
+        };
+    };
+
     Window_CabbyCodesCookbook.prototype.maxItems = function() {
         if (!this._combinations || !Array.isArray(this._combinations)) {
             return 0;
         }
         return this._combinations.length;
-    };
-
-    Window_CabbyCodesCookbook.prototype.itemRect = function(index) {
-        const rect = new Rectangle(0, 0, 0, 0);
-        const itemWidth = this.itemWidth();
-        const itemHeight = this.itemHeight();
-        const rowSpacing = this.rowSpacing();
-        
-        // Calculate row position accounting for spacing
-        rect.x = CONTENT_PADDING;
-        rect.y = index * (itemHeight + rowSpacing);
-        rect.width = itemWidth;
-        rect.height = itemHeight;
-        return rect;
     };
 
     Window_CabbyCodesCookbook.prototype.itemWidth = function() {
@@ -403,6 +410,13 @@
 
     Window_CabbyCodesCookbook.prototype.itemHeight = function() {
         return ROW_HEIGHT;
+    };
+
+    Window_CabbyCodesCookbook.prototype.itemRect = function(index) {
+        const rect = Window_Selectable.prototype.itemRect.call(this, index);
+        rect.x = 0;
+        rect.width = this.contentsWidth();
+        return rect;
     };
 
     Window_CabbyCodesCookbook.prototype.maxCols = function() {
@@ -419,22 +433,11 @@
 
     Window_CabbyCodesCookbook.prototype.update = function() {
         Window_Selectable.prototype.update.call(this);
-        
-        // Handle scrolling with keyboard
+
         if (this.active) {
-            if (Input.isRepeated('down') || Input.isRepeated('ok')) {
-                this.scrollDown();
-            }
-            if (Input.isRepeated('up')) {
-                this.scrollUp();
-            }
+            this.ensureCursorVisible(true);
         }
-        
-        // Handle wheel scrolling
-        if (TouchInput.wheelY !== 0) {
-            this.processWheelScroll();
-        }
-        
+
         if (this._refreshTimer > 0) {
             this._refreshTimer -= 1;
         }
@@ -447,16 +450,21 @@
     Window_CabbyCodesCookbook.prototype.refreshIfNeeded = function(force) {
         const combinations = getAllCookingCombinations();
         const discoveredCount = combinations.filter(c => c.discovered).length;
-        
-        if (!force && 
+
+        if (
+            !force &&
             this._discoveredCount === discoveredCount &&
-            combinationsEqual(this._combinations, combinations)) {
+            combinationsEqual(this._combinations, combinations)
+        ) {
             return;
         }
-        
+
         this._combinations = combinations;
         this._discoveredCount = discoveredCount;
-        this.refresh();
+        this.paint();
+        if (this._headerWindow) {
+            this._headerWindow.refresh();
+        }
     };
 
     Window_CabbyCodesCookbook.prototype.requestImmediateRefresh = function() {
@@ -467,12 +475,14 @@
     };
 
     function combinationsEqual(a, b) {
-        if (a.length !== b.length) {
+        if (!a || !b || a.length !== b.length) {
             return false;
         }
         for (let i = 0; i < a.length; i++) {
-            if (a[i].combinationKey !== b[i].combinationKey || 
-                a[i].discovered !== b[i].discovered) {
+            if (
+                a[i].combinationKey !== b[i].combinationKey ||
+                a[i].discovered !== b[i].discovered
+            ) {
                 return false;
             }
         }
@@ -480,32 +490,12 @@
     }
 
     Window_CabbyCodesCookbook.prototype.paint = function() {
-        // Override paint to include header and footer
         if (this.contents) {
             this.resetFontSettings();
             this.contents.clear();
             this.contentsBack.clear();
             this.refreshPanelBackground();
-            
-            const usableWidth = this.contentsWidth() - CONTENT_PADDING * 2;
-            let offsetY = CONTENT_PADDING;
-
-            // Draw header with count
-            offsetY += this.drawHeader(offsetY, usableWidth);
-            offsetY += ROW_SPACING * 2;
-
-            // Store header offset for item drawing
-            this._headerHeight = offsetY;
-            
-            // Draw scrollable item list
             this.drawAllItems();
-            
-            // Draw footer
-            if (FOOTER_TEXT) {
-                const footerY = this.contentsHeight() - this.lineHeight() - CONTENT_PADDING;
-                this.changeTextColor(ColorManager.textColor(6));
-                this.drawText(FOOTER_TEXT, CONTENT_PADDING, footerY, usableWidth, 'center');
-            }
         }
     };
 
@@ -521,6 +511,22 @@
         }
     };
 
+    Window_CabbyCodesCookbook.prototype.drawItemBackground = function(index) {
+        const rect = this.itemRect(index);
+        this.drawBackgroundRect(rect);
+    };
+
+    Window_CabbyCodesCookbook.prototype.drawBackgroundRect = function(rect) {
+        const c1 = ColorManager.itemBackColor1();
+        const c2 = ColorManager.itemBackColor2();
+        const x = rect.x;
+        const y = rect.y;
+        const w = rect.width;
+        const h = rect.height;
+        this.contentsBack.gradientFillRect(x, y, w, h, c1, c2, true);
+        this.contentsBack.fillRect(x, y + h - 1, w, 1, 'rgba(255, 255, 255, 0.1)');
+    };
+
     Window_CabbyCodesCookbook.prototype.drawItem = function(index) {
         if (!this._combinations || !Array.isArray(this._combinations)) {
             return;
@@ -530,162 +536,91 @@
         }
         const combination = this._combinations[index];
         const rect = this.itemRect(index);
-        // Adjust Y position to account for header offset
-        const adjustedY = (this._headerHeight || CONTENT_PADDING + this.lineHeight() + ROW_SPACING * 2) + rect.y;
-        this.drawCombinationRow(combination, rect.x, adjustedY, rect.width);
-    };
-
-    Window_CabbyCodesCookbook.prototype.maxVisibleItems = function() {
-        const lineHeight = this.itemHeight() + this.rowSpacing();
-        const headerHeight = this._headerHeight || (CONTENT_PADDING + this.lineHeight() + ROW_SPACING * 2);
-        const footerHeight = FOOTER_TEXT ? this.lineHeight() + ROW_SPACING : 0;
-        const availableHeight = this.contentsHeight() - headerHeight - footerHeight - CONTENT_PADDING;
-        return Math.max(1, Math.floor(availableHeight / lineHeight));
-    };
-
-    Window_CabbyCodesCookbook.prototype.topIndex = function() {
-        return Math.max(0, Math.floor((this._scrollY || 0) / (this.itemHeight() + this.rowSpacing())));
-    };
-
-    Window_CabbyCodesCookbook.prototype.contentsHeight = function() {
-        const lineHeight = this.lineHeight();
-        const headerHeight = lineHeight + ROW_SPACING * 2;
-        const footerHeight = FOOTER_TEXT ? lineHeight + ROW_SPACING : 0;
-        const combinationsLength = (this._combinations && Array.isArray(this._combinations)) ? this._combinations.length : 0;
-        const listHeight = combinationsLength * (ROW_HEIGHT + ROW_SPACING);
-        return headerHeight + listHeight + footerHeight + CONTENT_PADDING * 2;
-    };
-
-    Window_CabbyCodesCookbook.prototype.processWheelScroll = function() {
-        if (this.isOpenAndActive() && TouchInput.wheelY !== 0) {
-            const threshold = 3;
-            const scrollAmount = Math.floor(Math.abs(TouchInput.wheelY) / threshold);
-            if (TouchInput.wheelY > 0) {
-                for (let i = 0; i < scrollAmount; i++) {
-                    this.scrollDown();
-                }
-            } else {
-                for (let i = 0; i < scrollAmount; i++) {
-                    this.scrollUp();
-                }
-            }
-        }
-    };
-
-    Window_CabbyCodesCookbook.prototype.scrollDown = function() {
-        const maxScroll = Math.max(0, this.maxItems() - this.maxVisibleItems());
-        const currentTop = this.topIndex();
-        if (currentTop < maxScroll) {
-            this._scrollY = (this._scrollY || 0) + (this.itemHeight() + this.rowSpacing());
-            this.paint();
-        }
-    };
-
-    Window_CabbyCodesCookbook.prototype.scrollUp = function() {
-        const currentTop = this.topIndex();
-        if (currentTop > 0) {
-            this._scrollY = Math.max(0, (this._scrollY || 0) - (this.itemHeight() + this.rowSpacing()));
-            this.paint();
-        }
-    };
-
-    Window_CabbyCodesCookbook.prototype.isOpenAndActive = function() {
-        return this.isOpen() && this.active;
-    };
-
-    Window_CabbyCodesCookbook.prototype.drawHeader = function(top, usableWidth) {
-        const lineHeight = this.lineHeight();
-        const combinationsLength = (this._combinations && Array.isArray(this._combinations)) ? this._combinations.length : 0;
-        const countText = `${this._discoveredCount || 0} / ${combinationsLength}`;
-        
-        // Title
-        this.changeTextColor(ColorManager.systemColor());
-        this.drawText(HEADER_TEXT, CONTENT_PADDING, top, usableWidth / 2, 'left');
-        
-        // Count
-        this.changeTextColor(ColorManager.normalColor());
-        this.drawText(countText, CONTENT_PADDING + usableWidth / 2, top, usableWidth / 2, 'right');
-        
-        return lineHeight;
+        this.drawCombinationRow(combination, rect.x, rect.y, rect.width);
     };
 
     Window_CabbyCodesCookbook.prototype.drawCombinationRow = function(combination, x, y, width) {
-        if (!this._listOffsetY) {
-            this._listOffsetY = CONTENT_PADDING + this.lineHeight() + ROW_SPACING * 2;
-        }
-        
-        const checkboxX = x + CONTENT_PADDING;
-        const lineHeight = this.itemHeight();
-        // Better vertical alignment: center checkbox with text baseline
-        const textBaseline = y + Math.floor((lineHeight - this.lineHeight()) / 2) + this.lineHeight() - 2;
-        const checkboxY = textBaseline - CHECKBOX_SIZE / 2;
-        const nameX = checkboxX + CHECKBOX_SIZE + CHECKBOX_PADDING * 2;
-        const nameWidth = width - CHECKBOX_SIZE - CHECKBOX_PADDING * 3 - CONTENT_PADDING;
+        const checkboxX = x + ROW_CONTENT_LEFT;
+        const rowHeight = this.itemHeight();
+        const checkboxY = y + Math.floor((rowHeight - CHECKBOX_SIZE) / 2);
+        const contentWidth = width - ROW_CONTENT_LEFT - ROW_CONTENT_RIGHT;
+        const textX = checkboxX + CHECKBOX_SIZE + CHECKBOX_PADDING * 2;
+        const textWidth = Math.max(0, contentWidth - CHECKBOX_SIZE - CHECKBOX_PADDING * 2);
+        const columnGap = 12;
+        const comboWidth = Math.floor(textWidth * 0.55);
+        const resultX = textX + comboWidth + columnGap;
+        const resultWidth = Math.max(0, textWidth - comboWidth - columnGap);
+        const textY = y + Math.floor((rowHeight - this.lineHeight()) / 2);
 
-        // Draw checkbox
         this.drawCheckbox(checkboxX, checkboxY, combination.discovered);
 
-        // Draw combination name/result
-        const combinationText = combination.secondaryId
-            ? `${combination.primaryName} + ${combination.secondaryName} -> ${combination.resultName}`
-            : `${combination.primaryName} (solo) -> ${combination.resultName}`;
-        this.changeTextColor(
-            combination.discovered 
-                ? ColorManager.normalColor() 
-                : ColorManager.textColor(6)
-        );
-        this.drawText(combinationText, nameX, y, nameWidth, 'left');
+        const pairText = combination.secondaryId
+            ? `${combination.primaryName} + ${combination.secondaryName}`
+            : `${combination.primaryName} (solo)`;
+        const resultText = `→ ${combination.resultName}`;
+
+        const pairColor = combination.discovered
+            ? ColorManager.normalColor()
+            : ColorManager.textColor(6);
+        const resultColor = combination.discovered
+            ? ColorManager.systemColor()
+            : ColorManager.textColor(6);
+
+        this.changeTextColor(pairColor);
+        this.drawText(pairText, textX, textY, comboWidth, 'left');
+
+        if (resultWidth > 0) {
+            this.changeTextColor(resultColor);
+            this.drawText(resultText, resultX, textY, resultWidth, 'left');
+        }
     };
 
     Window_CabbyCodesCookbook.prototype.drawCheckbox = function(x, y, checked) {
+        if (bookUi && typeof bookUi.drawCheckbox === 'function') {
+            bookUi.drawCheckbox(this, x, y, checked, { size: CHECKBOX_SIZE });
+            return;
+        }
         const size = CHECKBOX_SIZE;
         const borderWidth = 2;
-        
-        // Draw checkbox background
         this.contents.fillRect(
-            x, 
-            y, 
-            size, 
-            size, 
+            x,
+            y,
+            size,
+            size,
             checked ? CHECKBOX_CHECKED_COLOR : CHECKBOX_UNCHECKED_COLOR
         );
-        
-        // Draw border
         this.contents.fillRect(x, y, size, borderWidth, CHECKBOX_BORDER_COLOR);
         this.contents.fillRect(x, y, borderWidth, size, CHECKBOX_BORDER_COLOR);
         this.contents.fillRect(x + size - borderWidth, y, borderWidth, size, CHECKBOX_BORDER_COLOR);
         this.contents.fillRect(x, y + size - borderWidth, size, borderWidth, CHECKBOX_BORDER_COLOR);
-        
-        // Draw checkmark if checked
         if (checked) {
             this.drawCheckmark(x, y, size);
         }
     };
 
     Window_CabbyCodesCookbook.prototype.drawCheckmark = function(x, y, size) {
+        if (bookUi && typeof bookUi.drawCheckmark === 'function') {
+            bookUi.drawCheckmark(this, x, y, size, { padding: 4 });
+            return;
+        }
         const checkColor = '#000000';
         const lineWidth = 2.5;
         const padding = 4;
-        
-        // Draw checkmark as a simple V shape using two lines
-        // Start point: bottom-left
         const startX = x + padding;
         const startY = y + size - padding;
-        // Mid point: center
         const midX = x + size / 2;
         const midY = y + size / 2 + 1;
-        // End point: top-right
         const endX = x + size - padding;
         const endY = y + padding;
-        
-        // Draw left leg (bottom-left to center)
         this.drawThickLine(startX, startY, midX, midY, lineWidth, checkColor);
-        
-        // Draw right leg (center to top-right)
         this.drawThickLine(midX, midY, endX, endY, lineWidth, checkColor);
     };
     
     Window_CabbyCodesCookbook.prototype.drawThickLine = function(x1, y1, x2, y2, thickness, color) {
+        if (bookUi && typeof bookUi.drawThickLine === 'function') {
+            bookUi.drawThickLine(this, x1, y1, x2, y2, thickness, color);
+            return;
+        }
         const dx = x2 - x1;
         const dy = y2 - y1;
         const length = Math.sqrt(dx * dx + dy * dy);
@@ -718,7 +653,8 @@
 
     Scene_CabbyCodesCookbook.prototype.create = function() {
         Scene_MenuBase.prototype.create.call(this);
-        this.createCookbookWindow();
+        this.createCookbookHeaderWindow();
+        this.createCookbookListWindow();
     };
 
     Scene_CabbyCodesCookbook.prototype.update = function() {
@@ -733,35 +669,163 @@
         }
     };
 
-    Scene_CabbyCodesCookbook.prototype.createCookbookWindow = function() {
-        const rect = this.cookbookWindowRect();
+    Scene_CabbyCodesCookbook.prototype.createCookbookHeaderWindow = function() {
+        const rect = this.cookbookHeaderWindowRect();
+        if (bookUi && bookUi.BookHeaderWindow) {
+            this._cookbookHeaderWindow = new bookUi.BookHeaderWindow(rect, {
+                title: HEADER_TEXT,
+                contentPadding: CONTENT_PADDING
+            });
+        } else {
+            this._cookbookHeaderWindow = new Window_CabbyCodesCookbookHeader(rect);
+        }
+        this.addWindow(this._cookbookHeaderWindow);
+    };
+
+    Scene_CabbyCodesCookbook.prototype.createCookbookListWindow = function() {
+        const rect = this.cookbookListWindowRect();
         this._cookbookWindow = new Window_CabbyCodesCookbook(rect);
+        this._cookbookWindow.setHeaderWindow(this._cookbookHeaderWindow);
         this.addWindow(this._cookbookWindow);
     };
 
-    Scene_CabbyCodesCookbook.prototype.cookbookWindowRect = function() {
+    Scene_CabbyCodesCookbook.prototype.cookbookHeaderWindowRect = function() {
+        const layout = this.cookbookLayoutInfo();
+        return new Rectangle(layout.wx, layout.headerY, layout.ww, layout.headerHeight);
+    };
+
+    Scene_CabbyCodesCookbook.prototype.cookbookListWindowRect = function() {
+        const layout = this.cookbookLayoutInfo();
+        return new Rectangle(layout.wx, layout.listY, layout.ww, layout.listHeight);
+    };
+
+    Scene_CabbyCodesCookbook.prototype.cookbookLayoutInfo = function() {
+        if (this._cookbookLayout) {
+            return this._cookbookLayout;
+        }
         const ww = Math.min(WINDOW_WIDTH, Graphics.boxWidth - 48);
-        const padding = typeof Window_Base !== 'undefined' &&
-            typeof Window_Base.prototype.standardPadding === 'function'
-            ? Window_Base.prototype.standardPadding.call(Window_Base.prototype)
-            : 12;
-        
+        const headerHeight = this.headerWindowHeight();
+        const gap = this.windowGap();
+        const listHeight = this.listWindowHeight(headerHeight, gap);
+        const totalHeight = headerHeight + gap + listHeight;
+        const wx = (Graphics.boxWidth - ww) / 2;
+        const headerY = Math.max(24, (Graphics.boxHeight - totalHeight) / 2);
+        const listY = headerY + headerHeight + gap;
+        this._cookbookLayout = { ww, headerHeight, listHeight, headerY, listY, wx };
+        return this._cookbookLayout;
+    };
+
+    Scene_CabbyCodesCookbook.prototype.windowGap = function() {
+        return 6;
+    };
+
+    Scene_CabbyCodesCookbook.prototype.headerWindowHeight = function() {
         const lineHeight = typeof Window_Base !== 'undefined' &&
             typeof Window_Base.prototype.lineHeight === 'function'
             ? Window_Base.prototype.lineHeight.call(Window_Base.prototype)
             : 36;
-        
-        // Fixed window height for scrolling - large enough to show many items
-        const headerHeight = lineHeight + ROW_SPACING * 2;
-        const footerHeight = FOOTER_TEXT ? lineHeight + ROW_SPACING : 0;
-        const listHeight = Graphics.boxHeight - 200; // Fixed scrollable area
-        const contentHeight = headerHeight + listHeight + footerHeight + CONTENT_PADDING * 2;
-        
-        const wh = Math.min(contentHeight + padding * 2, Graphics.boxHeight - 48);
-        const wx = (Graphics.boxWidth - ww) / 2;
-        const wy = (Graphics.boxHeight - wh) / 2;
-        return new Rectangle(wx, wy, ww, wh);
+        return lineHeight + CONTENT_PADDING;
     };
+
+    Scene_CabbyCodesCookbook.prototype.listWindowHeight = function(headerHeight, gap) {
+        const padding = this.standardPadding();
+        const maxRows = Math.max(6, Math.floor((Graphics.boxHeight - 200) / (ROW_HEIGHT + ROW_SPACING)));
+        const listAreaHeight = maxRows * (ROW_HEIGHT + ROW_SPACING) + CONTENT_PADDING * 2;
+        const desiredHeight = listAreaHeight + padding * 2;
+        const maxAvailable = Graphics.boxHeight - 48 - headerHeight - gap;
+        return Math.max(padding * 2 + ROW_HEIGHT * 2, Math.min(desiredHeight, maxAvailable));
+    };
+
+    Scene_CabbyCodesCookbook.prototype.standardPadding = function() {
+        return typeof Window_Base !== 'undefined' &&
+            typeof Window_Base.prototype.standardPadding === 'function'
+            ? Window_Base.prototype.standardPadding.call(Window_Base.prototype)
+            : 12;
+    };
+
+    const CookbookHeaderBase = bookUi && bookUi.BookHeaderWindow ? bookUi.BookHeaderWindow : null;
+
+    let Window_CabbyCodesCookbookHeader;
+
+    if (CookbookHeaderBase) {
+        Window_CabbyCodesCookbookHeader = function(rect) {
+            CookbookHeaderBase.call(this, rect, {
+                title: HEADER_TEXT,
+                contentPadding: CONTENT_PADDING
+            });
+        };
+        Window_CabbyCodesCookbookHeader.prototype = Object.create(CookbookHeaderBase.prototype);
+        Window_CabbyCodesCookbookHeader.prototype.constructor = Window_CabbyCodesCookbookHeader;
+    } else {
+        Window_CabbyCodesCookbookHeader = function() {
+            this.initialize(...arguments);
+        };
+
+        Window_CabbyCodesCookbookHeader.prototype = Object.create(Window_Base.prototype);
+        Window_CabbyCodesCookbookHeader.prototype.constructor = Window_CabbyCodesCookbookHeader;
+
+        Window_CabbyCodesCookbookHeader.prototype.initialize = function(rect) {
+            Window_Base.prototype.initialize.call(this, rect);
+            this.opacity = 255;
+            this._listWindow = null;
+            this.padding = this.standardPadding();
+            this.refreshBackground();
+            this.refresh();
+        };
+
+        Window_CabbyCodesCookbookHeader.prototype.setListWindow = function(listWindow) {
+            this._listWindow = listWindow;
+            this.refresh();
+        };
+
+        Window_CabbyCodesCookbookHeader.prototype.refreshBackground = function() {
+            if (bookUi && typeof bookUi.applyPanelBackground === 'function') {
+                bookUi.applyPanelBackground(this);
+                return;
+            }
+            if (this.contentsBack) {
+                this.contentsBack.clear();
+                this.contentsBack.gradientFillRect(
+                    0,
+                    0,
+                    this.contentsBack.width,
+                    this.contentsBack.height,
+                    'rgba(12, 20, 32, 0.98)',
+                    'rgba(8, 16, 28, 0.95)',
+                    true
+                );
+            }
+        };
+
+        Window_CabbyCodesCookbookHeader.prototype.refresh = function() {
+            if (!this.contents) {
+                this.createContents();
+            }
+            this.resetFontSettings();
+            this.contents.clear();
+            this.refreshBackground();
+            const info = this._listWindow ? this._listWindow.headerInfo() : { discovered: 0, total: 0 };
+            const usableWidth = this.contentsWidth() - CONTENT_PADDING * 2;
+            const top = Math.max(0, Math.floor((this.contentsHeight() - this.lineHeight()) / 2));
+
+            this.changeTextColor(ColorManager.systemColor());
+            this.drawText(HEADER_TEXT, CONTENT_PADDING, top, usableWidth / 2, 'left');
+
+            this.changeTextColor(ColorManager.normalColor());
+            const countText = `${info.discovered || 0} / ${info.total || 0}`;
+            this.drawText(countText, CONTENT_PADDING + usableWidth / 2, top, usableWidth / 2, 'right');
+        };
+
+        Window_CabbyCodesCookbookHeader.prototype.standardPadding = function() {
+            return 8;
+        };
+
+        Window_CabbyCodesCookbookHeader.prototype.updatePadding = function() {
+            this.padding = this.standardPadding();
+        };
+    }
+
+    window.Window_CabbyCodesCookbookHeader = Window_CabbyCodesCookbookHeader;
 
     CabbyCodes.log('[CabbyCodes] Cookbook initialized');
 

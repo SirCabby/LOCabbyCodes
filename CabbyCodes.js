@@ -29,6 +29,7 @@
             'cabbycodes-patches.js',
             'cabbycodes-session-state.js',
             'cabbycodes-settings.js',
+            'cabbycodes-book-ui.js',
             'cabbycodes-enemy-health-bars.js',
             'cabbycodes-version-display.js',
             'cabbycodes-hidden-stats-display.js',
