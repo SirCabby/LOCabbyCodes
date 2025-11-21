@@ -261,7 +261,7 @@
             this.contents.fontSize = originalFontSize;
             this.changeTextColor(originalColor);
         } catch (e) {
-            CabbyCodes.warn('[CabbyCodes] Error drawing message: ' + (e.message || e));
+            CabbyCodes.error('[CabbyCodes] Error drawing message: ' + (e.message || e));
         }
     };
 
@@ -274,25 +274,17 @@
         // Override to ensure correct handler is called based on current symbol
         // Get the symbol of the currently selected item
         const symbol = this.currentSymbol();
-        const index = this.index();
-        CabbyCodes.warn('[CabbyCodes] callOkHandler called, symbol: ' + symbol + ', index: ' + index);
         
         // Directly call the handler for the selected item's symbol
         if (symbol && this.isHandled(symbol)) {
-            CabbyCodes.warn('[CabbyCodes] Calling handler for symbol: ' + symbol);
             this.callHandler(symbol);
         } else {
             // If no handler for this symbol, use parent behavior
-            CabbyCodes.warn('[CabbyCodes] No handler for symbol ' + symbol + ', using parent behavior');
             Window_HorzCommand.prototype.callOkHandler.call(this);
         }
     };
     
     Window_DeleteConfirm.prototype.processOk = function() {
-        const symbol = this.currentSymbol();
-        const index = this.index();
-        CabbyCodes.warn('[CabbyCodes] processOk called, symbol: ' + symbol + ', index: ' + index);
-        
         // Don't call parent processOk - we'll handle it ourselves
         if (this.isCurrentItemEnabled()) {
             this.playOkSound();
@@ -359,7 +351,6 @@
 
     Window_DeleteConfirm.prototype.onOk = function() {
         // Handler for "ok" symbol - user confirmed deletion
-        CabbyCodes.warn('[CabbyCodes] onOk handler called');
         SoundManager.playOk();
         this.deactivate();
         if (_deleteConfirmCallback) {
@@ -379,7 +370,6 @@
 
     Window_DeleteConfirm.prototype.onCancel = function() {
         // Handler for "cancel" symbol - user cancelled deletion
-        CabbyCodes.warn('[CabbyCodes] onCancel handler called');
         SoundManager.playCancel();
         this.deactivate();
         if (_deleteConfirmCallback) {
@@ -486,16 +476,6 @@
                 listWindow.deactivate();
             }
             
-            CabbyCodes.warn('[CabbyCodes] Confirmation window created - visible: ' + _deleteConfirmWindow.visible + 
-                ', openness: ' + _deleteConfirmWindow.openness + 
-                ', x: ' + _deleteConfirmWindow.x + 
-                ', y: ' + _deleteConfirmWindow.y +
-                ', width: ' + _deleteConfirmWindow.width +
-                ', height: ' + _deleteConfirmWindow.height +
-                ', hasParent: ' + !!_deleteConfirmWindow.parent +
-                ', hasContents: ' + !!_deleteConfirmWindow.contents +
-                ', boxWidth: ' + Graphics.boxWidth +
-                ', boxHeight: ' + Graphics.boxHeight);
         } catch (e) {
             CabbyCodes.error('[CabbyCodes] Error creating confirmation window: ' + (e.message || e));
             // Fallback to browser confirm on error
@@ -643,8 +623,6 @@
                             // Only allow deletion of existing saves (enabled items)
                             if (isEnabled && isPointInDeleteButton(this, index, cx, cy)) {
                                 try {
-                                    CabbyCodes.warn('[CabbyCodes] Delete button clicked for savefile ' + savefileId);
-                                    
                                     // Clear the touch input first to prevent it from also triggering item selection
                                     TouchInput.clear();
                                     
@@ -652,12 +630,9 @@
                                     const savefileName = savefileId === 0 ? (TextManager.autosave || "Autosave") : (TextManager.file || "File") + " " + savefileId;
                                     const confirmMessage = `Delete ${savefileName}?`;
                                     
-                                    CabbyCodes.warn('[CabbyCodes] Showing confirm dialog: ' + confirmMessage);
-                                    
                                     // Show confirmation dialog
                                     showConfirmDialog(confirmMessage, (confirmed) => {
                                         try {
-                                            CabbyCodes.warn('[CabbyCodes] Confirm dialog result: ' + confirmed);
                                             if (confirmed) {
                                                 deleteSaveFile(savefileId, this);
                                             }
@@ -695,8 +670,6 @@
                 const savefileName = savefileId === 0 ? (TextManager.autosave || "Autosave") : (TextManager.file || "File") + " " + savefileId;
                 const confirmMessage = `Overwrite ${savefileName}?`;
                 
-                CabbyCodes.warn('[CabbyCodes] Save file exists, showing overwrite confirmation: ' + confirmMessage);
-                
                 // Deactivate list window while confirmation is showing
                 if (this._listWindow) {
                     this._listWindow.deactivate();
@@ -707,7 +680,6 @@
                 
                 // Show confirmation dialog
                 showConfirmDialog(confirmMessage, (confirmed) => {
-                    CabbyCodes.warn('[CabbyCodes] Save overwrite confirmation result: ' + confirmed);
                     
                     // Reactivate list window
                     if (scene._listWindow) {
