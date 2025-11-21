@@ -125,9 +125,13 @@
             }
         }
         
-        // Sort recipes alphabetically by name
+        // Sort recipes alphabetically by the resulting item name (case-insensitive)
         recipes.sort((a, b) => {
-            return a.name.localeCompare(b.name);
+            const nameCompare = a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+            if (nameCompare !== 0) {
+                return nameCompare;
+            }
+            return a.id - b.id;
         });
         
         return recipes;

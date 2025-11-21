@@ -142,17 +142,25 @@
 
         debugLogCookbookSnapshot(combinations, cookArray);
 
+        const localeOptions = { sensitivity: 'base' };
         combinations.sort((a, b) => {
-            if (a.discovered !== b.discovered) {
-                return a.discovered ? -1 : 1;
+            const resultCompare = a.resultName.localeCompare(
+                b.resultName,
+                undefined,
+                localeOptions
+            );
+            if (resultCompare !== 0) {
+                return resultCompare;
             }
-            if (a.primaryName !== b.primaryName) {
-                return a.primaryName.localeCompare(b.primaryName);
+            const primaryCompare = a.primaryName.localeCompare(
+                b.primaryName,
+                undefined,
+                localeOptions
+            );
+            if (primaryCompare !== 0) {
+                return primaryCompare;
             }
-            if (a.secondaryName !== b.secondaryName) {
-                return a.secondaryName.localeCompare(b.secondaryName);
-            }
-            return a.resultName.localeCompare(b.resultName);
+            return a.secondaryName.localeCompare(b.secondaryName, undefined, localeOptions);
         });
 
         return combinations;
