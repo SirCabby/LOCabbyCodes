@@ -32,7 +32,7 @@
     const COOKED_RESULT_VAR_ID = 137;
 
     let ovenCombinationCache = null;
-    let dishNameMapCache = null;
+    let dishMetadataCache = null;
 
     // Window constants
     const WINDOW_WIDTH = Number.isFinite(bookUiDefaults.windowWidth)
@@ -124,17 +124,22 @@
             const secondaryItem = entry.secondaryId ? $dataItems[entry.secondaryId] : null;
             const dishIds = entry.variants.map(variant => variant.dishId);
             const resultName = formatVariantName(entry.variants);
+            const primaryName = safeItemName(primaryItem, entry.primaryId);
+            const secondaryName = secondaryItem
+                ? safeItemName(secondaryItem, entry.secondaryId)
+                : 'Solo';
+            const variantNames = entry.variants.map(v => cleanCookbookText(v.dishName, 'Unknown Dish'));
             const discovered = cookArray
                 ? dishIds.some(id => !!cookArray[id])
                 : false;
             return {
                 combinationKey: `${entry.primaryId}-${entry.secondaryId || 'solo'}`,
                 primaryId: entry.primaryId,
-                primaryName: safeItemName(primaryItem, entry.primaryId),
+                primaryName,
                 secondaryId: entry.secondaryId,
-                secondaryName: secondaryItem ? safeItemName(secondaryItem, entry.secondaryId) : '(Solo)',
+                secondaryName,
                 dishIds,
-                variantNames: entry.variants.map(v => v.dishName),
+                variantNames,
                 resultName,
                 discovered
             };
@@ -175,15 +180,40 @@
     }
 
     function safeItemName(item, id) {
+        const fallback = id ? `Item ${id}` : 'Unknown';
         if (item && item.name) {
-            return item.name;
+            return cleanCookbookText(item.name, fallback);
         }
-        return id ? `Item ${id}` : 'Unknown';
+        return fallback;
     }
 
     function resolveDishResultName(dishId) {
-        const dishMap = getDishNameMap();
-        return dishMap.get(dishId) || `Dish ${dishId}`;
+        const fallback = `Dish ${dishId}`;
+        const metadata = getDishMetadata().get(dishId) || null;
+        if (metadata?.itemId) {
+            const itemName = resolveItemNameFromDatabase(metadata.itemId);
+            if (itemName) {
+                return itemName;
+            }
+        }
+        if (metadata?.label) {
+            return metadata.label;
+        }
+        if (metadata?.description) {
+            return cleanCookbookText(metadata.description, fallback);
+        }
+        return fallback;
+    }
+
+    function resolveItemNameFromDatabase(itemId) {
+        if (typeof $dataItems === 'undefined' || !$dataItems) {
+            return null;
+        }
+        const item = $dataItems[itemId];
+        if (!item || !item.name) {
+            return null;
+        }
+        return cleanCookbookText(item.name, '');
     }
 
     function getOvenCombinationData() {
@@ -285,55 +315,199 @@
         return null;
     }
 
-    function getDishNameMap() {
-        if (dishNameMapCache) {
-            return dishNameMapCache;
+    function getDishMetadata() {
+        if (dishMetadataCache) {
+            return dishMetadataCache;
         }
-        dishNameMapCache = buildDishNameMap();
-        return dishNameMapCache;
+        dishMetadataCache = buildDishMetadata();
+        return dishMetadataCache;
     }
 
-    function buildDishNameMap() {
-        const map = new Map();
+    function buildDishMetadata() {
+        const metadata = new Map();
         const event = findCommonEventByName(COOKED_MEAL_EVENT_NAME);
         if (!event || !Array.isArray(event.list)) {
-            return map;
+            return metadata;
         }
+
+        const dishConditionStack = [];
+
         for (const command of event.list) {
+            trimConstraintStack(dishConditionStack, command.indent);
+
             if (command.code === 118 && command.parameters && command.parameters[0]) {
-                const label = command.parameters[0];
-                const match = /^(\d+)\s*[-:]\s*(.+)$/i.exec(label);
-                if (match) {
-                    const dishId = Number(match[1]);
-                    const rawName = match[2].trim();
-                    if (dishId > 0 && rawName) {
-                        map.set(dishId, prettifyDishName(rawName));
-                    }
+                const parsed = parseDishLabel(command.parameters[0]);
+                if (parsed) {
+                    const entry = ensureDishMetadata(metadata, parsed.dishId);
+                    entry.label = parsed.label || entry.label;
+                }
+                continue;
+            }
+
+            if (command.code === 111) {
+                const condition = parseVariableEqualityCondition(command);
+                if (condition && condition.varId === COOKED_RESULT_VAR_ID) {
+                    dishConditionStack.push(condition);
+                    ensureDishMetadata(metadata, condition.value);
+                }
+                continue;
+            }
+
+            if (!dishConditionStack.length) {
+                continue;
+            }
+
+            const activeDish = dishConditionStack[dishConditionStack.length - 1];
+            const entry = ensureDishMetadata(metadata, activeDish.value);
+
+            if (command.code === 122 && isSettingCookDescription(command)) {
+                const description = extractCookDescription(command.parameters[4]);
+                if (description) {
+                    entry.description = entry.description || description;
+                }
+            } else if (command.code === 126 && isAddingResultItem(command.parameters)) {
+                const itemId = command.parameters[0];
+                if (itemId) {
+                    entry.itemId = entry.itemId || itemId;
                 }
             }
         }
-        return map;
+
+        return metadata;
     }
 
-    function prettifyDishName(text) {
-        return text
+    function ensureDishMetadata(map, dishId) {
+        if (!map.has(dishId)) {
+            map.set(dishId, { label: null, description: null, itemId: null });
+        }
+        return map.get(dishId);
+    }
+
+    const DISH_LABEL_OVERRIDES = {
+        frozenveggies: 'Frozen Veggies',
+        frozenfish: 'Frozen Fish',
+        tomatosoup: 'Tomato Soup',
+        cookedham: 'Cooked Ham'
+    };
+
+    function parseDishLabel(label) {
+        const match = /^(\d+)\s*[-:]\s*(.+)$/i.exec(label);
+        if (!match) {
+            return null;
+        }
+        const dishId = Number(match[1]);
+        if (!dishId) {
+            return null;
+        }
+        const labelText = formatDishLabel(typeof match[2] === 'string' ? match[2].trim() : '');
+        if (!labelText) {
+            return null;
+        }
+        return { dishId, label: labelText };
+    }
+
+    function isSettingCookDescription(command) {
+        const params = command.parameters;
+        return (
+            Array.isArray(params) &&
+            params[0] === 8 &&
+            params[1] === 8 &&
+            params[3] === 4 &&
+            typeof params[4] === 'string'
+        );
+    }
+
+    function isAddingResultItem(params) {
+        if (!Array.isArray(params)) {
+            return false;
+        }
+        const [itemId, operation, operandType] = params;
+        return itemId > 0 && operation === 0 && operandType === 0;
+    }
+
+    function extractCookDescription(script) {
+        const text = parseCookbookScriptString(script);
+        if (!text) {
+            return '';
+        }
+        return cleanCookbookText(text, '');
+    }
+
+    function parseCookbookScriptString(script) {
+        if (typeof script !== 'string') {
+            return '';
+        }
+        try {
+            return JSON.parse(script);
+        } catch (error) {
+            const trimmed = script.trim();
+            if (trimmed.startsWith('"') && trimmed.endsWith('"')) {
+                return trimmed.slice(1, -1);
+            }
+            return trimmed;
+        }
+    }
+
+    function formatDishLabel(rawLabel) {
+        if (!rawLabel) {
+            return '';
+        }
+        const trimmed = rawLabel.trim();
+        if (!trimmed) {
+            return '';
+        }
+        if (Object.prototype.hasOwnProperty.call(DISH_LABEL_OVERRIDES, trimmed)) {
+            return DISH_LABEL_OVERRIDES[trimmed];
+        }
+        const expanded = trimmed
             .replace(/[_\-]+/g, ' ')
-            .replace(/\s+/g, ' ')
+            .replace(/([a-z])([A-Z])/g, '$1 $2');
+        const cleaned = cleanCookbookText(expanded, '');
+        if (!cleaned) {
+            return '';
+        }
+        return cleaned
+            .split(' ')
+            .map(capitalizeDishWord)
+            .join(' ')
             .trim();
+    }
+
+    function capitalizeDishWord(word) {
+        if (!word) {
+            return '';
+        }
+        if (word.length <= 2) {
+            return word.toUpperCase();
+        }
+        return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+    }
+
+    function cleanCookbookText(text, fallback = '') {
+        if (text === null || text === undefined) {
+            return fallback;
+        }
+        const withoutParens = String(text).replace(/\s*\([^)]*\)/g, ' ');
+        const collapsed = withoutParens.replace(/\s+/g, ' ').trim();
+        return collapsed || fallback;
     }
 
     function formatVariantName(variants) {
         if (!Array.isArray(variants) || variants.length === 0) {
             return 'Unknown Dish';
         }
-        const uniqueNames = [...new Set(variants.map(v => (v.dishName || '').trim()).filter(Boolean))];
-        if (uniqueNames.length === 0) {
+        const cleanedNames = variants
+            .map(v => cleanCookbookText(v.dishName || '', ''))
+            .filter(Boolean);
+        if (cleanedNames.length === 0) {
             return 'Unknown Dish';
         }
+        const uniqueNames = [...new Set(cleanedNames)];
         if (uniqueNames.length === 1) {
             return uniqueNames[0];
         }
-        return uniqueNames.join(' / ');
+        const combined = uniqueNames.join(' / ');
+        return cleanCookbookText(combined, 'Unknown Dish');
     }
 
     function debugLogCookbookSnapshot(combos, cookArray) {
@@ -623,7 +797,7 @@
         const resultText = combination.resultName;
         const ingredientsText = combination.secondaryId
             ? `${combination.primaryName} + ${combination.secondaryName}`
-            : `${combination.primaryName} (solo)`;
+            : combination.primaryName;
 
         const resultColor = combination.discovered
             ? ColorManager.systemColor()
@@ -1138,4 +1312,5 @@
             CabbyCodes.log('[CabbyCodes] Cookbook: Added cooking combination checkboxes to item windows');
         }
 })();
+
 
