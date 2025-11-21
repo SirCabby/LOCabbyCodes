@@ -34,6 +34,7 @@
             'cabbycodes-hidden-stats-display.js',
             'cabbycodes-refill-status.js',
             'cabbycodes-save-anywhere.js',
+            'cabbycodes-delete-save.js',
             'cabbycodes-infinite-money.js',
             'cabbycodes-invincibility.js',
             'cabbycodes-status-immunity.js',
