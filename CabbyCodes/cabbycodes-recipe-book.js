@@ -39,8 +39,8 @@
     const RECIPE_NAME_OFFSET = CHECKBOX_SIZE + CHECKBOX_PADDING * 2;
     const CONTENT_PADDING = 12;
     const FOOTER_TEXT = '';
-    const ROW_LEFT_PADDING = 16;
-    const ROW_RIGHT_PADDING = 8;
+    const ROW_CONTENT_LEFT = 16;
+    const ROW_CONTENT_RIGHT = 8;
     const RESET_DELAY_MS = 30;
 
     // Checkbox colors
@@ -224,6 +224,13 @@
         return 1;
     };
 
+    Window_CabbyCodesRecipeBook.prototype.itemRect = function(index) {
+        const rect = Window_Selectable.prototype.itemRect.call(this, index);
+        rect.x = 0;
+        rect.width = this.contentsWidth();
+        return rect;
+    };
+
     Window_CabbyCodesRecipeBook.prototype.colSpacing = function() {
         return 0;
     };
@@ -341,7 +348,7 @@
     };
 
     Window_CabbyCodesRecipeBook.prototype.drawRecipeRow = function(recipe, x, y, width) {
-        const checkboxX = x + ROW_LEFT_PADDING;
+        const checkboxX = x + ROW_CONTENT_LEFT;
         const itemHeight = this.itemHeight();
         const lineHeight = this.lineHeight();
         
@@ -349,7 +356,7 @@
         const checkboxY = y + Math.floor((itemHeight - CHECKBOX_SIZE) / 2);
         
         // Position text to align with checkbox center
-        const contentWidth = width - ROW_LEFT_PADDING - ROW_RIGHT_PADDING;
+        const contentWidth = width - ROW_CONTENT_LEFT - ROW_CONTENT_RIGHT;
         const nameX = checkboxX + CHECKBOX_SIZE + CHECKBOX_PADDING * 2;
         const nameWidth = Math.max(0, contentWidth - CHECKBOX_SIZE - CHECKBOX_PADDING * 2);
         
