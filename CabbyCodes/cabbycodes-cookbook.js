@@ -198,6 +198,16 @@
     moduleApi.openViewer = () => {
         openCookbookScene();
     };
+    moduleApi.getCombinationData = options => {
+        if (options && options.invalidateCache) {
+            ovenCombinationCache = null;
+        }
+        return getAllCookingCombinations();
+    };
+    moduleApi.resetCombinationCache = () => {
+        ovenCombinationCache = null;
+        dishMetadataCache = null;
+    };
 
     function scheduleReset() {
         if (typeof setTimeout !== 'function') {
