@@ -56,6 +56,8 @@
     };
 
     const DEFAULT_INCOMPLETE_HEADER_COLOR = '#2edf87';
+    const DEFAULT_COMPLETE_LEFT_COLOR = '#66bfff';
+    const DEFAULT_COMPLETE_RIGHT_COLOR = '#ffffff';
 
     function resolveIncompleteHeaderColor() {
         if (typeof ColorManager !== 'undefined') {
@@ -75,6 +77,64 @@
 
     bookUi.defaults = Object.assign({}, defaults);
     bookUi.getIncompleteHeaderColor = resolveIncompleteHeaderColor;
+
+    function resolveRowIncompleteColor() {
+        if (typeof ColorManager !== 'undefined' && typeof ColorManager.textColor === 'function') {
+            try {
+                return ColorManager.textColor(6);
+            } catch (error) {
+                // Ignore and fall through to fallback.
+            }
+        }
+        return DEFAULT_INCOMPLETE_HEADER_COLOR;
+    }
+
+    function resolveRowCompleteLeftColor() {
+        if (typeof ColorManager !== 'undefined' && typeof ColorManager.systemColor === 'function') {
+            try {
+                return ColorManager.systemColor();
+            } catch (error) {
+                // Ignore and fall through to fallback.
+            }
+        }
+        return DEFAULT_COMPLETE_LEFT_COLOR;
+    }
+
+    function resolveRowCompleteRightColor() {
+        if (typeof ColorManager !== 'undefined' && typeof ColorManager.normalColor === 'function') {
+            try {
+                return ColorManager.normalColor();
+            } catch (error) {
+                // Ignore and fall through to fallback.
+            }
+        }
+        return DEFAULT_COMPLETE_RIGHT_COLOR;
+    }
+
+    function resolveColorPairFromState(isComplete) {
+        if (isComplete) {
+            return {
+                left: resolveRowCompleteLeftColor(),
+                right: resolveRowCompleteRightColor()
+            };
+        }
+        const incomplete = resolveRowIncompleteColor();
+        return { left: incomplete, right: incomplete };
+    }
+
+    bookUi.resolveRowTextColors = function(options = {}) {
+        return resolveColorPairFromState(!!options.discovered);
+    };
+
+    bookUi.resolveProgressTextColors = function(options = {}) {
+        return resolveColorPairFromState(!!options.complete);
+    };
+
+    bookUi.colors = Object.assign({}, bookUi.colors || {}, {
+        rowIncomplete: resolveRowIncompleteColor,
+        rowCompleteLeft: resolveRowCompleteLeftColor,
+        rowCompleteRight: resolveRowCompleteRightColor
+    });
 
     function resolveBitmap(target) {
         if (!target) {
@@ -502,13 +562,8 @@
             const info = this.headerInfo();
             const discovered = Number(info?.discovered ?? 0);
             const total = Number(info?.total ?? 0);
-            const isIncomplete = total > 0 && discovered < total;
-            const accentColor = isIncomplete
-                ? resolveIncompleteHeaderColor()
-                : ColorManager?.systemColor?.() || '#FFFFFF';
-            const countColor = isIncomplete
-                ? accentColor
-                : ColorManager?.normalColor?.() || '#FFFFFF';
+            const isComplete = total > 0 && discovered >= total;
+            const progressColors = resolveColorPairFromState(isComplete);
             const padding = this._bookUiOptions.contentPadding ?? defaults.contentPadding;
             const usableWidth = this.contentsWidth() - padding * 2;
             const lineY = Math.max(
@@ -517,7 +572,7 @@
             );
 
             const titleText = this._bookUiOptions.title || '';
-            this.changeTextColor(accentColor);
+            this.changeTextColor(progressColors.left);
             const titleX = resolveTitleXFromOptions(this, padding, usableWidth);
             const titleWidth = Math.max(0, this.contentsWidth() - titleX - padding);
             this.drawText(titleText, titleX, lineY, titleWidth, 'left');
@@ -527,7 +582,7 @@
                     ? this._bookUiOptions.formatCount
                     : defaultCountFormatter;
             const countText = formatter(info);
-            this.changeTextColor(countColor);
+            this.changeTextColor(progressColors.right);
             this.drawText(countText, padding, lineY, usableWidth, 'right');
         };
 

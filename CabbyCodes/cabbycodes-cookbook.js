@@ -83,6 +83,76 @@
     const CHECKBOX_UNCHECKED_COLOR = 'rgba(255, 255, 255, 0.3)';
     const CHECKBOX_BORDER_COLOR = '#ffffff';
 
+    const FALLBACK_PROGRESS_INCOMPLETE_COLOR = '#2edf87';
+    const FALLBACK_PROGRESS_COMPLETE_LEFT_COLOR = '#66bfff';
+    const FALLBACK_PROGRESS_COMPLETE_RIGHT_COLOR = '#ffffff';
+
+    function fallbackIncompleteTextColor() {
+        if (typeof ColorManager !== 'undefined' && typeof ColorManager.textColor === 'function') {
+            try {
+                return ColorManager.textColor(6);
+            } catch (error) {
+                // Ignore and fall through to fallback.
+            }
+        }
+        return FALLBACK_PROGRESS_INCOMPLETE_COLOR;
+    }
+
+    function fallbackCompleteLeftTextColor() {
+        if (typeof ColorManager !== 'undefined' && typeof ColorManager.systemColor === 'function') {
+            try {
+                return ColorManager.systemColor();
+            } catch (error) {
+                // Ignore and fall through to fallback.
+            }
+        }
+        return FALLBACK_PROGRESS_COMPLETE_LEFT_COLOR;
+    }
+
+    function fallbackCompleteRightTextColor() {
+        if (typeof ColorManager !== 'undefined' && typeof ColorManager.normalColor === 'function') {
+            try {
+                return ColorManager.normalColor();
+            } catch (error) {
+                // Ignore and fall through to fallback.
+            }
+        }
+        return FALLBACK_PROGRESS_COMPLETE_RIGHT_COLOR;
+    }
+
+    function fallbackProgressColors(isComplete) {
+        if (isComplete) {
+            return {
+                left: fallbackCompleteLeftTextColor(),
+                right: fallbackCompleteRightTextColor()
+            };
+        }
+        const incomplete = fallbackIncompleteTextColor();
+        return { left: incomplete, right: incomplete };
+    }
+
+    function resolveRowTextColors(discovered) {
+        if (bookUi && typeof bookUi.resolveRowTextColors === 'function') {
+            try {
+                return bookUi.resolveRowTextColors({ discovered });
+            } catch (error) {
+                console.warn('[CabbyCodes] Cookbook failed to resolve row text colors:', error);
+            }
+        }
+        return fallbackProgressColors(discovered);
+    }
+
+    function resolveProgressTextColors(isComplete) {
+        if (bookUi && typeof bookUi.resolveProgressTextColors === 'function') {
+            try {
+                return bookUi.resolveProgressTextColors({ complete: isComplete });
+            } catch (error) {
+                console.warn('[CabbyCodes] Cookbook failed to resolve progress text colors:', error);
+            }
+        }
+        return fallbackProgressColors(isComplete);
+    }
+
     function resolveWindowBaseLineHeight() {
         if (
             typeof Window_Base !== 'undefined' &&
@@ -632,6 +702,7 @@
         this._discoveredCount = 0;
         this._refreshTimer = 0;
         this._headerWindow = null;
+        this._columnHeaderWindow = null;
         this.deactivate();
         this.refreshPanelBackground();
         this.requestImmediateRefresh();
@@ -661,6 +732,13 @@
         this._headerWindow = headerWindow || null;
         if (this._headerWindow && typeof this._headerWindow.setListWindow === 'function') {
             this._headerWindow.setListWindow(this);
+        }
+    };
+
+    Window_CabbyCodesCookbook.prototype.setColumnHeaderWindow = function(columnWindow) {
+        this._columnHeaderWindow = columnWindow || null;
+        if (this._columnHeaderWindow && typeof this._columnHeaderWindow.setListWindow === 'function') {
+            this._columnHeaderWindow.setListWindow(this);
         }
     };
 
@@ -740,6 +818,9 @@
         this.paint();
         if (this._headerWindow) {
             this._headerWindow.refresh();
+        }
+        if (this._columnHeaderWindow) {
+            this._columnHeaderWindow.refresh();
         }
     };
 
@@ -853,12 +934,9 @@
             ? `${combination.primaryName} + ${combination.secondaryName}`
             : combination.primaryName;
 
-        const resultColor = combination.discovered
-            ? ColorManager.systemColor()
-            : ColorManager.textColor(6);
-        const ingredientsColor = combination.discovered
-            ? ColorManager.normalColor()
-            : ColorManager.textColor(6);
+        const rowColors = resolveRowTextColors(combination.discovered);
+        const resultColor = rowColors.left;
+        const ingredientsColor = rowColors.right;
 
         if (recipeWidth > 0) {
             this.changeTextColor(resultColor);
@@ -996,6 +1074,7 @@
         const rect = this.cookbookListWindowRect();
         this._cookbookWindow = new Window_CabbyCodesCookbook(rect);
         this._cookbookWindow.setHeaderWindow(this._cookbookHeaderWindow);
+        this._cookbookWindow.setColumnHeaderWindow(this._cookbookColumnHeaderWindow);
         this.addWindow(this._cookbookWindow);
     };
 
@@ -1115,27 +1194,6 @@
             this.initialize(...arguments);
         };
 
-        const FALLBACK_HEADER_GREEN = '#2edf87';
-
-        function cookbookIncompleteHeaderColor() {
-            if (bookUi && typeof bookUi.getIncompleteHeaderColor === 'function') {
-                return bookUi.getIncompleteHeaderColor();
-            }
-            if (typeof ColorManager !== 'undefined') {
-                if (typeof ColorManager.powerUpColor === 'function') {
-                    return ColorManager.powerUpColor();
-                }
-                if (typeof ColorManager.textColor === 'function') {
-                    try {
-                        return ColorManager.textColor(3);
-                    } catch (error) {
-                        // Ignore and fall through to the default color.
-                    }
-                }
-            }
-            return FALLBACK_HEADER_GREEN;
-        }
-
         Window_CabbyCodesCookbookHeader.prototype = Object.create(Window_Base.prototype);
         Window_CabbyCodesCookbookHeader.prototype.constructor = Window_CabbyCodesCookbookHeader;
 
@@ -1182,13 +1240,10 @@
             const info = this._listWindow ? this._listWindow.headerInfo() : { discovered: 0, total: 0 };
             const discovered = Number(info?.discovered ?? 0);
             const total = Number(info?.total ?? 0);
-            const isIncomplete = total > 0 && discovered < total;
-            const accentColor = isIncomplete
-                ? cookbookIncompleteHeaderColor()
-                : ColorManager?.systemColor?.() || '#FFFFFF';
-            const countColor = isIncomplete
-                ? accentColor
-                : ColorManager?.normalColor?.() || '#FFFFFF';
+            const isComplete = total > 0 && discovered >= total;
+            const colors = resolveProgressTextColors(isComplete);
+            const accentColor = colors.left;
+            const countColor = colors.right;
             const usableWidth = this.contentsWidth() - CONTENT_PADDING * 2;
             const top = Math.max(0, Math.floor((this.contentsHeight() - this.lineHeight()) / 2));
             const titleX = cookbookHeaderTitleX(this.padding);
@@ -1224,6 +1279,7 @@
         Window_Base.prototype.initialize.call(this, rect);
         this.opacity = 255;
         this.padding = this.standardPadding();
+        this._listWindow = null;
         this.refreshBackground();
         this.refresh();
     };
@@ -1234,6 +1290,18 @@
 
     Window_CabbyCodesCookbookColumns.prototype.lineHeight = function() {
         return COLUMN_HEADER_LINE_HEIGHT;
+    };
+
+    Window_CabbyCodesCookbookColumns.prototype.setListWindow = function(listWindow) {
+        this._listWindow = listWindow || null;
+        this.refresh();
+    };
+
+    Window_CabbyCodesCookbookColumns.prototype.progressInfo = function() {
+        if (this._listWindow && typeof this._listWindow.headerInfo === 'function') {
+            return this._listWindow.headerInfo();
+        }
+        return { discovered: 0, total: 0 };
     };
 
     Window_CabbyCodesCookbookColumns.prototype.refreshBackground = function() {
@@ -1263,13 +1331,16 @@
         this.contents.clear();
         this.refreshBackground();
 
+        const info = this.progressInfo();
+        const isComplete = info.total > 0 && info.discovered >= info.total;
+        const colors = resolveProgressTextColors(isComplete);
         const layout = calculateCookbookColumnLayout(this.contentsWidth());
         const baselineY = Math.max(
             0,
             Math.floor((this.contentsHeight() - this.lineHeight()) / 2)
         );
-        const recipeColor = ColorManager?.systemColor?.() || '#FFFFFF';
-        const ingredientsColor = ColorManager?.normalColor?.() || '#FFFFFF';
+        const recipeColor = colors.left;
+        const ingredientsColor = colors.right;
 
         this.changeTextColor(recipeColor);
         this.drawText(

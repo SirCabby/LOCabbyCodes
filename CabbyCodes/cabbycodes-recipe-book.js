@@ -78,6 +78,76 @@
     const RECIPE_INGREDIENT_KEYS = ['ing1', 'ing2', 'ing3', 'ing4', 'ing5'];
     const UNKNOWN_INGREDIENT_TEXT = 'Ingredients unknown';
 
+    const FALLBACK_PROGRESS_INCOMPLETE_COLOR = '#2edf87';
+    const FALLBACK_PROGRESS_COMPLETE_LEFT_COLOR = '#66bfff';
+    const FALLBACK_PROGRESS_COMPLETE_RIGHT_COLOR = '#ffffff';
+
+    function fallbackIncompleteTextColor() {
+        if (typeof ColorManager !== 'undefined' && typeof ColorManager.textColor === 'function') {
+            try {
+                return ColorManager.textColor(6);
+            } catch (error) {
+                // Ignore and fall through to fallback.
+            }
+        }
+        return FALLBACK_PROGRESS_INCOMPLETE_COLOR;
+    }
+
+    function fallbackCompleteLeftTextColor() {
+        if (typeof ColorManager !== 'undefined' && typeof ColorManager.systemColor === 'function') {
+            try {
+                return ColorManager.systemColor();
+            } catch (error) {
+                // Ignore and fall through to fallback.
+            }
+        }
+        return FALLBACK_PROGRESS_COMPLETE_LEFT_COLOR;
+    }
+
+    function fallbackCompleteRightTextColor() {
+        if (typeof ColorManager !== 'undefined' && typeof ColorManager.normalColor === 'function') {
+            try {
+                return ColorManager.normalColor();
+            } catch (error) {
+                // Ignore and fall through to fallback.
+            }
+        }
+        return FALLBACK_PROGRESS_COMPLETE_RIGHT_COLOR;
+    }
+
+    function fallbackProgressColors(isComplete) {
+        if (isComplete) {
+            return {
+                left: fallbackCompleteLeftTextColor(),
+                right: fallbackCompleteRightTextColor()
+            };
+        }
+        const incomplete = fallbackIncompleteTextColor();
+        return { left: incomplete, right: incomplete };
+    }
+
+    function resolveRowTextColors(discovered) {
+        if (bookUi && typeof bookUi.resolveRowTextColors === 'function') {
+            try {
+                return bookUi.resolveRowTextColors({ discovered });
+            } catch (error) {
+                console.warn('[CabbyCodes] Recipe book failed to resolve row text colors:', error);
+            }
+        }
+        return fallbackProgressColors(discovered);
+    }
+
+    function resolveProgressTextColors(isComplete) {
+        if (bookUi && typeof bookUi.resolveProgressTextColors === 'function') {
+            try {
+                return bookUi.resolveProgressTextColors({ complete: isComplete });
+            } catch (error) {
+                console.warn('[CabbyCodes] Recipe book failed to resolve progress text colors:', error);
+            }
+        }
+        return fallbackProgressColors(isComplete);
+    }
+
     function columnHeaderPadding() {
         return resolveWindowBasePadding();
     }
@@ -278,6 +348,7 @@
         this._discoveredCount = 0;
         this._refreshTimer = 0;
         this._headerWindow = null;
+        this._columnHeaderWindow = null;
         this.deactivate();
         this.refreshPanelBackground();
         this.requestImmediateRefresh();
@@ -307,6 +378,13 @@
         this._headerWindow = headerWindow;
         if (this._headerWindow) {
             this._headerWindow.setListWindow(this);
+        }
+    };
+
+    Window_CabbyCodesRecipeBook.prototype.setColumnHeaderWindow = function(columnWindow) {
+        this._columnHeaderWindow = columnWindow || null;
+        if (this._columnHeaderWindow && typeof this._columnHeaderWindow.setListWindow === 'function') {
+            this._columnHeaderWindow.setListWindow(this);
         }
     };
 
@@ -383,6 +461,9 @@
         this.paint();
         if (this._headerWindow) {
             this._headerWindow.refresh();
+        }
+        if (this._columnHeaderWindow) {
+            this._columnHeaderWindow.refresh();
         }
     };
 
@@ -503,13 +584,9 @@
         // Draw checkbox
         this.drawCheckbox(checkboxX, checkboxY, recipe.discovered);
 
-        // Draw recipe name
-        const nameColor = recipe.discovered
-            ? ColorManager.normalColor()
-            : ColorManager.textColor(6);
-        const comboColor = recipe.discovered
-            ? ColorManager.systemColor()
-            : ColorManager.textColor(6);
+        const rowColors = resolveRowTextColors(recipe.discovered);
+        const nameColor = recipe.discovered ? rowColors.right : rowColors.left;
+        const comboColor = rowColors.left;
         const combinationText = recipe.combinationText || UNKNOWN_INGREDIENT_TEXT;
 
         this.changeTextColor(nameColor);
@@ -609,27 +686,6 @@
             this.initialize(...arguments);
         };
 
-        const FALLBACK_HEADER_GREEN = '#2edf87';
-
-        function recipeIncompleteHeaderColor() {
-            if (bookUi && typeof bookUi.getIncompleteHeaderColor === 'function') {
-                return bookUi.getIncompleteHeaderColor();
-            }
-            if (typeof ColorManager !== 'undefined') {
-                if (typeof ColorManager.powerUpColor === 'function') {
-                    return ColorManager.powerUpColor();
-                }
-                if (typeof ColorManager.textColor === 'function') {
-                    try {
-                        return ColorManager.textColor(3);
-                    } catch (error) {
-                        // Ignore and use fallback.
-                    }
-                }
-            }
-            return FALLBACK_HEADER_GREEN;
-        }
-
         Window_CabbyCodesRecipeBookHeader.prototype = Object.create(Window_Base.prototype);
         Window_CabbyCodesRecipeBookHeader.prototype.constructor = Window_CabbyCodesRecipeBookHeader;
 
@@ -676,13 +732,10 @@
             const info = this._listWindow ? this._listWindow.headerInfo() : { discovered: 0, total: 0 };
             const discovered = Number(info?.discovered ?? 0);
             const total = Number(info?.total ?? 0);
-            const isIncomplete = total > 0 && discovered < total;
-            const accentColor = isIncomplete
-                ? recipeIncompleteHeaderColor()
-                : ColorManager?.systemColor?.() || '#FFFFFF';
-            const countColor = isIncomplete
-                ? accentColor
-                : ColorManager?.normalColor?.() || '#FFFFFF';
+            const isComplete = total > 0 && discovered >= total;
+            const colors = resolveProgressTextColors(isComplete);
+            const accentColor = colors.left;
+            const countColor = colors.right;
             const usableWidth = this.contentsWidth() - CONTENT_PADDING * 2;
             const top = Math.max(0, Math.floor((this.contentsHeight() - this.lineHeight()) / 2));
             const titleX = recipeBookHeaderTitleX(this.padding);
@@ -718,6 +771,7 @@
         Window_Base.prototype.initialize.call(this, rect);
         this.opacity = 255;
         this.padding = this.standardPadding();
+        this._listWindow = null;
         this.refreshBackground();
         this.refresh();
     };
@@ -728,6 +782,18 @@
 
     Window_CabbyCodesRecipeBookColumns.prototype.lineHeight = function() {
         return COLUMN_HEADER_LINE_HEIGHT;
+    };
+
+    Window_CabbyCodesRecipeBookColumns.prototype.setListWindow = function(listWindow) {
+        this._listWindow = listWindow || null;
+        this.refresh();
+    };
+
+    Window_CabbyCodesRecipeBookColumns.prototype.progressInfo = function() {
+        if (this._listWindow && typeof this._listWindow.headerInfo === 'function') {
+            return this._listWindow.headerInfo();
+        }
+        return { discovered: 0, total: 0 };
     };
 
     Window_CabbyCodesRecipeBookColumns.prototype.refreshBackground = function() {
@@ -757,13 +823,16 @@
         this.contents.clear();
         this.refreshBackground();
 
+        const info = this.progressInfo();
+        const isComplete = info.total > 0 && info.discovered >= info.total;
+        const colors = resolveProgressTextColors(isComplete);
         const layout = calculateRecipeColumnLayout(this.contentsWidth());
         const baselineY = Math.max(
             0,
             Math.floor((this.contentsHeight() - this.lineHeight()) / 2)
         );
-        const recipeColor = ColorManager?.systemColor?.() || '#FFFFFF';
-        const ingredientsColor = ColorManager?.normalColor?.() || '#FFFFFF';
+        const recipeColor = colors.left;
+        const ingredientsColor = colors.right;
 
         this.changeTextColor(recipeColor);
         this.drawText(
@@ -834,6 +903,7 @@
         const rect = this.recipeListWindowRect();
         this._recipeBookWindow = new Window_CabbyCodesRecipeBook(rect);
         this._recipeBookWindow.setHeaderWindow(this._recipeHeaderWindow);
+        this._recipeBookWindow.setColumnHeaderWindow(this._recipeColumnHeaderWindow);
         this.addWindow(this._recipeBookWindow);
     };
 
