@@ -60,6 +60,15 @@
         (bookUi?.defaults?.rowContentLeft ?? 16) - 8
     );
     const ROW_CONTENT_RIGHT = bookUi?.defaults?.rowContentRight ?? 8;
+    const ROW_VERTICAL_ADJUST = Number.isFinite(bookUiDefaults.rowVerticalAdjust)
+        ? bookUiDefaults.rowVerticalAdjust
+        : 0;
+    const ROW_CHECKBOX_OFFSET = Number.isFinite(bookUiDefaults.rowCheckboxOffset)
+        ? bookUiDefaults.rowCheckboxOffset
+        : ROW_VERTICAL_ADJUST;
+    const ROW_TEXT_OFFSET = Number.isFinite(bookUiDefaults.rowTextOffset)
+        ? bookUiDefaults.rowTextOffset
+        : ROW_VERTICAL_ADJUST;
     const COLUMN_GAP = 12;
     const COLUMN_HEADER_RECIPE_TEXT = 'Recipe';
     const COLUMN_HEADER_INGREDIENTS_TEXT = 'Ingredients';
@@ -827,13 +836,15 @@
     Window_CabbyCodesCookbook.prototype.drawCombinationRow = function(combination, x, y, width) {
         const checkboxX = x + ROW_CONTENT_LEFT;
         const rowHeight = this.itemHeight();
-        const checkboxY = y + Math.floor((rowHeight - CHECKBOX_SIZE) / 2);
+        const checkboxY =
+            y + Math.floor((rowHeight - CHECKBOX_SIZE) / 2) + ROW_CHECKBOX_OFFSET;
         const layout = this.columnLayout();
         const recipeX = x + layout.recipeX;
         const recipeWidth = layout.recipeWidth;
         const ingredientsX = x + layout.ingredientsX;
         const ingredientsWidth = layout.ingredientsWidth;
-        const textY = y + Math.floor((rowHeight - this.lineHeight()) / 2);
+        const textY =
+            y + Math.floor((rowHeight - this.lineHeight()) / 2) + ROW_TEXT_OFFSET;
 
         this.drawCheckbox(checkboxX, checkboxY, combination.discovered);
 

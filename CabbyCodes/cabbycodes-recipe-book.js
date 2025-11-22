@@ -55,6 +55,15 @@
         (bookUi?.defaults?.rowContentLeft ?? 16) - 8
     );
     const ROW_CONTENT_RIGHT = bookUi?.defaults?.rowContentRight ?? 8;
+    const ROW_VERTICAL_ADJUST = Number.isFinite(bookUiDefaults.rowVerticalAdjust)
+        ? bookUiDefaults.rowVerticalAdjust
+        : 0;
+    const ROW_CHECKBOX_OFFSET = Number.isFinite(bookUiDefaults.rowCheckboxOffset)
+        ? bookUiDefaults.rowCheckboxOffset
+        : ROW_VERTICAL_ADJUST;
+    const ROW_TEXT_OFFSET = Number.isFinite(bookUiDefaults.rowTextOffset)
+        ? bookUiDefaults.rowTextOffset
+        : ROW_VERTICAL_ADJUST;
     const RESET_DELAY_MS = 30;
     const COLUMN_GAP = 12;
     const RECIPE_COLUMN_RATIO = 0.45;
@@ -479,7 +488,8 @@
         const lineHeight = this.lineHeight();
         
         // Center checkbox vertically within the row
-        const checkboxY = y + Math.floor((itemHeight - CHECKBOX_SIZE) / 2);
+        const checkboxY =
+            y + Math.floor((itemHeight - CHECKBOX_SIZE) / 2) + ROW_CHECKBOX_OFFSET;
         
         const layout = this.columnLayout();
         const recipeX = x + layout.recipeX;
@@ -488,7 +498,7 @@
         const comboWidth = layout.ingredientsWidth;
         
         // Center text vertically within the row
-        const textY = y + Math.floor((itemHeight - lineHeight) / 2);
+        const textY = y + Math.floor((itemHeight - lineHeight) / 2) + ROW_TEXT_OFFSET;
 
         // Draw checkbox
         this.drawCheckbox(checkboxX, checkboxY, recipe.discovered);

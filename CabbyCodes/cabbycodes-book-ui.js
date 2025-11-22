@@ -24,6 +24,9 @@
         windowWidth: 640,
         rowHeight: 24,
         rowSpacing: 2,
+        rowVerticalAdjust: -2, // Legacy option for both checkbox/text
+        rowCheckboxOffset: -2,
+        rowTextOffset: -4,
         contentPadding: 12,
         rowContentLeft: 16,
         rowContentRight: 8,
