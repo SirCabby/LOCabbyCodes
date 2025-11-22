@@ -117,6 +117,12 @@
         return filters;
     }, new Set(['all']));
 
+    const ITEM_GIVER_AUTO_EXCLUDED_NAMES = new Set(['return to title screen']);
+    const ITEM_GIVER_ALWAYS_INCLUDED_NAMES = new Set(['cowboy hat']);
+    const RPG_COLOR_CODE_REGEX = /\\C\[\d+\]/gi;
+    const BROKEN_WEAPON_NAME_REGEX = /\b(broken|cracked)\b/i;
+    const NOT_OPTIMAL_NOTE_REGEX = /<notOptimal>/i;
+
     let itemGiverPersistedFilters = null;
 
     const ITEM_GIVER_UI_CONSTANTS = {
@@ -281,6 +287,96 @@
             entries: orderedItems,
             subsections
         };
+    }
+
+    function normalizeNameForComparison(itemOrName) {
+        const rawName = typeof itemOrName === 'string' ? itemOrName : itemOrName?.name;
+        const sanitized = sanitizeDatabaseName(rawName || '');
+        if (!sanitized) {
+            return '';
+        }
+        const withoutCodes = sanitized.replace(RPG_COLOR_CODE_REGEX, '');
+        return withoutCodes.trim().toLowerCase();
+    }
+
+    function shouldExcludeItemByName(item) {
+        if (!item) {
+            return false;
+        }
+        const normalized = normalizeNameForComparison(item);
+        return normalized ? ITEM_GIVER_AUTO_EXCLUDED_NAMES.has(normalized) : false;
+    }
+
+    function isAlwaysIncludedName(item) {
+        const normalized = normalizeNameForComparison(item);
+        return normalized ? ITEM_GIVER_ALWAYS_INCLUDED_NAMES.has(normalized) : false;
+    }
+
+    function hasMetaFlag(item, flag) {
+        if (!item || !item.meta || typeof item.meta !== 'object') {
+            return false;
+        }
+        return Object.prototype.hasOwnProperty.call(item.meta, flag);
+    }
+
+    function isNotOptimalEntry(entry) {
+        const item = entry?.item;
+        if (!item) {
+            return false;
+        }
+        if (hasMetaFlag(item, 'notOptimal')) {
+            return true;
+        }
+        const note = typeof item.note === 'string' ? item.note : '';
+        return note.length > 0 && NOT_OPTIMAL_NOTE_REGEX.test(note);
+    }
+
+    function isBrokenOrCrackedWeaponEntry(entry) {
+        if (!entry || entry.type !== 'weapon') {
+            return false;
+        }
+        const item = entry.item;
+        if (!item) {
+            return false;
+        }
+        if (
+            hasMetaFlag(item, 'repairTo') ||
+            hasMetaFlag(item, 'repairFrom') ||
+            hasMetaFlag(item, 'brokenVariant')
+        ) {
+            return true;
+        }
+        const name = typeof item.name === 'string' ? item.name : '';
+        if (name && BROKEN_WEAPON_NAME_REGEX.test(name)) {
+            return true;
+        }
+        const note = typeof item.note === 'string' ? item.note : '';
+        return note && BROKEN_WEAPON_NAME_REGEX.test(note);
+    }
+
+    function shouldSkipCatalogEntry(entry) {
+        if (!entry || !entry.item) {
+            return true;
+        }
+
+        if (isAlwaysIncludedName(entry.item)) {
+            // Keep explicitly included entries unless they are marked as not optimal variants.
+            return isNotOptimalEntry(entry);
+        }
+
+        if (shouldExcludeItemByName(entry.item)) {
+            return true;
+        }
+
+        if (isNotOptimalEntry(entry)) {
+            return true;
+        }
+
+        if (isBrokenOrCrackedWeaponEntry(entry)) {
+            return true;
+        }
+
+        return false;
     }
 
     /**
@@ -2925,20 +3021,21 @@
         };
     }
 
-    function resolveGrantableCatalogItem(entry, rangedGrantTracker) {
+    function resolveGrantableCatalogItem(entry) {
+        if (!entry) {
+            return null;
+        }
         const rangedGrant = resolveRangedWeaponGrant(entry);
         if (!rangedGrant) {
-            return entry.item;
+            return {
+                item: entry.item,
+                rangedGroupKey: null
+            };
         }
-
-        if (rangedGrant.groupKey) {
-            if (rangedGrantTracker.has(rangedGrant.groupKey)) {
-                return null;
-            }
-            rangedGrantTracker.add(rangedGrant.groupKey);
-        }
-
-        return rangedGrant.item || entry.item;
+        return {
+            item: rangedGrant.item || entry.item,
+            rangedGroupKey: rangedGrant.groupKey || null
+        };
     }
 
     function iterateGainableItemCatalog(visitor) {
@@ -2958,10 +3055,24 @@
             if (!isGrantableCatalogEntry(entry)) {
                 continue;
             }
-            const grantableItem = resolveGrantableCatalogItem(entry, rangedGrantTracker);
+            if (shouldSkipCatalogEntry(entry)) {
+                continue;
+            }
+
+            const resolved = resolveGrantableCatalogItem(entry);
+            const grantableItem = resolved?.item;
+            const rangedGroupKey = resolved?.rangedGroupKey;
             if (!grantableItem) {
                 continue;
             }
+
+            if (rangedGroupKey) {
+                if (rangedGrantTracker.has(rangedGroupKey)) {
+                    continue;
+                }
+                rangedGrantTracker.add(rangedGroupKey);
+            }
+
             processed += 1;
             visitor(grantableItem, entry);
         }
