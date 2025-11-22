@@ -56,6 +56,11 @@
     );
     const ROW_CONTENT_RIGHT = bookUi?.defaults?.rowContentRight ?? 8;
     const RESET_DELAY_MS = 30;
+    const COLUMN_GAP = 12;
+    const RECIPE_COLUMN_RATIO = 0.45;
+    const COLUMN_HEADER_RECIPE_TEXT = 'Recipe';
+    const COLUMN_HEADER_INGREDIENTS_TEXT = 'Ingredients';
+    const COLUMN_HEADER_LINE_HEIGHT = ROW_HEIGHT;
 
     // Checkbox colors
     const CHECKBOX_CHECKED_COLOR = '#68ffd1';
@@ -63,6 +68,38 @@
     const CHECKBOX_BORDER_COLOR = '#ffffff';
     const RECIPE_INGREDIENT_KEYS = ['ing1', 'ing2', 'ing3', 'ing4', 'ing5'];
     const UNKNOWN_INGREDIENT_TEXT = 'Ingredients unknown';
+
+    function columnHeaderPadding() {
+        return resolveWindowBasePadding();
+    }
+
+    function resolveWindowBaseLineHeight() {
+        if (
+            typeof Window_Base !== 'undefined' &&
+            typeof Window_Base.prototype.lineHeight === 'function'
+        ) {
+            try {
+                return Window_Base.prototype.lineHeight.call(Window_Base.prototype);
+            } catch (error) {
+                // Ignore and fall through to fallback.
+            }
+        }
+        return 36;
+    }
+
+    function resolveWindowBasePadding() {
+        if (
+            typeof Window_Base !== 'undefined' &&
+            typeof Window_Base.prototype.standardPadding === 'function'
+        ) {
+            try {
+                return Window_Base.prototype.standardPadding.call(Window_Base.prototype);
+            } catch (error) {
+                // Ignore and fall through to fallback.
+            }
+        }
+        return 12;
+    }
 
     CabbyCodes.registerSetting(settingKey, 'Recipe Book', {
         defaultValue: false,
@@ -405,6 +442,24 @@
         this.contentsBack.fillRect(x, y + h - 1, w, 1, 'rgba(255, 255, 255, 0.1)');
     };
 
+    function calculateRecipeColumnLayout(availableWidth) {
+        const usableWidth = Math.max(
+            0,
+            availableWidth - ROW_CONTENT_LEFT - ROW_CONTENT_RIGHT
+        );
+        const recipeX = ROW_CONTENT_LEFT + CHECKBOX_SIZE + CHECKBOX_PADDING * 2;
+        const textWidth = Math.max(0, usableWidth - CHECKBOX_SIZE - CHECKBOX_PADDING * 2);
+        const recipeWidth = Math.max(0, Math.floor(textWidth * RECIPE_COLUMN_RATIO));
+        const ingredientsX = recipeX + recipeWidth + COLUMN_GAP;
+        const ingredientsWidth = Math.max(0, textWidth - recipeWidth - COLUMN_GAP);
+        return {
+            recipeX,
+            recipeWidth,
+            ingredientsX,
+            ingredientsWidth
+        };
+    }
+
     Window_CabbyCodesRecipeBook.prototype.drawItem = function(index) {
         if (!this._recipes || !Array.isArray(this._recipes)) {
             return;
@@ -426,10 +481,11 @@
         // Center checkbox vertically within the row
         const checkboxY = y + Math.floor((itemHeight - CHECKBOX_SIZE) / 2);
         
-        // Position text to align with checkbox center
-        const contentWidth = width - ROW_CONTENT_LEFT - ROW_CONTENT_RIGHT;
-        const nameX = checkboxX + CHECKBOX_SIZE + CHECKBOX_PADDING * 2;
-        const nameWidth = Math.max(0, contentWidth - CHECKBOX_SIZE - CHECKBOX_PADDING * 2);
+        const layout = this.columnLayout();
+        const recipeX = x + layout.recipeX;
+        const recipeWidth = layout.recipeWidth;
+        const comboX = x + layout.ingredientsX;
+        const comboWidth = layout.ingredientsWidth;
         
         // Center text vertically within the row
         const textY = y + Math.floor((itemHeight - lineHeight) / 2);
@@ -445,18 +501,18 @@
             ? ColorManager.systemColor()
             : ColorManager.textColor(6);
         const combinationText = recipe.combinationText || UNKNOWN_INGREDIENT_TEXT;
-        const columnGap = 12;
-        const nameColumnWidth = Math.floor(nameWidth * 0.45);
-        const comboX = nameX + nameColumnWidth + columnGap;
-        const comboWidth = Math.max(0, nameWidth - nameColumnWidth - columnGap);
 
         this.changeTextColor(nameColor);
-        this.drawText(recipe.name, nameX, textY, nameColumnWidth, 'left');
+        this.drawText(recipe.name, recipeX, textY, recipeWidth, 'left');
 
         if (comboWidth > 0) {
             this.changeTextColor(comboColor);
             this.drawText(combinationText, comboX, textY, comboWidth, 'left');
         }
+    };
+
+    Window_CabbyCodesRecipeBook.prototype.columnLayout = function() {
+        return calculateRecipeColumnLayout(this.contentsWidth());
     };
 
     Window_CabbyCodesRecipeBook.prototype.drawCheckbox = function(x, y, checked) {
@@ -636,6 +692,85 @@
 
     window.Window_CabbyCodesRecipeBookHeader = Window_CabbyCodesRecipeBookHeader;
 
+    function Window_CabbyCodesRecipeBookColumns() {
+        this.initialize(...arguments);
+    }
+
+    window.Window_CabbyCodesRecipeBookColumns = Window_CabbyCodesRecipeBookColumns;
+
+    Window_CabbyCodesRecipeBookColumns.prototype = Object.create(Window_Base.prototype);
+    Window_CabbyCodesRecipeBookColumns.prototype.constructor = Window_CabbyCodesRecipeBookColumns;
+
+    Window_CabbyCodesRecipeBookColumns.prototype.initialize = function(rect) {
+        Window_Base.prototype.initialize.call(this, rect);
+        this.opacity = 255;
+        this.padding = this.standardPadding();
+        this.refreshBackground();
+        this.refresh();
+    };
+
+    Window_CabbyCodesRecipeBookColumns.prototype.standardPadding = function() {
+        return columnHeaderPadding();
+    };
+
+    Window_CabbyCodesRecipeBookColumns.prototype.lineHeight = function() {
+        return COLUMN_HEADER_LINE_HEIGHT;
+    };
+
+    Window_CabbyCodesRecipeBookColumns.prototype.refreshBackground = function() {
+        if (bookUi && typeof bookUi.applyPanelBackground === 'function') {
+            bookUi.applyPanelBackground(this);
+            return;
+        }
+        if (this.contentsBack) {
+            this.contentsBack.clear();
+            this.contentsBack.gradientFillRect(
+                0,
+                0,
+                this.contentsBack.width,
+                this.contentsBack.height,
+                'rgba(12, 20, 32, 0.98)',
+                'rgba(8, 16, 28, 0.95)',
+                true
+            );
+        }
+    };
+
+    Window_CabbyCodesRecipeBookColumns.prototype.refresh = function() {
+        if (!this.contents) {
+            this.createContents();
+        }
+        this.resetFontSettings();
+        this.contents.clear();
+        this.refreshBackground();
+
+        const layout = calculateRecipeColumnLayout(this.contentsWidth());
+        const baselineY = Math.max(
+            0,
+            Math.floor((this.contentsHeight() - this.lineHeight()) / 2)
+        );
+        const recipeColor = ColorManager?.systemColor?.() || '#FFFFFF';
+        const ingredientsColor = ColorManager?.normalColor?.() || '#FFFFFF';
+
+        this.changeTextColor(recipeColor);
+        this.drawText(
+            COLUMN_HEADER_RECIPE_TEXT,
+            layout.recipeX,
+            baselineY,
+            layout.recipeWidth,
+            'left'
+        );
+
+        this.changeTextColor(ingredientsColor);
+        this.drawText(
+            COLUMN_HEADER_INGREDIENTS_TEXT,
+            layout.ingredientsX,
+            baselineY,
+            layout.ingredientsWidth,
+            'left'
+        );
+    };
+
     // -- Scene implementation --------------------------------------------------
 
     function Scene_CabbyCodesRecipeBook() {
@@ -654,6 +789,7 @@
     Scene_CabbyCodesRecipeBook.prototype.create = function() {
         Scene_MenuBase.prototype.create.call(this);
         this.createRecipeHeaderWindow();
+        this.createRecipeColumnHeaderWindow();
         this.createRecipeListWindow();
     };
 
@@ -675,6 +811,12 @@
         this.addWindow(this._recipeHeaderWindow);
     };
 
+    Scene_CabbyCodesRecipeBook.prototype.createRecipeColumnHeaderWindow = function() {
+        const rect = this.recipeColumnHeaderWindowRect();
+        this._recipeColumnHeaderWindow = new Window_CabbyCodesRecipeBookColumns(rect);
+        this.addWindow(this._recipeColumnHeaderWindow);
+    };
+
     Scene_CabbyCodesRecipeBook.prototype.createRecipeListWindow = function() {
         const rect = this.recipeListWindowRect();
         this._recipeBookWindow = new Window_CabbyCodesRecipeBook(rect);
@@ -685,6 +827,11 @@
     Scene_CabbyCodesRecipeBook.prototype.recipeHeaderWindowRect = function() {
         const layout = this.layoutInfo();
         return new Rectangle(layout.wx, layout.headerY, layout.ww, layout.headerHeight);
+    };
+
+    Scene_CabbyCodesRecipeBook.prototype.recipeColumnHeaderWindowRect = function() {
+        const layout = this.layoutInfo();
+        return new Rectangle(layout.wx, layout.columnY, layout.ww, layout.columnHeight);
     };
 
     Scene_CabbyCodesRecipeBook.prototype.recipeListWindowRect = function() {
@@ -698,18 +845,36 @@
         }
         const ww = calculateWindowWidth();
         const headerHeight = this.headerWindowHeight();
-        const gap = this.windowGap();
-        const listHeight = this.listWindowHeight(headerHeight, gap);
-        const totalHeight = headerHeight + gap + listHeight;
+        const headerGap = this.windowGap();
+        const columnGap = this.windowGap();
+        const columnHeight = this.columnHeaderWindowHeight();
+        const occupiedAboveList = headerHeight + headerGap + columnHeight + columnGap;
+        const listHeight = this.listWindowHeight(occupiedAboveList);
+        const totalHeight = occupiedAboveList + listHeight;
         const wx = Math.max(0, Math.floor((Graphics.boxWidth - ww) / 2));
         const headerY = Math.max(24, (Graphics.boxHeight - totalHeight) / 2);
-        const listY = headerY + headerHeight + gap;
-        this._recipeLayout = { ww, headerHeight, listHeight, headerY, listY, wx };
+        const columnY = headerY + headerHeight + headerGap;
+        const listY = columnY + columnHeight + columnGap;
+        this._recipeLayout = {
+            ww,
+            headerHeight,
+            columnHeight,
+            listHeight,
+            headerY,
+            columnY,
+            listY,
+            wx
+        };
         return this._recipeLayout;
     };
 
     Scene_CabbyCodesRecipeBook.prototype.windowGap = function() {
-        return 6;
+        return 0;
+    };
+
+    Scene_CabbyCodesRecipeBook.prototype.columnHeaderWindowHeight = function() {
+        const padding = columnHeaderPadding();
+        return COLUMN_HEADER_LINE_HEIGHT + padding * 2;
     };
 
     Scene_CabbyCodesRecipeBook.prototype.headerWindowHeight = function() {
@@ -720,12 +885,12 @@
         return lineHeight + CONTENT_PADDING;
     };
 
-    Scene_CabbyCodesRecipeBook.prototype.listWindowHeight = function(headerHeight, gap) {
+    Scene_CabbyCodesRecipeBook.prototype.listWindowHeight = function(occupiedHeightAboveList) {
         const padding = this.standardPadding();
         const maxRows = Math.max(6, Math.floor((Graphics.boxHeight - 200) / (ROW_HEIGHT + ROW_SPACING)));
         const listAreaHeight = maxRows * (ROW_HEIGHT + ROW_SPACING) + CONTENT_PADDING * 2;
         const desiredHeight = listAreaHeight + padding * 2;
-        const maxAvailable = Graphics.boxHeight - 48 - headerHeight - gap;
+        const maxAvailable = Graphics.boxHeight - 48 - occupiedHeightAboveList;
         return Math.max(padding * 2 + ROW_HEIGHT * 2, Math.min(desiredHeight, maxAvailable));
     };
 

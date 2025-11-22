@@ -60,11 +60,47 @@
         (bookUi?.defaults?.rowContentLeft ?? 16) - 8
     );
     const ROW_CONTENT_RIGHT = bookUi?.defaults?.rowContentRight ?? 8;
+    const COLUMN_GAP = 12;
+    const COLUMN_HEADER_RECIPE_TEXT = 'Recipe';
+    const COLUMN_HEADER_INGREDIENTS_TEXT = 'Ingredients';
+    const COLUMN_HEADER_LINE_HEIGHT = ROW_HEIGHT;
+
+    function columnHeaderPadding() {
+        return resolveWindowBasePadding();
+    }
 
     // Checkbox colors
     const CHECKBOX_CHECKED_COLOR = '#68ffd1';
     const CHECKBOX_UNCHECKED_COLOR = 'rgba(255, 255, 255, 0.3)';
     const CHECKBOX_BORDER_COLOR = '#ffffff';
+
+    function resolveWindowBaseLineHeight() {
+        if (
+            typeof Window_Base !== 'undefined' &&
+            typeof Window_Base.prototype.lineHeight === 'function'
+        ) {
+            try {
+                return Window_Base.prototype.lineHeight.call(Window_Base.prototype);
+            } catch (error) {
+                // Ignore and fall through to fallback.
+            }
+        }
+        return 36;
+    }
+
+    function resolveWindowBasePadding() {
+        if (
+            typeof Window_Base !== 'undefined' &&
+            typeof Window_Base.prototype.standardPadding === 'function'
+        ) {
+            try {
+                return Window_Base.prototype.standardPadding.call(Window_Base.prototype);
+            } catch (error) {
+                // Ignore and fall through to fallback.
+            }
+        }
+        return 12;
+    }
 
     CabbyCodes.registerSetting(settingKey, 'Cook Book', {
         defaultValue: false,
@@ -147,8 +183,6 @@
                 discovered
             };
         });
-
-        debugLogCookbookSnapshot(combinations, cookArray);
 
         const localeOptions = { sensitivity: 'base' };
         combinations.sort((a, b) => {
@@ -547,79 +581,11 @@
         return cleanCookbookText(combined, 'Unknown Dish');
     }
 
-    function debugLogCookbookSnapshot(combos, cookArray) {
-        if (!CabbyCodes || typeof CabbyCodes.log !== 'function') {
-            return;
-        }
-        const discovered = combos.filter(c => c.discovered).length;
-        const variantCount = combos.reduce((sum, combo) => sum + (combo.dishIds ? combo.dishIds.length : 0), 0);
-        const cookArrayTrue = cookArray
-            ? cookArray.reduce((sum, value) => sum + (value ? 1 : 0), 0)
-            : 'n/a';
-        const summaryKey = `${combos.length}|${discovered}|${variantCount}|${cookArrayTrue}`;
-        if (debugLogCookbookSnapshot._lastSummary === summaryKey) {
-            return;
-        }
-        debugLogCookbookSnapshot._lastSummary = summaryKey;
-        CabbyCodes.log(
-            `[CabbyCodes] Cookbook snapshot: combos=${combos.length}, variants=${variantCount}, ` +
-            `discovered=${discovered}. cookArray entries=${cookArray ? cookArray.length : 'n/a'}, true=${cookArrayTrue}`
-        );
-        if (!cookArray) {
-            CabbyCodes.warn('[CabbyCodes] Cookbook: cookArray variable 649 is not initialised; recipes will all appear undiscovered.');
-        } else {
-            logCookbookArraySummary(cookArray);
-            logCookbookMismatches(combos, cookArray);
-            logToastDiagnostics(combos, cookArray);
-        }
-    }
-
     function findCommonEventByName(name) {
         if (typeof $dataCommonEvents === 'undefined' || !Array.isArray($dataCommonEvents)) {
             return null;
         }
         return $dataCommonEvents.find(evt => evt && evt.name === name) || null;
-    }
-
-    function logToastDiagnostics(combos, cookArray) {
-        if (logToastDiagnostics._logged || !Array.isArray(combos)) {
-            return;
-        }
-        const toastCombo = combos.find(
-            combo => Array.isArray(combo.dishIds) && combo.dishIds.includes(16)
-        );
-        if (!toastCombo) {
-            return;
-        }
-        const dishStatuses = cookArray
-            ? toastCombo.dishIds
-                  .map(id => `${id}:${cookArray[id] ? '✔' : '✘'}`)
-                  .join(', ')
-            : 'cookArray unavailable';
-        CabbyCodes.warn(
-            `[CabbyCodes] Cookbook diag (toast) discovered=${toastCombo.discovered}, ` +
-                `primary=${toastCombo.primaryName}, dishes=[${dishStatuses}]`
-        );
-        logToastDiagnostics._logged = true;
-    }
-
-    function logCookbookArraySummary(cookArray) {
-        if (!Array.isArray(cookArray) || logCookbookArraySummary._logged) {
-            return;
-        }
-        const truthy = [];
-        for (let i = 0; i < cookArray.length; i++) {
-            if (cookArray[i]) {
-                truthy.push(i);
-                if (truthy.length >= 50) {
-                    break;
-                }
-            }
-        }
-        CabbyCodes.warn(
-            `[CabbyCodes] Cookbook diag (array) first 50 discovered IDs=${truthy.length ? truthy.join(', ') : 'none'}`
-        );
-        logCookbookArraySummary._logged = true;
     }
 
     function hasAutoDiscovery(comboEntry) {
@@ -628,33 +594,6 @@
         }
         // Single-ingredient (solo) recipes never require discovery marks in-game
         return !comboEntry.secondaryId;
-    }
-
-    function logCookbookMismatches(combos, cookArray) {
-        if (logCookbookMismatches._logged || !cookArray || typeof CabbyCodes.warn !== 'function') {
-            return;
-        }
-        const mismatches = combos.filter(
-            combo => combo.dishIds && combo.dishIds.some(id => !!cookArray[id]) && !combo.discovered
-        );
-        if (mismatches.length === 0) {
-            return;
-        }
-        logCookbookMismatches._logged = true;
-        const sample = mismatches.slice(0, 8);
-        CabbyCodes.warn(
-            `[CabbyCodes] Cookbook mismatch: ${mismatches.length} combos have cooked variants but still show unchecked. Showing first ${sample.length}.`
-        );
-        for (const combo of sample) {
-            const dishStatuses = combo.dishIds
-                .map(id => `${id}:${cookArray[id] ? '✔' : '✘'}`)
-                .join(', ');
-            CabbyCodes.warn(
-                `  Combo ${combo.primaryName}` +
-                (combo.secondaryId ? ` + ${combo.secondaryName}` : '') +
-                ` -> ${combo.resultName}; variants=${dishStatuses}`
-            );
-        }
     }
 
     /**
@@ -855,6 +794,24 @@
         this.contentsBack.fillRect(x, y + h - 1, w, 1, 'rgba(255, 255, 255, 0.1)');
     };
 
+    function calculateCookbookColumnLayout(availableWidth) {
+        const usableWidth = Math.max(
+            0,
+            availableWidth - ROW_CONTENT_LEFT - ROW_CONTENT_RIGHT
+        );
+        const recipeX = ROW_CONTENT_LEFT + CHECKBOX_SIZE + CHECKBOX_PADDING * 2;
+        const textWidth = Math.max(0, usableWidth - CHECKBOX_SIZE - CHECKBOX_PADDING * 2);
+        const recipeWidth = Math.max(0, Math.floor(textWidth * 0.5));
+        const ingredientsX = recipeX + recipeWidth + COLUMN_GAP;
+        const ingredientsWidth = Math.max(0, textWidth - recipeWidth - COLUMN_GAP);
+        return {
+            recipeX,
+            recipeWidth,
+            ingredientsX,
+            ingredientsWidth
+        };
+    }
+
     Window_CabbyCodesCookbook.prototype.drawItem = function(index) {
         if (!this._combinations || !Array.isArray(this._combinations)) {
             return;
@@ -871,13 +828,11 @@
         const checkboxX = x + ROW_CONTENT_LEFT;
         const rowHeight = this.itemHeight();
         const checkboxY = y + Math.floor((rowHeight - CHECKBOX_SIZE) / 2);
-        const contentWidth = width - ROW_CONTENT_LEFT - ROW_CONTENT_RIGHT;
-        const textX = checkboxX + CHECKBOX_SIZE + CHECKBOX_PADDING * 2;
-        const textWidth = Math.max(0, contentWidth - CHECKBOX_SIZE - CHECKBOX_PADDING * 2);
-        const columnGap = 12;
-        const resultWidth = Math.max(0, Math.floor(textWidth * 0.5));
-        const ingredientsX = textX + resultWidth + columnGap;
-        const ingredientsWidth = Math.max(0, textWidth - resultWidth - columnGap);
+        const layout = this.columnLayout();
+        const recipeX = x + layout.recipeX;
+        const recipeWidth = layout.recipeWidth;
+        const ingredientsX = x + layout.ingredientsX;
+        const ingredientsWidth = layout.ingredientsWidth;
         const textY = y + Math.floor((rowHeight - this.lineHeight()) / 2);
 
         this.drawCheckbox(checkboxX, checkboxY, combination.discovered);
@@ -894,15 +849,19 @@
             ? ColorManager.normalColor()
             : ColorManager.textColor(6);
 
-        if (resultWidth > 0) {
+        if (recipeWidth > 0) {
             this.changeTextColor(resultColor);
-            this.drawText(resultText, textX, textY, resultWidth, 'left');
+            this.drawText(resultText, recipeX, textY, recipeWidth, 'left');
         }
 
         if (ingredientsWidth > 0) {
             this.changeTextColor(ingredientsColor);
             this.drawText(ingredientsText, ingredientsX, textY, ingredientsWidth, 'left');
         }
+    };
+
+    Window_CabbyCodesCookbook.prototype.columnLayout = function() {
+        return calculateCookbookColumnLayout(this.contentsWidth());
     };
 
     Window_CabbyCodesCookbook.prototype.drawCheckbox = function(x, y, checked) {
@@ -984,6 +943,7 @@
     Scene_CabbyCodesCookbook.prototype.create = function() {
         Scene_MenuBase.prototype.create.call(this);
         this.createCookbookHeaderWindow();
+        this.createCookbookColumnHeaderWindow();
         this.createCookbookListWindow();
     };
 
@@ -1012,6 +972,12 @@
         this.addWindow(this._cookbookHeaderWindow);
     };
 
+    Scene_CabbyCodesCookbook.prototype.createCookbookColumnHeaderWindow = function() {
+        const rect = this.cookbookColumnHeaderWindowRect();
+        this._cookbookColumnHeaderWindow = new Window_CabbyCodesCookbookColumns(rect);
+        this.addWindow(this._cookbookColumnHeaderWindow);
+    };
+
     Scene_CabbyCodesCookbook.prototype.createCookbookListWindow = function() {
         const rect = this.cookbookListWindowRect();
         this._cookbookWindow = new Window_CabbyCodesCookbook(rect);
@@ -1022,6 +988,11 @@
     Scene_CabbyCodesCookbook.prototype.cookbookHeaderWindowRect = function() {
         const layout = this.cookbookLayoutInfo();
         return new Rectangle(layout.wx, layout.headerY, layout.ww, layout.headerHeight);
+    };
+
+    Scene_CabbyCodesCookbook.prototype.cookbookColumnHeaderWindowRect = function() {
+        const layout = this.cookbookLayoutInfo();
+        return new Rectangle(layout.wx, layout.columnY, layout.ww, layout.columnHeight);
     };
 
     Scene_CabbyCodesCookbook.prototype.cookbookListWindowRect = function() {
@@ -1035,18 +1006,36 @@
         }
         const ww = calculateWindowWidth();
         const headerHeight = this.headerWindowHeight();
-        const gap = this.windowGap();
-        const listHeight = this.listWindowHeight(headerHeight, gap);
-        const totalHeight = headerHeight + gap + listHeight;
+        const headerGap = this.windowGap();
+        const columnGap = this.windowGap();
+        const columnHeight = this.columnHeaderWindowHeight();
+        const occupiedAboveList = headerHeight + headerGap + columnHeight + columnGap;
+        const listHeight = this.listWindowHeight(occupiedAboveList);
+        const totalHeight = occupiedAboveList + listHeight;
         const wx = Math.max(0, Math.floor((Graphics.boxWidth - ww) / 2));
         const headerY = Math.max(24, (Graphics.boxHeight - totalHeight) / 2);
-        const listY = headerY + headerHeight + gap;
-        this._cookbookLayout = { ww, headerHeight, listHeight, headerY, listY, wx };
+        const columnY = headerY + headerHeight + headerGap;
+        const listY = columnY + columnHeight + columnGap;
+        this._cookbookLayout = {
+            ww,
+            headerHeight,
+            columnHeight,
+            listHeight,
+            headerY,
+            columnY,
+            listY,
+            wx
+        };
         return this._cookbookLayout;
     };
 
     Scene_CabbyCodesCookbook.prototype.windowGap = function() {
-        return 6;
+        return 0;
+    };
+
+    Scene_CabbyCodesCookbook.prototype.columnHeaderWindowHeight = function() {
+        const padding = columnHeaderPadding();
+        return COLUMN_HEADER_LINE_HEIGHT + padding * 2;
     };
 
     Scene_CabbyCodesCookbook.prototype.headerWindowHeight = function() {
@@ -1057,12 +1046,12 @@
         return lineHeight + CONTENT_PADDING;
     };
 
-    Scene_CabbyCodesCookbook.prototype.listWindowHeight = function(headerHeight, gap) {
+    Scene_CabbyCodesCookbook.prototype.listWindowHeight = function(occupiedHeightAboveList) {
         const padding = this.standardPadding();
         const maxRows = Math.max(6, Math.floor((Graphics.boxHeight - 200) / (ROW_HEIGHT + ROW_SPACING)));
         const listAreaHeight = maxRows * (ROW_HEIGHT + ROW_SPACING) + CONTENT_PADDING * 2;
         const desiredHeight = listAreaHeight + padding * 2;
-        const maxAvailable = Graphics.boxHeight - 48 - headerHeight - gap;
+        const maxAvailable = Graphics.boxHeight - 48 - occupiedHeightAboveList;
         return Math.max(padding * 2 + ROW_HEIGHT * 2, Math.min(desiredHeight, maxAvailable));
     };
 
@@ -1197,6 +1186,85 @@
     }
 
     window.Window_CabbyCodesCookbookHeader = Window_CabbyCodesCookbookHeader;
+
+    function Window_CabbyCodesCookbookColumns() {
+        this.initialize(...arguments);
+    }
+
+    window.Window_CabbyCodesCookbookColumns = Window_CabbyCodesCookbookColumns;
+
+    Window_CabbyCodesCookbookColumns.prototype = Object.create(Window_Base.prototype);
+    Window_CabbyCodesCookbookColumns.prototype.constructor = Window_CabbyCodesCookbookColumns;
+
+    Window_CabbyCodesCookbookColumns.prototype.initialize = function(rect) {
+        Window_Base.prototype.initialize.call(this, rect);
+        this.opacity = 255;
+        this.padding = this.standardPadding();
+        this.refreshBackground();
+        this.refresh();
+    };
+
+    Window_CabbyCodesCookbookColumns.prototype.standardPadding = function() {
+        return columnHeaderPadding();
+    };
+
+    Window_CabbyCodesCookbookColumns.prototype.lineHeight = function() {
+        return COLUMN_HEADER_LINE_HEIGHT;
+    };
+
+    Window_CabbyCodesCookbookColumns.prototype.refreshBackground = function() {
+        if (bookUi && typeof bookUi.applyPanelBackground === 'function') {
+            bookUi.applyPanelBackground(this);
+            return;
+        }
+        if (this.contentsBack) {
+            this.contentsBack.clear();
+            this.contentsBack.gradientFillRect(
+                0,
+                0,
+                this.contentsBack.width,
+                this.contentsBack.height,
+                'rgba(12, 20, 32, 0.98)',
+                'rgba(8, 16, 28, 0.95)',
+                true
+            );
+        }
+    };
+
+    Window_CabbyCodesCookbookColumns.prototype.refresh = function() {
+        if (!this.contents) {
+            this.createContents();
+        }
+        this.resetFontSettings();
+        this.contents.clear();
+        this.refreshBackground();
+
+        const layout = calculateCookbookColumnLayout(this.contentsWidth());
+        const baselineY = Math.max(
+            0,
+            Math.floor((this.contentsHeight() - this.lineHeight()) / 2)
+        );
+        const recipeColor = ColorManager?.systemColor?.() || '#FFFFFF';
+        const ingredientsColor = ColorManager?.normalColor?.() || '#FFFFFF';
+
+        this.changeTextColor(recipeColor);
+        this.drawText(
+            COLUMN_HEADER_RECIPE_TEXT,
+            layout.recipeX,
+            baselineY,
+            layout.recipeWidth,
+            'left'
+        );
+
+        this.changeTextColor(ingredientsColor);
+        this.drawText(
+            COLUMN_HEADER_INGREDIENTS_TEXT,
+            layout.ingredientsX,
+            baselineY,
+            layout.ingredientsWidth,
+            'left'
+        );
+    };
 
     CabbyCodes.log('[CabbyCodes] Cookbook initialized');
 
