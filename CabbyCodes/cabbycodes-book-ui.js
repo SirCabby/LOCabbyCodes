@@ -52,7 +52,26 @@
         backgroundBottomColor: 'rgba(8, 16, 28, 0.95)'
     };
 
+    const DEFAULT_INCOMPLETE_HEADER_COLOR = '#2edf87';
+
+    function resolveIncompleteHeaderColor() {
+        if (typeof ColorManager !== 'undefined') {
+            if (typeof ColorManager.powerUpColor === 'function') {
+                return ColorManager.powerUpColor();
+            }
+            if (typeof ColorManager.textColor === 'function') {
+                try {
+                    return ColorManager.textColor(3);
+                } catch (error) {
+                    // Ignore - we'll use the fallback below.
+                }
+            }
+        }
+        return DEFAULT_INCOMPLETE_HEADER_COLOR;
+    }
+
     bookUi.defaults = Object.assign({}, defaults);
+    bookUi.getIncompleteHeaderColor = resolveIncompleteHeaderColor;
 
     function resolveBitmap(target) {
         if (!target) {
@@ -456,6 +475,15 @@
             this.refreshBackground();
 
             const info = this.headerInfo();
+            const discovered = Number(info?.discovered ?? 0);
+            const total = Number(info?.total ?? 0);
+            const isIncomplete = total > 0 && discovered < total;
+            const accentColor = isIncomplete
+                ? resolveIncompleteHeaderColor()
+                : ColorManager?.systemColor?.() || '#FFFFFF';
+            const countColor = isIncomplete
+                ? accentColor
+                : ColorManager?.normalColor?.() || '#FFFFFF';
             const padding = this._bookUiOptions.contentPadding ?? defaults.contentPadding;
             const usableWidth = this.contentsWidth() - padding * 2;
             const halfWidth = Math.floor(usableWidth / 2);
@@ -465,7 +493,7 @@
             );
 
             const titleText = this._bookUiOptions.title || '';
-            this.changeTextColor(ColorManager?.systemColor?.() || '#FFFFFF');
+            this.changeTextColor(accentColor);
             this.drawText(titleText, padding, lineY, halfWidth, 'left');
 
             const formatter =
@@ -473,7 +501,7 @@
                     ? this._bookUiOptions.formatCount
                     : defaultCountFormatter;
             const countText = formatter(info);
-            this.changeTextColor(ColorManager?.normalColor?.() || '#FFFFFF');
+            this.changeTextColor(countColor);
             this.drawText(countText, padding + halfWidth, lineY, usableWidth - halfWidth, 'right');
         };
 

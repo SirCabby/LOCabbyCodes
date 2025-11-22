@@ -50,7 +50,10 @@
     const RECIPE_NAME_OFFSET = CHECKBOX_SIZE + CHECKBOX_PADDING * 2;
     const CONTENT_PADDING = bookUi?.defaults?.contentPadding ?? 12;
     const FOOTER_TEXT = '';
-    const ROW_CONTENT_LEFT = bookUi?.defaults?.rowContentLeft ?? 16;
+    const ROW_CONTENT_LEFT = Math.max(
+        0,
+        (bookUi?.defaults?.rowContentLeft ?? 16) - 8
+    );
     const ROW_CONTENT_RIGHT = bookUi?.defaults?.rowContentRight ?? 8;
     const RESET_DELAY_MS = 30;
 
@@ -537,6 +540,27 @@
             this.initialize(...arguments);
         };
 
+        const FALLBACK_HEADER_GREEN = '#2edf87';
+
+        function recipeIncompleteHeaderColor() {
+            if (bookUi && typeof bookUi.getIncompleteHeaderColor === 'function') {
+                return bookUi.getIncompleteHeaderColor();
+            }
+            if (typeof ColorManager !== 'undefined') {
+                if (typeof ColorManager.powerUpColor === 'function') {
+                    return ColorManager.powerUpColor();
+                }
+                if (typeof ColorManager.textColor === 'function') {
+                    try {
+                        return ColorManager.textColor(3);
+                    } catch (error) {
+                        // Ignore and use fallback.
+                    }
+                }
+            }
+            return FALLBACK_HEADER_GREEN;
+        }
+
         Window_CabbyCodesRecipeBookHeader.prototype = Object.create(Window_Base.prototype);
         Window_CabbyCodesRecipeBookHeader.prototype.constructor = Window_CabbyCodesRecipeBookHeader;
 
@@ -581,13 +605,22 @@
             this.contents.clear();
             this.refreshBackground();
             const info = this._listWindow ? this._listWindow.headerInfo() : { discovered: 0, total: 0 };
+            const discovered = Number(info?.discovered ?? 0);
+            const total = Number(info?.total ?? 0);
+            const isIncomplete = total > 0 && discovered < total;
+            const accentColor = isIncomplete
+                ? recipeIncompleteHeaderColor()
+                : ColorManager?.systemColor?.() || '#FFFFFF';
+            const countColor = isIncomplete
+                ? accentColor
+                : ColorManager?.normalColor?.() || '#FFFFFF';
             const usableWidth = this.contentsWidth() - CONTENT_PADDING * 2;
             const top = Math.max(0, Math.floor((this.contentsHeight() - this.lineHeight()) / 2));
 
-            this.changeTextColor(ColorManager.systemColor());
+            this.changeTextColor(accentColor);
             this.drawText(HEADER_TEXT, CONTENT_PADDING, top, usableWidth / 2, 'left');
 
-            this.changeTextColor(ColorManager.normalColor());
+            this.changeTextColor(countColor);
             const countText = `${info.discovered || 0} / ${info.total || 0}`;
             this.drawText(countText, CONTENT_PADDING + usableWidth / 2, top, usableWidth / 2, 'right');
         };
