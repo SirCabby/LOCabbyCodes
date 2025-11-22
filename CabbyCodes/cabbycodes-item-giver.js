@@ -2845,6 +2845,102 @@
     const MAX_ALL_ITEMS_SETTING_KEY = 'maxAllItems';
     const BULK_ITEM_SHORTCUT_RESET_DELAY_MS = 50;
 
+    function parseDatabaseIndex(value, { allowZero = false } = {}) {
+        if (value === null || value === undefined || value === '') {
+            return null;
+        }
+        const numeric = Number(value);
+        if (!Number.isFinite(numeric)) {
+            return null;
+        }
+        const floored = Math.floor(numeric);
+        if (!allowZero && floored <= 0) {
+            return null;
+        }
+        if (allowZero && floored < 0) {
+            return null;
+        }
+        return floored;
+    }
+
+    function getDatabaseCollectionForType(type) {
+        switch (type) {
+            case 'item':
+                return typeof $dataItems !== 'undefined' ? $dataItems : null;
+            case 'weapon':
+                return typeof $dataWeapons !== 'undefined' ? $dataWeapons : null;
+            case 'armor':
+                return typeof $dataArmors !== 'undefined' ? $dataArmors : null;
+            default:
+                return null;
+        }
+    }
+
+    function isGrantableDatabaseItem(item, type) {
+        if (!item) {
+            return false;
+        }
+        const validator = ITEM_GIVER_TYPE_VALIDATORS[type];
+        if (typeof validator !== 'function') {
+            return false;
+        }
+        return validator(item) && hasUsableName(item);
+    }
+
+    function resolveRangedWeaponGrant(entry) {
+        if (!entry || !entry.item || typeof entry.item.meta !== 'object') {
+            return null;
+        }
+        const meta = entry.item.meta;
+        if (typeof meta.emptyOb === 'undefined' || typeof meta.maxAmmo === 'undefined') {
+            return null;
+        }
+
+        const baseId = parseDatabaseIndex(meta.emptyOb);
+        const maxAmmo = parseDatabaseIndex(meta.maxAmmo);
+        if (!baseId || !maxAmmo) {
+            return null;
+        }
+
+        const dataSource = getDatabaseCollectionForType(entry.type);
+        if (!dataSource || !Array.isArray(dataSource)) {
+            return null;
+        }
+
+        const hasBigBurst = typeof meta.bigburstNeed !== 'undefined';
+        const hasBurst = typeof meta.burstNeed !== 'undefined';
+        const fullOffset = hasBigBurst ? 4 : hasBurst ? 3 : 2;
+        const fullId = baseId + fullOffset;
+        const fullItem = dataSource[fullId];
+        const grantItem = isGrantableDatabaseItem(fullItem, entry.type) ? fullItem : entry.item;
+
+        const wpnIndex = parseDatabaseIndex(meta.wpnIndex, { allowZero: true });
+        const groupKey = Number.isInteger(wpnIndex)
+            ? `ammoWeapon:${wpnIndex}`
+            : `ammoWeaponBase:${baseId}`;
+
+        return {
+            groupKey,
+            item: grantItem
+        };
+    }
+
+    function resolveGrantableCatalogItem(entry, rangedGrantTracker) {
+        const rangedGrant = resolveRangedWeaponGrant(entry);
+        if (!rangedGrant) {
+            return entry.item;
+        }
+
+        if (rangedGrant.groupKey) {
+            if (rangedGrantTracker.has(rangedGrant.groupKey)) {
+                return null;
+            }
+            rangedGrantTracker.add(rangedGrant.groupKey);
+        }
+
+        return rangedGrant.item || entry.item;
+    }
+
     function iterateGainableItemCatalog(visitor) {
         if (typeof visitor !== 'function') {
             return 0;
@@ -2854,14 +2950,20 @@
         if (!entries || entries.length === 0) {
             return 0;
         }
+
+        const rangedGrantTracker = new Set();
         let processed = 0;
         for (let i = 0; i < entries.length; i++) {
             const entry = entries[i];
             if (!isGrantableCatalogEntry(entry)) {
                 continue;
             }
+            const grantableItem = resolveGrantableCatalogItem(entry, rangedGrantTracker);
+            if (!grantableItem) {
+                continue;
+            }
             processed += 1;
-            visitor(entry.item, entry);
+            visitor(grantableItem, entry);
         }
         return processed;
     }
