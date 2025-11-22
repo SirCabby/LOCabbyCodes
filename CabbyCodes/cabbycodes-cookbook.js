@@ -975,7 +975,10 @@
         if (bookUi && bookUi.BookHeaderWindow) {
             this._cookbookHeaderWindow = new bookUi.BookHeaderWindow(rect, {
                 title: HEADER_TEXT,
-                contentPadding: CONTENT_PADDING
+                contentPadding: CONTENT_PADDING,
+                resolveTitleX() {
+                    return cookbookHeaderTitleX(this.padding);
+                }
             });
         } else {
             this._cookbookHeaderWindow = new Window_CabbyCodesCookbookHeader(rect);
@@ -1084,6 +1087,13 @@
         return Math.max(MIN_WINDOW_WIDTH, Math.min(WINDOW_WIDTH, availableWidth));
     }
 
+    function cookbookHeaderTitleX(headerPadding) {
+        const columnPadding = columnHeaderPadding();
+        const recipeColumnOffset = ROW_CONTENT_LEFT + CHECKBOX_SIZE + CHECKBOX_PADDING * 2;
+        const desired = columnPadding + recipeColumnOffset - (headerPadding || 0);
+        return Math.max(CONTENT_PADDING, desired);
+    }
+
     const CookbookHeaderBase = bookUi && bookUi.BookHeaderWindow ? bookUi.BookHeaderWindow : null;
 
     let Window_CabbyCodesCookbookHeader;
@@ -1092,7 +1102,10 @@
         Window_CabbyCodesCookbookHeader = function(rect) {
             CookbookHeaderBase.call(this, rect, {
                 title: HEADER_TEXT,
-                contentPadding: CONTENT_PADDING
+                contentPadding: CONTENT_PADDING,
+                resolveTitleX() {
+                    return cookbookHeaderTitleX(this.padding);
+                }
             });
         };
         Window_CabbyCodesCookbookHeader.prototype = Object.create(CookbookHeaderBase.prototype);
@@ -1178,13 +1191,13 @@
                 : ColorManager?.normalColor?.() || '#FFFFFF';
             const usableWidth = this.contentsWidth() - CONTENT_PADDING * 2;
             const top = Math.max(0, Math.floor((this.contentsHeight() - this.lineHeight()) / 2));
-
+            const titleX = cookbookHeaderTitleX(this.padding);
+            const titleWidth = Math.max(0, this.contentsWidth() - titleX - CONTENT_PADDING);
             this.changeTextColor(accentColor);
-            this.drawText(HEADER_TEXT, CONTENT_PADDING, top, usableWidth / 2, 'left');
-
+            this.drawText(HEADER_TEXT, titleX, top, titleWidth, 'left');
             this.changeTextColor(countColor);
             const countText = `${info.discovered || 0} / ${info.total || 0}`;
-            this.drawText(countText, CONTENT_PADDING + usableWidth / 2, top, usableWidth / 2, 'right');
+            this.drawText(countText, CONTENT_PADDING, top, usableWidth, 'right');
         };
 
         Window_CabbyCodesCookbookHeader.prototype.standardPadding = function() {

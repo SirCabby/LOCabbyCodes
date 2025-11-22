@@ -427,7 +427,8 @@
                     contentPadding: defaults.contentPadding,
                     gradientTop: defaults.backgroundTopColor,
                     gradientBottom: defaults.backgroundBottomColor,
-                    formatCount: defaultCountFormatter
+                    formatCount: defaultCountFormatter,
+                    resolveTitleX: null
                 },
                 options || {}
             );
@@ -469,6 +470,27 @@
             });
         };
 
+        function resolveTitleXFromOptions(instance, padding, usableWidth) {
+            const resolver = instance?._bookUiOptions?.resolveTitleX;
+            if (typeof resolver === 'function') {
+                try {
+                    const value = resolver.call(instance, {
+                        window: instance,
+                        padding,
+                        usableWidth,
+                        contentsWidth: instance.contentsWidth(),
+                        contentsHeight: instance.contentsHeight()
+                    });
+                    if (Number.isFinite(value)) {
+                        return Math.max(padding, value);
+                    }
+                } catch (error) {
+                    console.warn('[CabbyCodes] Book header title resolver error:', error);
+                }
+            }
+            return padding;
+        }
+
         Window_CabbyCodesBookHeader.prototype.refresh = function() {
             if (!this.contents) {
                 this.createContents();
@@ -489,7 +511,6 @@
                 : ColorManager?.normalColor?.() || '#FFFFFF';
             const padding = this._bookUiOptions.contentPadding ?? defaults.contentPadding;
             const usableWidth = this.contentsWidth() - padding * 2;
-            const halfWidth = Math.floor(usableWidth / 2);
             const lineY = Math.max(
                 0,
                 Math.floor((this.contentsHeight() - this.lineHeight()) / 2)
@@ -497,7 +518,9 @@
 
             const titleText = this._bookUiOptions.title || '';
             this.changeTextColor(accentColor);
-            this.drawText(titleText, padding, lineY, halfWidth, 'left');
+            const titleX = resolveTitleXFromOptions(this, padding, usableWidth);
+            const titleWidth = Math.max(0, this.contentsWidth() - titleX - padding);
+            this.drawText(titleText, titleX, lineY, titleWidth, 'left');
 
             const formatter =
                 typeof this._bookUiOptions.formatCount === 'function'
@@ -505,7 +528,7 @@
                     : defaultCountFormatter;
             const countText = formatter(info);
             this.changeTextColor(countColor);
-            this.drawText(countText, padding + halfWidth, lineY, usableWidth - halfWidth, 'right');
+            this.drawText(countText, padding, lineY, usableWidth, 'right');
         };
 
         Window_CabbyCodesBookHeader.prototype.standardPadding = function() {
