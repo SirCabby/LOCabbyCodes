@@ -2837,6 +2837,227 @@
         }
     };
 
+    //--------------------------------------------------------------------------
+    // Bulk Item Shortcuts
+    //--------------------------------------------------------------------------
+
+    const GIVE_ALL_ITEMS_SETTING_KEY = 'giveAllItems';
+    const MAX_ALL_ITEMS_SETTING_KEY = 'maxAllItems';
+    const BULK_ITEM_SHORTCUT_RESET_DELAY_MS = 50;
+
+    function iterateGainableItemCatalog(visitor) {
+        if (typeof visitor !== 'function') {
+            return 0;
+        }
+        const catalog = collectAllItems();
+        const entries = catalog && Array.isArray(catalog.entries) ? catalog.entries : null;
+        if (!entries || entries.length === 0) {
+            return 0;
+        }
+        let processed = 0;
+        for (let i = 0; i < entries.length; i++) {
+            const entry = entries[i];
+            if (!isGrantableCatalogEntry(entry)) {
+                continue;
+            }
+            processed += 1;
+            visitor(entry.item, entry);
+        }
+        return processed;
+    }
+
+    function isGrantableCatalogEntry(entry) {
+        if (!isValidItemEntry(entry)) {
+            return false;
+        }
+        return !isKeyItemData(entry.item);
+    }
+
+    function isKeyItemData(item) {
+        if (!item) {
+            return false;
+        }
+        const typeId = Number(item.itypeId);
+        return Number.isFinite(typeId) && typeId === 2;
+    }
+
+    function ensureGamePartyForItemShortcuts(actionName) {
+        if (typeof $gameParty === 'undefined' || !$gameParty) {
+            CabbyCodes.warn(
+                `[CabbyCodes] ${actionName}: Game data is not ready. Load a save before using this option.`
+            );
+            return null;
+        }
+        if (typeof $gameParty.gainItem !== 'function') {
+            CabbyCodes.warn(
+                `[CabbyCodes] ${actionName}: gainItem is unavailable; cannot modify inventory.`
+            );
+            return null;
+        }
+        return $gameParty;
+    }
+
+    function scheduleBulkItemShortcutReset(settingKey) {
+        if (typeof setTimeout === 'function') {
+            setTimeout(() => {
+                CabbyCodes.setSetting(settingKey, false);
+            }, BULK_ITEM_SHORTCUT_RESET_DELAY_MS);
+        } else {
+            CabbyCodes.setSetting(settingKey, false);
+        }
+    }
+
+    function playBulkItemShortcutSound(success) {
+        if (typeof SoundManager === 'undefined') {
+            return;
+        }
+        if (success && typeof SoundManager.playShop === 'function') {
+            SoundManager.playShop();
+        } else if (!success && typeof SoundManager.playBuzzer === 'function') {
+            SoundManager.playBuzzer();
+        }
+    }
+
+    function clampPositiveInteger(value, fallback = 0) {
+        const numeric = Number(value);
+        if (!Number.isFinite(numeric)) {
+            return Math.max(0, Math.floor(fallback));
+        }
+        return Math.max(0, Math.floor(numeric));
+    }
+
+    function performGiveMissingItems() {
+        const party = ensureGamePartyForItemShortcuts('Give Missing Items');
+        if (!party) {
+            return { success: false, processed: 0, granted: 0 };
+        }
+        if (typeof party.numItems !== 'function') {
+            CabbyCodes.warn(
+                '[CabbyCodes] Give Missing Items: numItems is unavailable; cannot determine owned quantities.'
+            );
+            return { success: false, processed: 0, granted: 0 };
+        }
+        let granted = 0;
+        const processed = iterateGainableItemCatalog(item => {
+            const owned = clampPositiveInteger(party.numItems(item), 0);
+            if (owned > 0) {
+                return;
+            }
+            try {
+                party.gainItem(item, 1);
+                granted += 1;
+            } catch (error) {
+                CabbyCodes.error(
+                    `[CabbyCodes] Give Missing Items: Failed to add ${item?.name || 'Unknown Item'}: ${
+                        error?.message || error
+                    }`
+                );
+            }
+        });
+        if (processed === 0) {
+            CabbyCodes.warn(
+                '[CabbyCodes] Give Missing Items: No catalog entries were processed. Make sure game data is loaded.'
+            );
+        } else if (granted === 0) {
+            CabbyCodes.log(
+                '[CabbyCodes] Give Missing Items: Inventory already contains every catalog entry.'
+            );
+        } else {
+            CabbyCodes.log(
+                `[CabbyCodes] Give Missing Items granted ${granted} previously missing entries (out of ${processed} catalog entries).`
+            );
+        }
+        playBulkItemShortcutSound(granted > 0);
+        return { success: granted > 0, processed, granted };
+    }
+
+    function performMaxAllItems() {
+        const party = ensureGamePartyForItemShortcuts('Max All Items');
+        if (!party) {
+            return { success: false, processed: 0, adjusted: 0 };
+        }
+        if (
+            typeof party.maxItems !== 'function' ||
+            typeof party.numItems !== 'function'
+        ) {
+            CabbyCodes.warn(
+                '[CabbyCodes] Max All Items: Inventory helpers are unavailable; cannot determine stack limits.'
+            );
+            return { success: false, processed: 0, adjusted: 0 };
+        }
+        let adjusted = 0;
+        const processed = iterateGainableItemCatalog(item => {
+            const maxQuantity = clampPositiveInteger(
+                party.maxItems(item),
+                99
+            );
+            const currentQuantity = clampPositiveInteger(
+                party.numItems(item),
+                0
+            );
+            const missing = maxQuantity - currentQuantity;
+            if (missing > 0) {
+                try {
+                    party.gainItem(item, missing);
+                    adjusted += 1;
+                } catch (error) {
+                    CabbyCodes.error(
+                        `[CabbyCodes] Max All Items: Failed to adjust ${item?.name || 'Unknown Item'}: ${
+                            error?.message || error
+                        }`
+                    );
+                }
+            }
+        });
+        if (processed === 0) {
+            CabbyCodes.warn(
+                '[CabbyCodes] Max All Items: No catalog entries were processed. Make sure game data is loaded.'
+            );
+        } else {
+            CabbyCodes.log(
+                `[CabbyCodes] Max All Items ensured max stacks for ${processed} entries (${adjusted} required changes).`
+            );
+        }
+        playBulkItemShortcutSound(processed > 0);
+        return { success: processed > 0, processed, adjusted };
+    }
+
+    CabbyCodes.registerSetting(GIVE_ALL_ITEMS_SETTING_KEY, 'Give Missing Items', {
+        defaultValue: false,
+        order: 105,
+        formatValue: () => 'Press',
+        onChange: newValue => {
+            if (!newValue) {
+                return;
+            }
+            const result = performGiveMissingItems();
+            if (!result.success) {
+                CabbyCodes.warn(
+                    '[CabbyCodes] Give Missing Items could not run. Load a save before pressing this option.'
+                );
+            }
+            scheduleBulkItemShortcutReset(GIVE_ALL_ITEMS_SETTING_KEY);
+        }
+    });
+
+    CabbyCodes.registerSetting(MAX_ALL_ITEMS_SETTING_KEY, 'Max All Items', {
+        defaultValue: false,
+        order: 110,
+        formatValue: () => 'Press',
+        onChange: newValue => {
+            if (!newValue) {
+                return;
+            }
+            const result = performMaxAllItems();
+            if (!result.success) {
+                CabbyCodes.warn(
+                    '[CabbyCodes] Max All Items could not determine inventory limits. Load a save before pressing this option.'
+                );
+            }
+            scheduleBulkItemShortcutReset(MAX_ALL_ITEMS_SETTING_KEY);
+        }
+    });
+
     // Register setting with formatValue to show "Press" instead of on/off
     CabbyCodes.registerSetting('itemGiver', 'Give Item', {
         defaultValue: false,
