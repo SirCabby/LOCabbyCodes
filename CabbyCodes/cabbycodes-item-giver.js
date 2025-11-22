@@ -2939,7 +2939,20 @@
 
     const GIVE_ALL_ITEMS_SETTING_KEY = 'giveAllItems';
     const MAX_ALL_ITEMS_SETTING_KEY = 'maxAllItems';
+    const MAX_ALL_ITEMS_LABEL = 'Max Items in Inventory';
     const BULK_ITEM_SHORTCUT_RESET_DELAY_MS = 50;
+    const CABBYCODES_OPTION_SYMBOL_PREFIX = 'cabbycodes_';
+    const ITEM_GIVER_SETTING_SYMBOL = `${CABBYCODES_OPTION_SYMBOL_PREFIX}itemGiver`;
+    const GIVE_ALL_ITEMS_SYMBOL = `${CABBYCODES_OPTION_SYMBOL_PREFIX}${GIVE_ALL_ITEMS_SETTING_KEY}`;
+    const MAX_ALL_ITEMS_SYMBOL = `${CABBYCODES_OPTION_SYMBOL_PREFIX}${MAX_ALL_ITEMS_SETTING_KEY}`;
+    const GIVE_ALL_ITEMS_CONFIRMATION_TEXT =
+        'WARNING:\n' +
+        'This gives one copy of every missing non-key catalog item to your party.\n' +
+        'Proceed?';
+    const MAX_ALL_ITEMS_CONFIRMATION_TEXT =
+        'WARNING:\n' +
+        'This fills every grantable item you already have in your inventory to its maximum stack size.\n' +
+        'Proceed?';
 
     function parseDatabaseIndex(value, { allowZero = false } = {}) {
         if (value === null || value === undefined || value === '') {
@@ -3184,8 +3197,9 @@
         return { success: granted > 0, processed, granted };
     }
 
-    function performMaxAllItems() {
-        const party = ensureGamePartyForItemShortcuts('Max All Items');
+    function performMaxItemsInInventory() {
+        const actionName = MAX_ALL_ITEMS_LABEL;
+        const party = ensureGamePartyForItemShortcuts(actionName);
         if (!party) {
             return { success: false, processed: 0, adjusted: 0 };
         }
@@ -3194,19 +3208,24 @@
             typeof party.numItems !== 'function'
         ) {
             CabbyCodes.warn(
-                '[CabbyCodes] Max All Items: Inventory helpers are unavailable; cannot determine stack limits.'
+                `[CabbyCodes] ${actionName}: Inventory helpers are unavailable; cannot determine stack limits.`
             );
             return { success: false, processed: 0, adjusted: 0 };
         }
         let adjusted = 0;
-        const processed = iterateGainableItemCatalog(item => {
-            const maxQuantity = clampPositiveInteger(
-                party.maxItems(item),
-                99
-            );
+        let processed = 0;
+        const catalogEntries = iterateGainableItemCatalog(item => {
             const currentQuantity = clampPositiveInteger(
                 party.numItems(item),
                 0
+            );
+            if (currentQuantity <= 0) {
+                return;
+            }
+            processed += 1;
+            const maxQuantity = clampPositiveInteger(
+                party.maxItems(item),
+                99
             );
             const missing = maxQuantity - currentQuantity;
             if (missing > 0) {
@@ -3215,24 +3234,50 @@
                     adjusted += 1;
                 } catch (error) {
                     CabbyCodes.error(
-                        `[CabbyCodes] Max All Items: Failed to adjust ${item?.name || 'Unknown Item'}: ${
+                        `[CabbyCodes] ${actionName}: Failed to adjust ${item?.name || 'Unknown Item'}: ${
                             error?.message || error
                         }`
                     );
                 }
             }
         });
-        if (processed === 0) {
+        if (catalogEntries === 0) {
             CabbyCodes.warn(
-                '[CabbyCodes] Max All Items: No catalog entries were processed. Make sure game data is loaded.'
+                `[CabbyCodes] ${actionName}: No catalog entries were processed. Make sure game data is loaded.`
+            );
+        } else if (processed === 0) {
+            CabbyCodes.log(
+                `[CabbyCodes] ${actionName}: No eligible inventory entries were found.`
             );
         } else {
             CabbyCodes.log(
-                `[CabbyCodes] Max All Items ensured max stacks for ${processed} entries (${adjusted} required changes).`
+                `[CabbyCodes] ${actionName} ensured max stacks for ${processed} inventory entries (${adjusted} required changes).`
             );
         }
         playBulkItemShortcutSound(processed > 0);
-        return { success: processed > 0, processed, adjusted };
+        return { success: catalogEntries > 0, processed, adjusted };
+    }
+
+    function triggerGiveMissingItemsShortcut() {
+        const result = performGiveMissingItems();
+        if (!result.success) {
+            CabbyCodes.warn(
+                '[CabbyCodes] Give Missing Items could not run. Load a save before pressing this option.'
+            );
+        }
+        scheduleBulkItemShortcutReset(GIVE_ALL_ITEMS_SETTING_KEY);
+        return result;
+    }
+
+    function triggerMaxItemsInInventoryShortcut() {
+        const result = performMaxItemsInInventory();
+        if (!result.success) {
+            CabbyCodes.warn(
+                `[CabbyCodes] ${MAX_ALL_ITEMS_LABEL} could not determine inventory limits. Load a save before pressing this option.`
+            );
+        }
+        scheduleBulkItemShortcutReset(MAX_ALL_ITEMS_SETTING_KEY);
+        return result;
     }
 
     CabbyCodes.registerSetting(GIVE_ALL_ITEMS_SETTING_KEY, 'Give Missing Items', {
@@ -3243,17 +3288,11 @@
             if (!newValue) {
                 return;
             }
-            const result = performGiveMissingItems();
-            if (!result.success) {
-                CabbyCodes.warn(
-                    '[CabbyCodes] Give Missing Items could not run. Load a save before pressing this option.'
-                );
-            }
-            scheduleBulkItemShortcutReset(GIVE_ALL_ITEMS_SETTING_KEY);
+            triggerGiveMissingItemsShortcut();
         }
     });
 
-    CabbyCodes.registerSetting(MAX_ALL_ITEMS_SETTING_KEY, 'Max All Items', {
+    CabbyCodes.registerSetting(MAX_ALL_ITEMS_SETTING_KEY, MAX_ALL_ITEMS_LABEL, {
         defaultValue: false,
         order: 110,
         formatValue: () => 'Press',
@@ -3261,15 +3300,28 @@
             if (!newValue) {
                 return;
             }
-            const result = performMaxAllItems();
-            if (!result.success) {
-                CabbyCodes.warn(
-                    '[CabbyCodes] Max All Items could not determine inventory limits. Load a save before pressing this option.'
-                );
-            }
-            scheduleBulkItemShortcutReset(MAX_ALL_ITEMS_SETTING_KEY);
+            triggerMaxItemsInInventoryShortcut();
         }
     });
+
+    const BULK_ITEM_SHORTCUT_CONFIGS = {
+        [GIVE_ALL_ITEMS_SYMBOL]: {
+            label: 'Give Missing Items',
+            confirmText: GIVE_ALL_ITEMS_CONFIRMATION_TEXT,
+            confirmLabel: 'Yes, give them',
+            cancelLabel: 'No, go back',
+            execute: triggerGiveMissingItemsShortcut
+        },
+        [MAX_ALL_ITEMS_SYMBOL]: {
+            label: MAX_ALL_ITEMS_LABEL,
+            confirmText: MAX_ALL_ITEMS_CONFIRMATION_TEXT,
+            confirmLabel: 'Yes, max inventory',
+            cancelLabel: 'No, go back',
+            execute: triggerMaxItemsInInventoryShortcut
+        }
+    };
+
+    let pendingBulkItemConfirmConfig = null;
 
     // Register setting with formatValue to show "Press" instead of on/off
     CabbyCodes.registerSetting('itemGiver', 'Give Item', {
@@ -3277,6 +3329,244 @@
         order: 20,
         formatValue: () => 'Press'
     });
+
+    function openBulkItemShortcutConfirmation(symbol) {
+        const config = BULK_ITEM_SHORTCUT_CONFIGS[symbol];
+        if (!config) {
+            return false;
+        }
+        if (
+            typeof SceneManager === 'undefined' ||
+            typeof SceneManager.push !== 'function'
+        ) {
+            CabbyCodes.warn(
+                `[CabbyCodes] ${config.label}: SceneManager is not available; cannot show confirmation.`
+            );
+            return false;
+        }
+        if (typeof Scene_CabbyCodesBulkItemConfirm === 'undefined') {
+            CabbyCodes.warn(
+                `[CabbyCodes] ${config.label}: Confirmation scene is unavailable.`
+            );
+            return false;
+        }
+        pendingBulkItemConfirmConfig = config;
+        SceneManager.push(Scene_CabbyCodesBulkItemConfirm);
+        if (typeof SceneManager.prepareNextScene === 'function') {
+            SceneManager.prepareNextScene(config);
+        }
+        return true;
+    }
+
+    function tryOpenItemGiverScene() {
+        if (typeof Scene_CabbyCodesItemGiver === 'undefined') {
+            CabbyCodes.error('[CabbyCodes] Item Giver: Scene_CabbyCodesItemGiver is undefined!');
+            return false;
+        }
+        if (
+            typeof SceneManager === 'undefined' ||
+            typeof SceneManager.push !== 'function'
+        ) {
+            CabbyCodes.error('[CabbyCodes] Item Giver: SceneManager.push is not available!');
+            return false;
+        }
+        SceneManager.push(Scene_CabbyCodesItemGiver);
+        return true;
+    }
+
+    function handleCabbyCodesOptionPress(symbol) {
+        if (!symbol) {
+            return false;
+        }
+        if (symbol === ITEM_GIVER_SETTING_SYMBOL) {
+            itemGiverDebugLog('[CabbyCodes] Item Giver: Opening scene');
+            return tryOpenItemGiverScene();
+        }
+        if (openBulkItemShortcutConfirmation(symbol)) {
+            itemGiverDebugLog(`[CabbyCodes] Item Giver: Opened confirmation for ${symbol}`);
+            return true;
+        }
+        return false;
+    }
+
+    //--------------------------------------------------------------------------
+    // Bulk Item Confirmation Scene
+    //--------------------------------------------------------------------------
+
+    function Scene_CabbyCodesBulkItemConfirm() {
+        this.initialize(...arguments);
+    }
+
+    window.Scene_CabbyCodesBulkItemConfirm = Scene_CabbyCodesBulkItemConfirm;
+
+    Scene_CabbyCodesBulkItemConfirm.prototype = Object.create(Scene_MenuBase.prototype);
+    Scene_CabbyCodesBulkItemConfirm.prototype.constructor = Scene_CabbyCodesBulkItemConfirm;
+
+    Scene_CabbyCodesBulkItemConfirm.prototype.prepare = function(config) {
+        this._bulkShortcutConfig = config || null;
+    };
+
+    Scene_CabbyCodesBulkItemConfirm.prototype.helpAreaHeight = function() {
+        return 0;
+    };
+
+    Scene_CabbyCodesBulkItemConfirm.prototype.create = function() {
+        Scene_MenuBase.prototype.create.call(this);
+        this.currentConfig();
+        this.createInfoWindow();
+        this.createCommandWindow();
+    };
+
+    Scene_CabbyCodesBulkItemConfirm.prototype.currentConfig = function() {
+        if (this._bulkShortcutConfig) {
+            pendingBulkItemConfirmConfig = null;
+            return this._bulkShortcutConfig;
+        }
+        if (!this._bulkShortcutConfig && pendingBulkItemConfirmConfig) {
+            this._bulkShortcutConfig = pendingBulkItemConfirmConfig;
+            pendingBulkItemConfirmConfig = null;
+        }
+        if (!this._bulkShortcutConfig) {
+            this._bulkShortcutConfig = {
+                label: 'Bulk Item Shortcut',
+                confirmText: 'Proceed?',
+                confirmLabel: 'Yes, proceed',
+                cancelLabel: 'No, go back',
+                execute: null
+            };
+        }
+        return this._bulkShortcutConfig;
+    };
+
+    Scene_CabbyCodesBulkItemConfirm.prototype.createInfoWindow = function() {
+        const rect = this.infoWindowRect();
+        const config = this.currentConfig();
+        const uiApi = CabbyCodes.ui || {};
+        const factory =
+            typeof uiApi.createInfoBox === 'function'
+                ? uiApi.createInfoBox
+                : rectParam => new Window_CabbyCodesBulkItemInfo(rectParam);
+        this._infoWindow = factory(rect, config.confirmText);
+        if (this._infoWindow && typeof this._infoWindow.setText === 'function') {
+            this._infoWindow.setText(config.confirmText);
+        }
+        this.addWindow(this._infoWindow);
+    };
+
+    Scene_CabbyCodesBulkItemConfirm.prototype.infoWindowRect = function() {
+        const ww = Math.min(Graphics.boxWidth - 96, 640);
+        const wx = (Graphics.boxWidth - ww) / 2;
+        const wy = this.buttonAreaBottom() + 12;
+        const wh = this.calcWindowHeight(4, false);
+        return new Rectangle(wx, wy, ww, wh);
+    };
+
+    Scene_CabbyCodesBulkItemConfirm.prototype.createCommandWindow = function() {
+        const rect = this.commandWindowRect();
+        const config = this.currentConfig();
+        this._commandWindow = new Window_CabbyCodesBulkItemConfirm(rect, config);
+        this._commandWindow.setHandler('confirm', this.onConfirm.bind(this));
+        this._commandWindow.setHandler('cancel', this.popScene.bind(this));
+        this.addWindow(this._commandWindow);
+    };
+
+    Scene_CabbyCodesBulkItemConfirm.prototype.commandWindowRect = function() {
+        const ww = 360;
+        const wh = this.calcWindowHeight(2, true);
+        const wx = (Graphics.boxWidth - ww) / 2;
+        const spacing = 18;
+        const baseY = this._infoWindow
+            ? this._infoWindow.y + this._infoWindow.height + spacing
+            : this.buttonAreaBottom() + spacing;
+        const maxY = Graphics.boxHeight - wh - spacing;
+        const wy = Math.min(baseY, maxY);
+        return new Rectangle(wx, wy, ww, wh);
+    };
+
+    Scene_CabbyCodesBulkItemConfirm.prototype.onConfirm = function() {
+        const config = this.currentConfig();
+        try {
+            if (typeof config.execute === 'function') {
+                config.execute();
+            }
+        } catch (error) {
+            const label = config.label || 'Bulk Item Shortcut';
+            CabbyCodes.error(
+                `[CabbyCodes] ${label}: Confirmation failed: ${error?.message || error}`
+            );
+        }
+        SceneManager.pop();
+    };
+
+    //--------------------------------------------------------------------------
+    // Confirmation Command Window
+    //--------------------------------------------------------------------------
+
+    function Window_CabbyCodesBulkItemConfirm() {
+        this.initialize(...arguments);
+    }
+
+    window.Window_CabbyCodesBulkItemConfirm = Window_CabbyCodesBulkItemConfirm;
+
+    Window_CabbyCodesBulkItemConfirm.prototype = Object.create(Window_Command.prototype);
+    Window_CabbyCodesBulkItemConfirm.prototype.constructor = Window_CabbyCodesBulkItemConfirm;
+
+    Window_CabbyCodesBulkItemConfirm.prototype.initialize = function(rect, config) {
+        this._bulkShortcutConfig = config || null;
+        Window_Command.prototype.initialize.call(this, rect);
+    };
+
+    Window_CabbyCodesBulkItemConfirm.prototype.makeCommandList = function() {
+        const confirmLabel =
+            (this._bulkShortcutConfig && this._bulkShortcutConfig.confirmLabel) ||
+            'Yes, proceed';
+        const cancelLabel =
+            (this._bulkShortcutConfig && this._bulkShortcutConfig.cancelLabel) ||
+            'No, go back';
+        this.addCommand(confirmLabel, 'confirm');
+        this.addCommand(cancelLabel, 'cancel');
+    };
+
+    //--------------------------------------------------------------------------
+    // Fallback Info Window
+    //--------------------------------------------------------------------------
+
+    function Window_CabbyCodesBulkItemInfo() {
+        this.initialize(...arguments);
+    }
+
+    window.Window_CabbyCodesBulkItemInfo = Window_CabbyCodesBulkItemInfo;
+
+    Window_CabbyCodesBulkItemInfo.prototype = Object.create(Window_Base.prototype);
+    Window_CabbyCodesBulkItemInfo.prototype.constructor = Window_CabbyCodesBulkItemInfo;
+
+    Window_CabbyCodesBulkItemInfo.prototype.initialize = function(rect) {
+        Window_Base.prototype.initialize.call(this, rect);
+        this._text = '';
+    };
+
+    Window_CabbyCodesBulkItemInfo.prototype.setText = function(text) {
+        const normalized = String(text || '');
+        if (this._text === normalized) {
+            return;
+        }
+        this._text = normalized;
+        this.refresh();
+    };
+
+    Window_CabbyCodesBulkItemInfo.prototype.refresh = function() {
+        if (!this.contents) {
+            this.createContents();
+        }
+        this.contents.clear();
+        const lines = String(this._text || '').split(/\r?\n/);
+        const maxWidth = this.contentsWidth();
+        let y = 0;
+        lines.forEach(line => {
+            this.drawText(line, 0, y, maxWidth);
+            y += this.lineHeight();
+        });
+    };
 
     // Hook into Window_Options to open scene when setting is selected
     // This needs to wrap the settings.js hook to intercept before toggle
@@ -3286,12 +3576,16 @@
                 itemGiverDebugLog('[CabbyCodes] Item Giver: Window_Options is undefined');
                 return false;
             }
+            if (Window_Options.prototype._cabbycodesItemGiverProcessOkHookInstalled) {
+                itemGiverDebugLog('[CabbyCodes] Item Giver: Hook already installed');
+                return true;
+            }
             if (!Window_Options.prototype.processOk) {
                 itemGiverDebugLog('[CabbyCodes] Item Giver: Window_Options.prototype.processOk is undefined');
                 return false;
             }
-            const _Window_Options_processOk_itemGiver = Window_Options.prototype.processOk;
-            const hookType = typeof _Window_Options_processOk_itemGiver;
+            const previousProcessOk = Window_Options.prototype.processOk;
+            const hookType = typeof previousProcessOk;
             itemGiverDebugLog('[CabbyCodes] Item Giver: Stored processOk hook, type: ' + hookType);
             if (hookType !== 'function' && hookType !== 'undefined') {
                 CabbyCodes.warn('[CabbyCodes] Item Giver: processOk is not a function, type:', hookType);
@@ -3304,40 +3598,29 @@
                     itemGiverDebugLog('[CabbyCodes] Item Giver: index = ' + String(index));
                     const symbol = this.commandSymbol(index);
                     itemGiverDebugLog('[CabbyCodes] Item Giver: symbol = ' + String(symbol || '(empty)'));
-                    if (symbol === 'cabbycodes_itemGiver') {
-                        // Always open the scene when this option is selected (don't toggle)
-                        itemGiverDebugLog('[CabbyCodes] Item Giver: Opening scene');
-                        if (typeof Scene_CabbyCodesItemGiver === 'undefined') {
-                            CabbyCodes.error('[CabbyCodes] Item Giver: Scene_CabbyCodesItemGiver is undefined!');
-                            return;
-                        }
-                        if (typeof SceneManager === 'undefined' || typeof SceneManager.push !== 'function') {
-                            CabbyCodes.error('[CabbyCodes] Item Giver: SceneManager.push is not available!');
-                            return;
-                        }
-                        SceneManager.push(Scene_CabbyCodesItemGiver);
+                    if (handleCabbyCodesOptionPress(symbol)) {
+                        itemGiverDebugLog('[CabbyCodes] Item Giver: Handled CabbyCodes press');
                         return;
                     }
-                    // Call the previous hook (which may be from settings.js)
-                    if (typeof _Window_Options_processOk_itemGiver === 'function') {
+                    if (typeof previousProcessOk === 'function') {
                         itemGiverDebugLog('[CabbyCodes] Item Giver: Calling previous hook');
-                        _Window_Options_processOk_itemGiver.call(this);
+                        previousProcessOk.call(this);
                     } else {
-                        CabbyCodes.warn('[CabbyCodes] Item Giver: Previous hook is not a function, type:', typeof _Window_Options_processOk_itemGiver);
+                        CabbyCodes.warn('[CabbyCodes] Item Giver: Previous hook is not a function, type:', typeof previousProcessOk);
                     }
                 } catch (e) {
                     CabbyCodes.error('[CabbyCodes] Item Giver: Error in processOk hook:', e?.message || e);
                     CabbyCodes.error('[CabbyCodes] Item Giver: Stack:', e?.stack);
-                    // Don't throw - let the original handler try
-                    if (typeof _Window_Options_processOk_itemGiver === 'function') {
+                    if (typeof previousProcessOk === 'function') {
                         try {
-                            _Window_Options_processOk_itemGiver.call(this);
+                            previousProcessOk.call(this);
                         } catch (e2) {
                             CabbyCodes.error('[CabbyCodes] Item Giver: Error in fallback hook:', e2?.message || e2);
                         }
                     }
                 }
             };
+            Window_Options.prototype._cabbycodesItemGiverProcessOkHookInstalled = true;
             itemGiverDebugLog('[CabbyCodes] Item Giver: Hook installed successfully');
             return true;
         } catch (e) {
@@ -3357,7 +3640,10 @@
         }, 10);
         setTimeout(() => {
             clearInterval(checkWindowOptions);
-            if (!Window_Options || !Window_Options.prototype.processOk) {
+            if (
+                !Window_Options ||
+                !Window_Options.prototype._cabbycodesItemGiverProcessOkHookInstalled
+            ) {
                 CabbyCodes.error('[CabbyCodes] Item Giver: Failed to set up hook after 5 seconds');
             }
         }, 5000);
