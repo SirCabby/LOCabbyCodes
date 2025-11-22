@@ -132,9 +132,9 @@
                 ? safeItemName(secondaryItem, entry.secondaryId)
                 : 'Solo';
             const variantNames = entry.variants.map(v => cleanCookbookText(v.dishName, 'Unknown Dish'));
-            const discovered = cookArray
-                ? dishIds.some(id => !!cookArray[id])
-                : false;
+            const discovered =
+                hasAutoDiscovery(entry) ||
+                (cookArray ? dishIds.some(id => !!cookArray[id]) : false);
             return {
                 combinationKey: `${entry.primaryId}-${entry.secondaryId || 'solo'}`,
                 primaryId: entry.primaryId,
@@ -239,14 +239,24 @@
 
         const combosByKey = new Map();
         const constraintStack = [];
+        const complexityStack = [];
 
         for (const command of event.list) {
             trimConstraintStack(constraintStack, command.indent);
+            trimComplexityStack(complexityStack, command.indent);
 
             if (command.code === 111) {
                 const condition = parseVariableEqualityCondition(command);
                 if (condition) {
                     constraintStack.push(condition);
+                }
+            } else if (command.code === 122 && isSettingComplexityValue(command)) {
+                const complexityValue = Number(command.parameters?.[4]);
+                if (Number.isFinite(complexityValue)) {
+                    complexityStack.push({
+                        indent: command.indent,
+                        value: complexityValue
+                    });
                 }
             } else if (command.code === 122 && isSettingCookedResult(command)) {
                 const dishId = command.parameters[4];
@@ -266,7 +276,8 @@
                     }
                     combo.variants.push({
                         dishId,
-                        dishName
+                        dishName,
+                        complexity: getCurrentComplexity(complexityStack)
                     });
                 }
             }
@@ -277,6 +288,12 @@
 
     function trimConstraintStack(stack, indent) {
         while (stack.length && stack[stack.length - 1].indent >= indent) {
+            stack.pop();
+        }
+    }
+
+    function trimComplexityStack(stack, indent) {
+        while (stack.length && stack[stack.length - 1].indent > indent) {
             stack.pop();
         }
     }
@@ -309,6 +326,15 @@
         );
     }
 
+    function isSettingComplexityValue(command) {
+        const params = command.parameters;
+        return (
+            Array.isArray(params) &&
+            params[0] === 647 &&
+            params[1] === 647
+        );
+    }
+
     function getConstraintValue(stack, varId) {
         for (let i = stack.length - 1; i >= 0; i--) {
             if (stack[i].varId === varId) {
@@ -316,6 +342,14 @@
             }
         }
         return null;
+    }
+
+    function getCurrentComplexity(stack) {
+        if (!stack.length) {
+            return null;
+        }
+        const entry = stack[stack.length - 1];
+        return Number.isFinite(entry?.value) ? entry.value : null;
     }
 
     function getDishMetadata() {
@@ -534,7 +568,9 @@
         if (!cookArray) {
             CabbyCodes.warn('[CabbyCodes] Cookbook: cookArray variable 649 is not initialised; recipes will all appear undiscovered.');
         } else {
+            logCookbookArraySummary(cookArray);
             logCookbookMismatches(combos, cookArray);
+            logToastDiagnostics(combos, cookArray);
         }
     }
 
@@ -543,6 +579,55 @@
             return null;
         }
         return $dataCommonEvents.find(evt => evt && evt.name === name) || null;
+    }
+
+    function logToastDiagnostics(combos, cookArray) {
+        if (logToastDiagnostics._logged || !Array.isArray(combos)) {
+            return;
+        }
+        const toastCombo = combos.find(
+            combo => Array.isArray(combo.dishIds) && combo.dishIds.includes(16)
+        );
+        if (!toastCombo) {
+            return;
+        }
+        const dishStatuses = cookArray
+            ? toastCombo.dishIds
+                  .map(id => `${id}:${cookArray[id] ? '✔' : '✘'}`)
+                  .join(', ')
+            : 'cookArray unavailable';
+        CabbyCodes.warn(
+            `[CabbyCodes] Cookbook diag (toast) discovered=${toastCombo.discovered}, ` +
+                `primary=${toastCombo.primaryName}, dishes=[${dishStatuses}]`
+        );
+        logToastDiagnostics._logged = true;
+    }
+
+    function logCookbookArraySummary(cookArray) {
+        if (!Array.isArray(cookArray) || logCookbookArraySummary._logged) {
+            return;
+        }
+        const truthy = [];
+        for (let i = 0; i < cookArray.length; i++) {
+            if (cookArray[i]) {
+                truthy.push(i);
+                if (truthy.length >= 50) {
+                    break;
+                }
+            }
+        }
+        CabbyCodes.warn(
+            `[CabbyCodes] Cookbook diag (array) first 50 discovered IDs=${truthy.length ? truthy.join(', ') : 'none'}`
+        );
+        logCookbookArraySummary._logged = true;
+    }
+
+    function hasAutoDiscovery(comboEntry) {
+        if (!comboEntry) {
+            return false;
+        }
+        // Single-ingredient (solo) recipes never require discovery marks in-game
+        return !comboEntry.secondaryId;
     }
 
     function logCookbookMismatches(combos, cookArray) {
