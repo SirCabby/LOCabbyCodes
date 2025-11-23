@@ -24,6 +24,11 @@
     const BUTTON_COLOR = '#1f2b38';
     const BUTTON_HIGHLIGHT = '#3ec793';
     const BUTTON_BORDER = '#0b1118';
+    const EDIT_MODAL_BUTTON_GAP = 24;
+    const EDIT_MODAL_BUTTON_MIN_WIDTH = 120;
+    const QUANTITY_HINT_EXTRA_HEIGHT = 18;
+    const QUANTITY_HINT_MARGIN = 4;
+    const EDIT_MODAL_EXTRA_HEIGHT = QUANTITY_HINT_EXTRA_HEIGHT + 4;
 
     const ItemEditor = {
         trackedWindows: new WeakSet(),
@@ -191,7 +196,7 @@
             confirmWindow.show();
             confirmWindow.open();
             confirmWindow.activate();
-            confirmWindow.select(0);
+        confirmWindow.select(1);
             this.closeEditor(scene);
         },
 
@@ -362,7 +367,8 @@
 
     function editWindowRect(scene) {
         const width = 420;
-        const height = scene.calcWindowHeight(4, true);
+        const baseHeight = scene.calcWindowHeight(2, true);
+        const height = baseHeight + EDIT_MODAL_EXTRA_HEIGHT;
         const x = Math.max(0, (Graphics.boxWidth - width) / 2);
         const y = Math.max(0, (Graphics.boxHeight - height) / 2 - 48);
         return new Rectangle(x, y, width, height);
@@ -370,7 +376,7 @@
 
     function confirmWindowRect(scene) {
         const width = 360;
-        const height = scene.calcWindowHeight(3, true);
+        const height = scene.calcWindowHeight(2, true);
         const x = Math.max(0, (Graphics.boxWidth - width) / 2);
         const y = Math.max(0, (Graphics.boxHeight - height) / 2 + 60);
         return new Rectangle(x, y, width, height);
@@ -454,6 +460,24 @@
         this._max = 1;
         this._quantity = 1;
         this._handlers = { onApply: null, onDelete: null, onCancel: null };
+        this._typedDigits = null;
+        this._listeningForTyping = false;
+        this._boundTypingHandler = null;
+    };
+
+    Window_CabbyCodesItemEdit.prototype.destroy = function(options) {
+        this._stopTypingListener();
+        Window_Selectable.prototype.destroy.call(this, options);
+    };
+
+    Window_CabbyCodesItemEdit.prototype.activate = function() {
+        Window_Selectable.prototype.activate.call(this);
+        this._startTypingListener();
+    };
+
+    Window_CabbyCodesItemEdit.prototype.deactivate = function() {
+        this._stopTypingListener();
+        Window_Selectable.prototype.deactivate.call(this);
     };
 
     Window_CabbyCodesItemEdit.prototype.setHandlers = function(handlers) {
@@ -465,6 +489,7 @@
         this._min = 1;
         this._max = Math.max(1, maxQuantity);
         this._quantity = clamp(currentQuantity, this._min, this._max);
+        this._typedDigits = null;
         this.refresh();
     };
 
@@ -472,8 +497,63 @@
         return 3;
     };
 
+    Window_CabbyCodesItemEdit.prototype.maxRows = function() {
+        return 2;
+    };
+
+    Window_CabbyCodesItemEdit.prototype._quantityRowHeight = function() {
+        return this.lineHeight() + QUANTITY_HINT_EXTRA_HEIGHT;
+    };
+
+    Window_CabbyCodesItemEdit.prototype.itemRect = function(index) {
+        const padding = this.itemPadding();
+        const rowSpacing = this.rowSpacing();
+        const scrollBaseX = this.scrollBaseX();
+        const scrollBaseY = this.scrollBaseY();
+        const quantityHeight = this._quantityRowHeight();
+        const buttonHeight = this.lineHeight();
+        const fullWidth = Math.max(0, this.innerWidth - padding * 2);
+        const rect = new Rectangle(0, 0, 0, 0);
+        if (index === 0) {
+            rect.height = quantityHeight;
+            rect.x = padding - scrollBaseX;
+            rect.y = padding - scrollBaseY;
+            rect.width = fullWidth;
+            return rect;
+        }
+        rect.height = buttonHeight;
+        const gap = Math.min(EDIT_MODAL_BUTTON_GAP, Math.max(0, fullWidth - 2));
+        const halfWidth = Math.max(1, Math.floor(fullWidth / 2));
+        const tentativeWidth = Math.floor((fullWidth - gap) / 2);
+        const buttonWidth = Math.max(
+            1,
+            Math.min(halfWidth, Math.max(EDIT_MODAL_BUTTON_MIN_WIDTH, tentativeWidth))
+        );
+        const spacing = Math.max(0, Math.min(gap, fullWidth - buttonWidth * 2));
+        const baseX = padding - scrollBaseX;
+        const baseY = padding + quantityHeight + rowSpacing - scrollBaseY;
+        rect.width = buttonWidth;
+        rect.y = baseY;
+        if (index === 1) {
+            rect.x = baseX;
+        } else {
+            let deleteX = baseX + buttonWidth + spacing;
+            const maxX = baseX + Math.max(0, fullWidth - buttonWidth);
+            if (deleteX > maxX) {
+                deleteX = maxX;
+            }
+            rect.x = deleteX;
+        }
+        return rect;
+    };
+
+    Window_CabbyCodesItemEdit.prototype.itemRectWithPadding = function(index) {
+        const rect = this.itemRect(index);
+        return new Rectangle(rect.x, rect.y, rect.width, rect.height);
+    };
+
     Window_CabbyCodesItemEdit.prototype.drawItem = function(index) {
-        const rect = this.itemLineRect(index);
+        const rect = index === 0 ? this.itemRect(index) : this.itemLineRect(index);
         if (index === 0) {
             this.drawQuantityRow(rect);
         } else if (index === 1) {
@@ -485,22 +565,46 @@
 
     Window_CabbyCodesItemEdit.prototype.drawQuantityRow = function(rect) {
         this.resetTextColor();
-        const nameAreaWidth = Math.max(120, rect.width - 120);
-        const quantityAreaWidth = Math.max(80, rect.width - nameAreaWidth);
-        const textWidth = Math.max(60, nameAreaWidth - ImageManager.iconWidth - 8);
+        const infoHeight = this.lineHeight();
+        const quantityAreaWidth = Math.min(
+            Math.max(160, Math.floor(rect.width * 0.45)),
+            rect.width
+        );
+        const nameAreaWidth = Math.max(0, rect.width - quantityAreaWidth);
+        const iconX = rect.x;
+        const iconY = rect.y + (infoHeight - ImageManager.iconHeight) / 2;
+        const textX = iconX + ImageManager.iconWidth + 8;
+        const textWidth = Math.max(60, nameAreaWidth - (ImageManager.iconWidth + 8));
+
         if (this._item) {
-            const iconY = rect.y + (rect.height - ImageManager.iconHeight) / 2;
-            this.drawIcon(this._item.iconIndex, rect.x, iconY);
-            this.drawText(this._item.name, rect.x + ImageManager.iconWidth + 8, rect.y, textWidth);
+            this.drawIcon(this._item.iconIndex, iconX, iconY);
+            this.drawText(this._item.name, textX, rect.y, textWidth);
         } else {
             this.drawText('Item', rect.x, rect.y, nameAreaWidth);
         }
-        const quantityText = `Qty: ${this._quantity}/${this._max} (<-/-> adjust)`;
-        this.drawText(quantityText, rect.x + nameAreaWidth, rect.y, quantityAreaWidth, 'right');
+
+        const quantityX = rect.x + nameAreaWidth;
+        const quantityText = `Qty: ${this._quantity}/${this._max}`;
+        this.drawText(quantityText, quantityX, rect.y, quantityAreaWidth, 'right');
+
+        const prevFontSize = this.contents.fontSize;
+        const hintFontSize = Math.max(14, prevFontSize - 6);
+        const hintOffset = Math.max(0, this.lineHeight() - hintFontSize);
+        const hintY = rect.y + infoHeight + QUANTITY_HINT_MARGIN - hintOffset;
+        this.contents.fontSize = hintFontSize;
+        this.changeTextColor(ColorManager.systemColor());
+        this.drawText('Type # or use <-/->', quantityX, hintY, quantityAreaWidth, 'right');
+        this.contents.fontSize = prevFontSize;
+        this.resetTextColor();
     };
 
     Window_CabbyCodesItemEdit.prototype.processOk = function() {
         const index = this.index();
+        if (index === 0) {
+            SoundManager.playCursor();
+            this.select(1);
+            return;
+        }
         if (index === 1 && typeof this._handlers.onApply === 'function') {
             this._handlers.onApply(this._item, this._quantity);
         } else if (index === 2 && typeof this._handlers.onDelete === 'function') {
@@ -530,6 +634,22 @@
         return this.isOkEnabled();
     };
 
+    Window_CabbyCodesItemEdit.prototype.cursorRight = function(wrap) {
+        if (this.index() === 1) {
+            this.smoothSelect(2);
+        } else {
+            Window_Selectable.prototype.cursorRight.call(this, wrap);
+        }
+    };
+
+    Window_CabbyCodesItemEdit.prototype.cursorLeft = function(wrap) {
+        if (this.index() === 2) {
+            this.smoothSelect(1);
+        } else {
+            Window_Selectable.prototype.cursorLeft.call(this, wrap);
+        }
+    };
+
     Window_CabbyCodesItemEdit.prototype.processHandling = function() {
         if (this.isOpenAndActive() && this.index() === 0) {
             if (Input.isRepeated('right')) {
@@ -545,11 +665,106 @@
 
     Window_CabbyCodesItemEdit.prototype.adjustQuantity = function(delta) {
         const newQuantity = clamp(this._quantity + delta, this._min, this._max);
+        this._typedDigits = null;
         if (newQuantity !== this._quantity) {
             this._quantity = newQuantity;
             SoundManager.playCursor();
-            this.refresh();
+            this.redrawItem(0);
         }
+    };
+
+    Window_CabbyCodesItemEdit.prototype._startTypingListener = function() {
+        if (this._listeningForTyping || typeof window === 'undefined') {
+            return;
+        }
+        if (!this._boundTypingHandler) {
+            this._boundTypingHandler = this._onTypingKeyDown.bind(this);
+        }
+        window.addEventListener('keydown', this._boundTypingHandler);
+        this._listeningForTyping = true;
+    };
+
+    Window_CabbyCodesItemEdit.prototype._stopTypingListener = function() {
+        if (!this._listeningForTyping || typeof window === 'undefined' || !this._boundTypingHandler) {
+            return;
+        }
+        window.removeEventListener('keydown', this._boundTypingHandler);
+        this._listeningForTyping = false;
+    };
+
+    Window_CabbyCodesItemEdit.prototype._onTypingKeyDown = function(event) {
+        if (!this.isOpenAndActive() || this.index() !== 0) {
+            return;
+        }
+        if (event.ctrlKey || event.metaKey || event.altKey) {
+            return;
+        }
+        const isDigit = /^[0-9]$/.test(event.key);
+        const isNumpadDigit = typeof event.code === 'string' && /^Numpad[0-9]$/.test(event.code);
+        if (isDigit || isNumpadDigit) {
+            event.preventDefault();
+            const digit = isDigit ? event.key : event.code.replace('Numpad', '');
+            this._handleDigitInput(digit);
+        } else if (event.key === 'Backspace') {
+            event.preventDefault();
+            this._handleBackspaceInput();
+        }
+    };
+
+    Window_CabbyCodesItemEdit.prototype._handleDigitInput = function(digit) {
+        const currentDigits = this._typedDigits ?? '';
+        if (currentDigits.length >= this._maxDigitCount()) {
+            SoundManager.playBuzzer();
+            return;
+        }
+        const combined = (currentDigits + digit).slice(0, this._maxDigitCount());
+        const normalized = combined.replace(/^0+(?=\d)/, '') || '0';
+        const numeric = Number(normalized) || 0;
+        const clamped = clamp(numeric, this._min, this._max);
+        this._typedDigits = numeric > this._max ? String(clamped) : normalized;
+        const previous = this._quantity;
+        this._quantity = clamped;
+        this.redrawItem(0);
+        if (clamped !== previous) {
+            SoundManager.playCursor();
+        } else if (numeric > this._max) {
+            SoundManager.playBuzzer();
+        }
+    };
+
+    Window_CabbyCodesItemEdit.prototype._handleBackspaceInput = function() {
+        if (this._typedDigits === null) {
+            this._typedDigits = String(this._quantity);
+        }
+        if (!this._typedDigits || this._typedDigits.length === 0) {
+            return;
+        }
+        this._typedDigits = this._typedDigits.slice(0, -1);
+        if (!this._typedDigits.length) {
+            this._typedDigits = null;
+            const previous = this._quantity;
+            this._quantity = this._min;
+            this.redrawItem(0);
+            if (previous !== this._quantity) {
+                SoundManager.playCursor();
+            }
+            return;
+        }
+        const numeric = Number(this._typedDigits) || 0;
+        const clamped = clamp(numeric, this._min, this._max);
+        if (numeric > this._max) {
+            this._typedDigits = String(clamped);
+        }
+        const previous = this._quantity;
+        this._quantity = clamped;
+        this.redrawItem(0);
+        if (previous !== this._quantity) {
+            SoundManager.playCursor();
+        }
+    };
+
+    Window_CabbyCodesItemEdit.prototype._maxDigitCount = function() {
+        return String(this._max).length;
     };
 
     //-------------------------------------------------------------------------
@@ -569,9 +784,14 @@
         Window_Selectable.prototype.initialize.call(this, rect);
         this._item = null;
         this._commands = [
-            { symbol: 'confirm', name: 'Remove Item' },
-            { symbol: 'cancel', name: 'Keep Item' }
+            { symbol: null, name: '', isHeader: true },
+            { symbol: 'confirm', name: 'Delete' },
+            { symbol: 'cancel', name: 'Keep' }
         ];
+    };
+
+    Window_CabbyCodesDeleteConfirm.prototype.maxRows = function() {
+        return 2;
     };
 
     Window_CabbyCodesDeleteConfirm.prototype.setItem = function(item) {
@@ -583,25 +803,144 @@
         return this._commands.length;
     };
 
+    Window_CabbyCodesDeleteConfirm.prototype.itemRect = function(index) {
+        const padding = this.itemPadding();
+        const lineHeight = this.lineHeight();
+        const rowSpacing = this.rowSpacing();
+        const scrollBaseX = this.scrollBaseX();
+        const scrollBaseY = this.scrollBaseY();
+        const fullWidth = Math.max(0, this.innerWidth - padding * 2);
+        const rect = new Rectangle(0, 0, 0, 0);
+        rect.height = lineHeight;
+        if (index === 0) {
+            rect.x = padding - scrollBaseX;
+            rect.y = padding - scrollBaseY;
+            rect.width = fullWidth;
+            return rect;
+        }
+        const gap = Math.min(EDIT_MODAL_BUTTON_GAP, Math.max(0, fullWidth - 2));
+        const halfWidth = Math.max(1, Math.floor(fullWidth / 2));
+        const tentativeWidth = Math.floor((fullWidth - gap) / 2);
+        const buttonWidth = Math.max(
+            1,
+            Math.min(halfWidth, Math.max(EDIT_MODAL_BUTTON_MIN_WIDTH, tentativeWidth))
+        );
+        const spacing = Math.max(0, Math.min(gap, fullWidth - buttonWidth * 2));
+        const baseX = padding - scrollBaseX;
+        const baseY = padding + lineHeight + rowSpacing - scrollBaseY;
+        rect.width = buttonWidth;
+        rect.y = baseY;
+        if (index === 1) {
+            rect.x = baseX;
+        } else {
+            let keepX = baseX + buttonWidth + spacing;
+            const maxX = baseX + Math.max(0, fullWidth - buttonWidth);
+            if (keepX > maxX) {
+                keepX = maxX;
+            }
+            rect.x = keepX;
+        }
+        return rect;
+    };
+
+    Window_CabbyCodesDeleteConfirm.prototype.itemRectWithPadding = function(index) {
+        const rect = this.itemRect(index);
+        return new Rectangle(rect.x, rect.y, rect.width, rect.height);
+    };
+
+    Window_CabbyCodesDeleteConfirm.prototype.drawItemBackground = function(index) {
+        if (index === 0) {
+            return;
+        }
+        Window_Selectable.prototype.drawItemBackground.call(this, index);
+    };
+
+    Window_CabbyCodesDeleteConfirm.prototype.refreshCursor = function() {
+        if (this._cursorAll) {
+            this.refreshCursorForAll();
+        } else if (this.index() >= 1) {
+            const rect = this.itemRect(this.index());
+            this.setCursorRect(rect.x, rect.y, rect.width, rect.height);
+        } else {
+            this.setCursorRect(0, 0, 0, 0);
+        }
+    };
+
     Window_CabbyCodesDeleteConfirm.prototype.drawItem = function(index) {
-        const rect = this.itemLineRect(index);
+        const rect = this.itemRect(index);
         const command = this._commands[index];
         if (!command) {
             return;
         }
-        const label = index === 0 && this._item
-            ? `Remove ${this._item.name}?`
-            : command.name;
-        drawCenteredButton(this, rect, label);
+        if (index === 0) {
+            const label = this._item ? `Remove ${this._item.name}?` : 'Remove this item?';
+            this.drawHeaderRow(rect, label);
+        } else {
+            drawCenteredButton(this, rect, command.name);
+        }
+    };
+
+    Window_CabbyCodesDeleteConfirm.prototype.drawHeaderRow = function(rect, label) {
+        this.resetTextColor();
+        const prevFontSize = this.contents.fontSize;
+        this.contents.fontSize = Math.max(20, prevFontSize - 2);
+        this.changeTextColor(ColorManager.systemColor());
+        this.drawText(label, rect.x + 6, rect.y, rect.width - 12, 'left');
+        this.contents.fontSize = prevFontSize;
+        this.resetTextColor();
     };
 
     Window_CabbyCodesDeleteConfirm.prototype.processOk = function() {
-        const command = this._commands[this.index()];
-        if (!command) {
+        const index = this.index();
+        if (index === 0) {
+            this.select(1);
+            return;
+        }
+        const command = this._commands[index];
+        if (!command || !command.symbol) {
             Window_Selectable.prototype.processOk.call(this);
             return;
         }
+        this.playOkSound();
+        this.updateInputData();
+        this.deactivate();
         this.callHandler(command.symbol);
+    };
+
+    Window_CabbyCodesDeleteConfirm.prototype.isCurrentItemEnabled = function() {
+        return this.index() !== 0;
+    };
+
+    Window_CabbyCodesDeleteConfirm.prototype.cursorRight = function(/*wrap*/) {
+        if (this.index() === 1) {
+            this.smoothSelect(2);
+        } else {
+            this.select(1);
+        }
+    };
+
+    Window_CabbyCodesDeleteConfirm.prototype.cursorLeft = function(wrap) {
+        if (this.index() === 2) {
+            this.smoothSelect(1);
+        } else {
+            this.select(1);
+        }
+    };
+
+    Window_CabbyCodesDeleteConfirm.prototype.cursorUp = function(/*wrap*/) {
+        if (this.index() >= 2) {
+            this.smoothSelect(1);
+        } else {
+            this.select(1);
+        }
+    };
+
+    Window_CabbyCodesDeleteConfirm.prototype.cursorDown = function(/*wrap*/) {
+        if (this.index() === 1) {
+            this.smoothSelect(2);
+        } else {
+            this.select(1);
+        }
     };
 
     Window_CabbyCodesDeleteConfirm.prototype.isOkEnabled = function() {
