@@ -19,21 +19,11 @@
         return;
     }
 
-    const settingKey = 'enableItemEditor';
     const BUTTON_WIDTH = 48;
     const BUTTON_GAP = 8;
     const BUTTON_COLOR = '#1f2b38';
     const BUTTON_HIGHLIGHT = '#3ec793';
     const BUTTON_BORDER = '#0b1118';
-
-    CabbyCodes.registerSetting(settingKey, 'Inventory Item Editor', true, () => {
-        console.warn('[CabbyCodes] Toggle the Item Editor setting requires returning to the title to fully apply.');
-    });
-
-    if (!CabbyCodes.getSetting(settingKey, true)) {
-        CabbyCodes.log('[CabbyCodes] Item editor disabled via settings.');
-        return;
-    }
 
     const ItemEditor = {
         trackedWindows: new WeakSet(),
@@ -312,11 +302,11 @@
         }
         this._cabbycodesItemEditor.editWindow = createItemEditWindow(this);
         this._cabbycodesItemEditor.confirmWindow = createDeleteConfirmWindow(this);
-    }, settingKey);
+    });
 
     CabbyCodes.after(Scene_Item.prototype, 'createItemWindow', function() {
         ItemEditor.registerItemWindow(this._itemWindow, this);
-    }, settingKey);
+    });
 
     CabbyCodes.after(Scene_Item.prototype, 'terminate', function() {
         if (this._cabbycodesItemEditor) {
@@ -327,7 +317,7 @@
             ItemEditor.unregisterItemWindow(this._itemWindow);
         }
         ItemEditor.sceneState = null;
-    }, settingKey);
+    });
 
     function createItemEditWindow(scene) {
         const rect = editWindowRect(scene);
@@ -394,7 +384,7 @@
         ensureItemEditorData(this);
         this._cabbycodesItemEditorEnabled = false;
         this._cabbycodesItemEditorScene = null;
-    }, settingKey);
+    });
 
     CabbyCodes.before(Window_ItemList.prototype, 'refresh', function() {
         if (!this._cabbycodesItemEditorEnabled) {
@@ -402,7 +392,7 @@
         }
         ensureItemEditorData(this);
         ItemEditor.resetButtonRects(this);
-    }, settingKey);
+    });
 
     CabbyCodes.override(Window_ItemList.prototype, 'drawItem', function(index) {
         if (!this._cabbycodesItemEditorEnabled) {
@@ -435,14 +425,14 @@
         this.drawItemName(item, offsetX, rect.y, nameWidth);
         this.drawItemNumber(item, offsetX, rect.y, contentWidth);
         this.changePaintOpacity(1);
-    }, settingKey);
+    });
 
     CabbyCodes.override(Window_ItemList.prototype, 'onTouchOk', function() {
         if (this._cabbycodesItemEditorEnabled && ItemEditor.tryHandleButtonTouch(this)) {
             return;
         }
         return CabbyCodes.callOriginal(Window_ItemList.prototype, 'onTouchOk', this, arguments);
-    }, settingKey);
+    });
 
     //-------------------------------------------------------------------------
     // Item edit window
