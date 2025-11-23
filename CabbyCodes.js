@@ -55,7 +55,8 @@
             'cabbycodes-freeze-hygiene.js',
             'cabbycodes-item-giver.js',
             'cabbycodes-max-cooking.js',
-            'cabbycodes-item-editor.js'
+            'cabbycodes-item-editor.js',
+            'cabbycodes-money-editor.js'
         ];
         
         scripts.forEach((scriptName) => {

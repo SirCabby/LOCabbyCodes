@@ -154,6 +154,7 @@ This is the most important step. You need to add the CabbyCodes plugin to the ga
 - **Send Next Door Visitor:** Adds a one-press option that immediately schedules the next queued (or freshly rolled) knock visitor so you can trigger door events on demand.
 - **Free Vending Machines:** Instantly bypass the coin slot mini-game so every vending machine interaction jumps right to the purchase menu with a price of zero.
 - **Free Merchants:** Forces every shop menu entry to show a cost of zero, allowing you to buy gear, consumables, and upgrades without spending any gold while the toggle is enabled.
+- **Money Editor Button:** Adds a pencil icon button to the gold display on the main menu. Click it to open the same inline editor UI used for inventory items (without the delete option) and instantly set the party's bankroll to any value up to the normal gold cap.
 - **Freeze Time of Day:** Locks the in-game time variable so wandering, minigames, or scripted sequences no longer push the clock forward while enabled.
 - **Video Games Cost No Time:** Lets you enjoy every console game in your apartment without advancing the in-game clock. The option automatically rewinds the time-of-day variable after each gaming session so the rest of the world remains in sync.
 - **Freeze Hygiene / Needs:** Locks all of the hidden personal-need meters (hygiene, hunger, vigor, morale, social, calm, plus the bad-breath counter) so they can’t tick downward, while still allowing positive actions like eating or showering to raise them.
