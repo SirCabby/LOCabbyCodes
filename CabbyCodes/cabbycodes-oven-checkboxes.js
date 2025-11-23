@@ -35,7 +35,7 @@
     const WD_PLUGIN_NAME = 'WD_ItemUse';
     const WD_SCENE_CLASS_NAME = 'Scene_WdItems';
     const DEBUG_LABEL = '[CabbyCodes][OvenCheckboxes]';
-    const ENABLE_DEBUG_LOGS = true;
+    const ENABLE_DEBUG_LOGS = false;
 
     const bookUi = CabbyCodes.bookUi || null;
     const DEFAULT_CHECKBOX_SIZE = Math.floor((bookUi?.defaults?.checkboxSize ?? 15) * (4 / 3));

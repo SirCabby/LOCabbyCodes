@@ -36,6 +36,7 @@
             'cabbycodes-cookbook.js',
             'cabbycodes-recipe-book.js',
             'cabbycodes-oven-checkboxes.js',
+            'cabbycodes-oven-navigation.js',
             'cabbycodes-refill-status.js',
             'cabbycodes-save-anywhere.js',
             'cabbycodes-delete-save.js',

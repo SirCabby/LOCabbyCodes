@@ -19,6 +19,7 @@
     
     // Track applied patches for debugging
     CabbyCodes._appliedPatches = CabbyCodes._appliedPatches || [];
+    CabbyCodes._duplicatePatchWarnings = CabbyCodes._duplicatePatchWarnings || new Set();
     
     /**
      * Log patch application for debugging
@@ -42,11 +43,17 @@
             p !== patchInfo
         );
         if (duplicates.length > 0) {
-            CabbyCodes.warn(`[CabbyCodes] WARNING: Multiple patches detected on ${targetName}.${functionName}:`);
+            const duplicateKey = `${targetName}.${functionName}`;
+            const alreadyWarned = CabbyCodes._duplicatePatchWarnings.has(duplicateKey);
+            const logFn = alreadyWarned ? CabbyCodes.log : CabbyCodes.warn;
+            logFn(`[CabbyCodes] ${alreadyWarned ? 'NOTICE' : 'WARNING'}: Multiple patches detected on ${targetName}.${functionName}:`);
             duplicates.forEach(dup => {
-                CabbyCodes.warn(`[CabbyCodes]   - ${dup.type} patch applied at ${new Date(dup.timestamp).toISOString()}`);
+                logFn(`[CabbyCodes]   - ${dup.type} patch applied at ${new Date(dup.timestamp).toISOString()}`);
             });
-            CabbyCodes.warn(`[CabbyCodes]   - ${type} patch applied now`);
+            logFn(`[CabbyCodes]   - ${type} patch applied now`);
+            if (!alreadyWarned) {
+                CabbyCodes._duplicatePatchWarnings.add(duplicateKey);
+            }
         }
     }
     
