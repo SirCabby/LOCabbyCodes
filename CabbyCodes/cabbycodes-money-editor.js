@@ -468,7 +468,8 @@
         ctx.stroke();
 
         ctx.save();
-        ctx.rotate(-Math.PI / 4);
+        // Rotate 180 degrees so the pencil icon flips direction
+        ctx.rotate((-Math.PI / 4) + Math.PI);
         const pencilWidth = Math.max(4, iconSize * 0.22);
         const pencilLength = iconSize * 1.05;
         const tipLength = pencilLength * 0.18;
