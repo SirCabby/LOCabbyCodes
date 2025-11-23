@@ -77,9 +77,36 @@
         return Math.min(Math.max(numeric, 0), MAX_STANDARD_MULTIPLIER);
     }
 
-    function grantInstantMax(actor) {
+    function grantInstantMax(actor, showOverride) {
         const targetExp = actor.expForLevel(actor.maxLevel());
-        actor.changeExp(targetExp, actor.shouldDisplayLevelUp());
+        const shouldShow = typeof showOverride === 'boolean'
+            ? showOverride
+            : actor.shouldDisplayLevelUp();
+        actor.changeExp(targetExp, shouldShow);
+    }
+
+    function getCurrentSliderValue() {
+        const rawValue = CabbyCodes.getSetting(SETTING_KEY, DEFAULT_RATE);
+        const numeric = Number(rawValue);
+        if (!Number.isFinite(numeric)) {
+            return DEFAULT_RATE;
+        }
+        return numeric;
+    }
+
+    function applyExpRateToEventGain(actor, baseGain, sliderValue, showLevelUpFlag) {
+        if (sliderValue >= INSTANT_MAX_VALUE) {
+            if (baseGain > 0 && !actor.isMaxLevel()) {
+                grantInstantMax(actor, showLevelUpFlag);
+            }
+            return;
+        }
+        const multiplier = resolveMultiplier(sliderValue);
+        const adjustedGain = Math.round(baseGain * multiplier);
+        const showFlag = typeof showLevelUpFlag === 'boolean'
+            ? showLevelUpFlag
+            : actor.shouldDisplayLevelUp();
+        actor.changeExp(actor.currentExp() + adjustedGain, showFlag);
     }
 
     function ensureExpRateDefaultValue() {
@@ -135,7 +162,7 @@
 
     CabbyCodes.override(Game_Actor.prototype, 'gainExp', function(exp) {
         try {
-            const sliderValue = CabbyCodes.getSetting(SETTING_KEY, DEFAULT_RATE);
+            const sliderValue = getCurrentSliderValue();
             const incomingGain = sanitizeExpGain(exp);
 
             if (incomingGain < 0) {
@@ -156,6 +183,25 @@
         } catch (error) {
             CabbyCodes.error(`[CabbyCodes] EXP Rate slider error: ${error?.message || error}`);
             return CabbyCodes.callOriginal(Game_Actor.prototype, 'gainExp', this, [exp]);
+        }
+    });
+
+    CabbyCodes.override(Game_Interpreter.prototype, 'command315', function(params) {
+        try {
+            const sliderValue = getCurrentSliderValue();
+            const changeAmount = sanitizeExpGain(this.operateValue(params[2], params[3], params[4]));
+            if (changeAmount <= 0 || sliderValue === DEFAULT_RATE) {
+                return CabbyCodes.callOriginal(Game_Interpreter.prototype, 'command315', this, [params]);
+            }
+
+            const showLevelUp = Boolean(params[5]);
+            this.iterateActorEx(params[0], params[1], actor => {
+                applyExpRateToEventGain(actor, changeAmount, sliderValue, showLevelUp);
+            });
+            return true;
+        } catch (error) {
+            CabbyCodes.error(`[CabbyCodes] EXP Rate slider (events) error: ${error?.message || error}`);
+            return CabbyCodes.callOriginal(Game_Interpreter.prototype, 'command315', this, [params]);
         }
     });
 
