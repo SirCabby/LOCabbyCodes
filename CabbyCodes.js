@@ -45,6 +45,7 @@
             'cabbycodes-status-immunity.js',
             'cabbycodes-always-escape.js',
             'cabbycodes-stamina.js',
+            'cabbycodes-exp-rate.js',
             'cabbycodes-infinite-consumables.js',
             'cabbycodes-unbreakable-items.js',
             'cabbycodes-friendly-door-visitors.js',

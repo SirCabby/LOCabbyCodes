@@ -60,7 +60,10 @@
             inputTitle: options.inputTitle,
             inputDescription: options.inputDescription,
             applyOnClose: options.applyOnClose,
-            order: typeof options.order === 'number' ? options.order : 100
+            order: typeof options.order === 'number' ? options.order : 100,
+            control: options.control,
+            wrap: Boolean(options.wrap),
+            onActivate: options.onActivate
         };
         
         CabbyCodes.settingsRegistry.push(definition);
@@ -95,7 +98,10 @@
                     inputTitle: '',
                     inputDescription: '',
                     applyOnClose: false,
-                    order: 100
+                    order: 100,
+                    control: null,
+                    wrap: false,
+                    onActivate: null
                 },
                 defaultOrOptions
             );
@@ -112,12 +118,33 @@
                 inputTitle: '',
                 inputDescription: '',
                 applyOnClose: false,
-                order: 100
+                order: 100,
+                control: null,
+                wrap: false,
+                onActivate: null
             };
         }
         
         if (!options.type) {
             options.type = 'boolean';
+        }
+
+        if (!options.control) {
+            if (options.type === 'slider') {
+                options.control = 'slider';
+            } else if (options.type === 'number') {
+                options.control = 'numberInput';
+            } else {
+                options.control = 'toggle';
+            }
+        }
+
+        if (typeof options.wrap !== 'boolean') {
+            options.wrap = Boolean(options.wrap);
+        }
+
+        if (typeof options.onActivate !== 'function') {
+            options.onActivate = null;
         }
         
         return options;
@@ -180,27 +207,133 @@
      * @returns {*}
      */
     CabbyCodes.normalizeSettingValue = function(definition, value) {
-        if (!definition || definition.type === 'boolean') {
+        if (!definition) {
+            return value;
+        }
+        
+        if (definition.type === 'boolean') {
             return Boolean(value);
         }
         
-        if (definition.type === 'number') {
+        if (isNumericSetting(definition)) {
             let numeric = Number(value);
             if (!Number.isFinite(numeric)) {
-                numeric = definition.defaultValue || 0;
+                numeric = Number(definition.defaultValue) || 0;
             }
             numeric = Math.round(numeric);
-            if (typeof definition.min === 'number') {
-                numeric = Math.max(definition.min, numeric);
-            }
-            if (typeof definition.max === 'number') {
-                numeric = Math.min(definition.max, numeric);
-            }
-            return numeric;
+            return clampNumericValue(definition, numeric, false);
         }
         
         return value;
     };
+
+    function isNumericSetting(definition) {
+        return (
+            definition &&
+            (definition.type === 'number' || definition.type === 'slider')
+        );
+    }
+
+    function usesSliderControl(definition) {
+        return definition && definition.control === 'slider';
+    }
+
+    function sliderStep(definition) {
+        const step = Number(definition?.step);
+        if (Number.isFinite(step) && step > 0) {
+            return step;
+        }
+        return 1;
+    }
+
+    function clampNumericValue(definition, value, wrap) {
+        const hasMin = typeof definition?.min === 'number';
+        const hasMax = typeof definition?.max === 'number';
+        const min = hasMin ? definition.min : null;
+        const max = hasMax ? definition.max : null;
+        if (wrap && hasMin && hasMax) {
+            if (value > max) {
+                return min;
+            }
+            if (value < min) {
+                return max;
+            }
+        }
+        if (hasMin) {
+            value = Math.max(min, value);
+        }
+        if (hasMax) {
+            value = Math.min(max, value);
+        }
+        return value;
+    }
+
+    function getCabbyCodesKeyFromSymbol(symbol) {
+        if (!isCabbyCodesSymbol(symbol)) {
+            return null;
+        }
+        return symbol.replace(SETTING_SYMBOL_PREFIX, '');
+    }
+
+    function getCabbyCodesSettingInfoFromSymbol(symbol) {
+        const key = getCabbyCodesKeyFromSymbol(symbol);
+        if (!key) {
+            return null;
+        }
+        const definition = CabbyCodes.getSettingDefinition(key);
+        if (!definition) {
+            return null;
+        }
+        return { key, definition };
+    }
+
+    function playCursorSound() {
+        if (typeof SoundManager !== 'undefined' && typeof SoundManager.playCursor === 'function') {
+            SoundManager.playCursor();
+        }
+    }
+
+    function playBuzzerSound() {
+        if (typeof SoundManager !== 'undefined' && typeof SoundManager.playBuzzer === 'function') {
+            SoundManager.playBuzzer();
+        }
+    }
+
+    function tryAdjustCabbyCodesSlider(windowInstance, forward) {
+        if (
+            !windowInstance ||
+            typeof windowInstance.index !== 'function' ||
+            typeof windowInstance.commandSymbol !== 'function'
+        ) {
+            return false;
+        }
+        const index = windowInstance.index();
+        if (index < 0) {
+            return false;
+        }
+        const symbol = windowInstance.commandSymbol(index);
+        const info = getCabbyCodesSettingInfoFromSymbol(symbol);
+        if (!info || !usesSliderControl(info.definition)) {
+            return false;
+        }
+        const step = sliderStep(info.definition);
+        const delta = forward ? step : -step;
+        const currentValue = CabbyCodes.getSetting(info.key, info.definition.defaultValue);
+        const wrap = Boolean(info.definition.wrap);
+        let nextValue = currentValue + delta;
+        nextValue = clampNumericValue(info.definition, nextValue, wrap);
+        nextValue = CabbyCodes.normalizeSettingValue(info.definition, nextValue);
+        if (nextValue === currentValue) {
+            playBuzzerSound();
+            return true;
+        }
+        CabbyCodes.applySettingValue(info.key, nextValue);
+        if (typeof windowInstance.redrawItem === 'function') {
+            windowInstance.redrawItem(index);
+        }
+        playCursorSound();
+        return true;
+    }
     
     /**
      * Get setting display name
@@ -281,7 +414,7 @@
             if (definition && typeof definition.formatValue === 'function') {
                 return definition.formatValue(value);
             }
-            if (definition && definition.type === 'number') {
+            if (definition && isNumericSetting(definition)) {
                 return String(value);
             }
             return this.booleanStatusText(!!value);
@@ -296,19 +429,47 @@
         if (symbol && symbol.startsWith(SETTING_SYMBOL_PREFIX)) {
             const key = symbol.replace(SETTING_SYMBOL_PREFIX, '');
             const definition = CabbyCodes.getSettingDefinition(key);
-            if (definition && definition.type === 'number') {
-                const currentValue = CabbyCodes.getSetting(key, definition.defaultValue);
-                CabbyCodes.openNumberInput(definition, currentValue, {
-                    onApply: value => {
-                        const normalized = CabbyCodes.normalizeSettingValue(definition, value);
-                        CabbyCodes.applySettingValue(key, normalized);
-                    },
-                    onCancel: () => {}
-                });
-                return;
+            if (definition) {
+                if (typeof definition.onActivate === 'function') {
+                    const handled = definition.onActivate({
+                        key,
+                        definition,
+                        window: this
+                    });
+                    if (handled !== false) {
+                        return;
+                    }
+                }
+                if (usesSliderControl(definition) || isNumericSetting(definition)) {
+                    const currentValue = CabbyCodes.getSetting(key, definition.defaultValue);
+                    CabbyCodes.openNumberInput(definition, currentValue, {
+                        onApply: value => {
+                            const normalized = CabbyCodes.normalizeSettingValue(definition, value);
+                            CabbyCodes.applySettingValue(key, normalized);
+                        },
+                        onCancel: () => {}
+                    });
+                    return;
+                }
             }
         }
         _Window_Options_processOk.call(this);
+    };
+
+    const _Window_Options_cursorRight = Window_Options.prototype.cursorRight;
+    Window_Options.prototype.cursorRight = function(...args) {
+        if (tryAdjustCabbyCodesSlider(this, true)) {
+            return;
+        }
+        _Window_Options_cursorRight.call(this, ...args);
+    };
+
+    const _Window_Options_cursorLeft = Window_Options.prototype.cursorLeft;
+    Window_Options.prototype.cursorLeft = function(...args) {
+        if (tryAdjustCabbyCodesSlider(this, false)) {
+            return;
+        }
+        _Window_Options_cursorLeft.call(this, ...args);
     };
 
     const _Window_Options_drawItemBackground = Window_Options.prototype.drawItemBackground;
