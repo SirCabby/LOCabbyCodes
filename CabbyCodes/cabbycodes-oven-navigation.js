@@ -62,6 +62,7 @@
     const PRIMARY_RETURN_MODE = JSON.parse(PRIMARY_CALL_ARGS.returnMode || '{}');
     const WD_RESULT_SWITCH_ID = Number(PRIMARY_RETURN_MODE.resultSwitch || 0) || 0;
 
+    const ENABLE_DEBUG_LOGS = false;
     const interpreterTracker = {
         restartQueued: false,
         primaryInterpreter: null,
@@ -69,7 +70,6 @@
     };
     let activeCookingInterpreter = null;
     const abortLabelCache = new Map();
-    let pendingPrimaryRestart = false;
 
     registerSetting();
     initializeLogger();
@@ -96,15 +96,18 @@
     }
 
     function debugLog(...args) {
+        if (!ENABLE_DEBUG_LOGS) {
+            return;
+        }
         try {
             const message = `${MODULE_LABEL} ${args.join(' ')}`;
-            if (typeof CabbyCodes !== 'undefined' && typeof CabbyCodes.warn === 'function') {
-                CabbyCodes.warn(message);
+            if (typeof CabbyCodes !== 'undefined' && typeof CabbyCodes.log === 'function') {
+                CabbyCodes.log(message);
             } else {
-                console.warn(message);
+                console.log(message);
             }
         } catch (error) {
-            console.warn(`${MODULE_LABEL} Failed to log message`, error);
+            console.log(`${MODULE_LABEL} Failed to log message`, error);
         }
     }
 
@@ -338,6 +341,7 @@
         };
     }
 
+
     function monitorWdScene() {
         if (typeof SceneManager === 'undefined') {
             setTimeout(monitorWdScene, 250);
@@ -482,7 +486,6 @@
         const sceneInstance = options?.sceneInstance;
         if (sceneInstance && sceneInstance.constructor?.name === WD_SCENE_CLASS_NAME) {
             handleWdBackRequest(sceneInstance, context);
-            // Fall through; WD cancel handler will finish flow.
             return;
         }
         if (isSecondary && typeof $gameVariables !== 'undefined') {
@@ -548,8 +551,7 @@
             }
         }
         interpreterTracker.restartQueued = false;
-        pendingPrimaryRestart = false;
-        schedulePrimaryRestart();
+        restartCookingControlFlow();
     }
 
     function abortCookingCommonEvent() {
@@ -740,58 +742,6 @@
         return true;
     }
 
-    function schedulePrimaryRestart() {
-        if (pendingPrimaryRestart) {
-            return;
-        }
-        pendingPrimaryRestart = true;
-        setTimeout(tryPrimaryRestart, 0);
-    }
-
-    function tryPrimaryRestart() {
-        if (!(SceneManager._scene instanceof Scene_Map)) {
-            setTimeout(tryPrimaryRestart, 10);
-            return;
-        }
-        pendingPrimaryRestart = false;
-        startPrimarySelection();
-    }
-
-    function startPrimarySelection() {
-        if (typeof PluginManager.callCommand !== 'function') {
-            queueCookingRestart();
-            return;
-        }
-        const interpreterContext = resolveInterpreterContext();
-        if (!interpreterContext) {
-            queueCookingRestart();
-            return;
-        }
-        if (typeof $gameVariables !== 'undefined') {
-            $gameVariables.setValue(69, 'recipe');
-            $gameVariables.setValue(PRIMARY_VAR_ID, 0);
-            $gameVariables.setValue(SECONDARY_VAR_ID, 0);
-        }
-        debugLog('Restarting primary ingredient selection via WD_ItemUse');
-        PluginManager.callCommand(interpreterContext, WD_PLUGIN_NAME, 'callItems', Object.assign({}, PRIMARY_CALL_ARGS));
-    }
-
-    function resolveInterpreterContext() {
-        if ($gameMap?._interpreter) {
-            return $gameMap._interpreter;
-        }
-        if (SceneManager._scene instanceof Scene_Map && SceneManager._scene._interpreter) {
-            return SceneManager._scene._interpreter;
-        }
-        if (typeof Game_Interpreter === 'function') {
-            const tempInterpreter = new Game_Interpreter();
-            tempInterpreter._mapId = $gameMap?._mapId || 0;
-            tempInterpreter._eventId = 0;
-            return tempInterpreter;
-        }
-        return null;
-    }
-
     function ensureInterpreterList(interpreter) {
         if (!interpreter) {
             return;
@@ -894,8 +844,10 @@
         if (!sceneInstance || sceneInstance.constructor?.name !== WD_SCENE_CLASS_NAME) {
             return false;
         }
-        ensureWdWindowStub(sceneInstance, '_wdItemWindow');
-        ensureWdWindowStub(sceneInstance, '_wdItemDescWindow');
+        const wdWindow = ensureWdWindowStub(sceneInstance, '_wdItemWindow');
+        const wdDesc = ensureWdWindowStub(sceneInstance, '_wdItemDescWindow');
+        wrapWindowClose(wdWindow);
+        wrapWindowClose(wdDesc);
         if (!sceneInstance._cabbycodesWdPatched) {
             patchWdUncloseableWindow(sceneInstance);
             sceneInstance._cabbycodesWdPatched = true;
@@ -966,18 +918,6 @@
         };
     }
 
-    function ensureWdWindowStub(sceneInstance, key) {
-        if (!sceneInstance) {
-            return;
-        }
-        const windowInstance = sceneInstance[key];
-        if (!windowInstance) {
-            sceneInstance[key] = { close() {} };
-        } else if (typeof windowInstance.close !== 'function') {
-            windowInstance.close = function() {};
-        }
-    }
-
     function handleWdBackRequest(sceneInstance, context) {
         if (!sceneInstance) {
             return false;
@@ -1015,15 +955,7 @@
     }
 
     function restartCookingControlFlow() {
-        if (
-            typeof $gameTemp === 'undefined' ||
-            typeof $gameTemp.reserveCommonEvent !== 'function'
-        ) {
-            debugLog('restartCookingControlFlow failed; $gameTemp unavailable');
-            return;
-        }
-        $gameTemp.reserveCommonEvent(COOKING_CONTROL_EVENT_ID);
-        debugLog('Queued cooking control event restart', `eventId=${COOKING_CONTROL_EVENT_ID}`);
+        interpreterTracker.restartQueued = false;
     }
 
     function fetchCookingCommandList(eventId) {
@@ -1064,6 +996,20 @@
             return result;
         }
         return value;
+    }
+
+    function ensureWdWindowStub(sceneInstance, key) {
+        if (!sceneInstance) {
+            return;
+        }
+        let windowInstance = sceneInstance[key];
+        if (!windowInstance) {
+            windowInstance = { close() {} };
+            sceneInstance[key] = windowInstance;
+        } else if (typeof windowInstance.close !== 'function') {
+            windowInstance.close = function() {};
+        }
+        return windowInstance;
     }
 })();
 
