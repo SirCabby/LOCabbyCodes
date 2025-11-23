@@ -14,7 +14,6 @@
  * Features:
  * - Always-on back button for the first ingredient list.
  * - Back button for the second ingredient list that also clears the first pick.
- * - Optional toggle in the CabbyCodes settings menu.
  */
 
 (() => {
@@ -41,7 +40,6 @@
         primary: 'Back',
         secondary: 'Back'
     });
-    const SETTING_KEY = 'ovenBackButtons';
     const WD_SCENE_CLASS_NAME = 'Scene_WdItems';
     const WD_PLUGIN_NAME = 'WD_ItemUse';
     const COOKING_CONTROL_EVENT_ID = 42;
@@ -71,7 +69,6 @@
     let activeCookingInterpreter = null;
     const abortLabelCache = new Map();
 
-    registerSetting();
     initializeLogger();
     hookSceneMessage();
     hookEventItemWindow();
@@ -79,17 +76,6 @@
     installInterpreterHooks();
 
     CabbyCodes.log?.('[CabbyCodes] Oven navigation helpers loaded');
-
-    function registerSetting() {
-        if (typeof CabbyCodes.registerSetting === 'function') {
-            CabbyCodes.registerSetting(SETTING_KEY, 'Oven Back Buttons', true, value => {
-                if (!value) {
-                    hideEventSceneButton();
-                    hideWdSceneButton();
-                }
-            });
-        }
-    }
 
     function initializeLogger() {
         debugLog('Oven navigation module initialized; debug logging active.');
@@ -112,10 +98,7 @@
     }
 
     function isFeatureEnabled() {
-        if (typeof CabbyCodes.getSetting !== 'function') {
-            return true;
-        }
-        return CabbyCodes.getSetting(SETTING_KEY, true) !== false;
+        return true;
     }
 
     function resolveChoiceVariableId() {
