@@ -379,6 +379,27 @@
         return false;
     }
 
+    function getOwnedItemCount(item) {
+        if (
+            !item ||
+            typeof $gameParty === 'undefined' ||
+            !$gameParty ||
+            typeof $gameParty.numItems !== 'function'
+        ) {
+            return null;
+        }
+        try {
+            return clampPositiveInteger($gameParty.numItems(item), 0);
+        } catch (error) {
+            itemGiverDebugLog(
+                `[CabbyCodes] Item Giver: Failed to read count for ${item?.name || 'Unknown Item'}: ${
+                    error?.message || error
+                }`
+            );
+            return null;
+        }
+    }
+
     /**
      * Selector background panel
      */
@@ -953,9 +974,14 @@
 
             const item = itemData.item;
             const typeText = itemData.type.charAt(0).toUpperCase() + itemData.type.slice(1);
+            const ownedCount = getOwnedItemCount(item);
+            const countText = typeof ownedCount === 'number' ? `x${ownedCount}` : '';
             const typeWidth = this.textWidth(typeText);
+            const countWidth = countText ? this.textWidth(countText) : 0;
+            const countSpacing = countText ? 12 : 0;
             const padding = 12; // Space between name and type
-            const nameWidth = rect.width - typeWidth - padding;
+            const rightReservedWidth = typeWidth + countSpacing + countWidth;
+            const nameWidth = Math.max(0, rect.width - rightReservedWidth - padding);
             
             this.changePaintOpacity(true);
             // Draw item name (icon + text) - drawItemName handles both
@@ -964,11 +990,16 @@
             } else {
                 CabbyCodes.warn('[CabbyCodes] Item Giver: drawItemName is not a function');
             }
-            
-            // Draw type indicator on the far right with padding
+            // Draw type indicator aligned near the right edge
+            const typeX = rect.x + nameWidth + padding;
             this.changeTextColor(this.systemColor());
-            this.drawText(typeText, rect.x, rect.y, rect.width, 'right');
+            this.drawText(typeText, typeX, rect.y, typeWidth, 'left');
             this.resetTextColor();
+
+            if (countText) {
+                const countX = rect.x + rect.width - countWidth;
+                this.drawText(countText, countX, rect.y, countWidth, 'right');
+            }
         } catch (e) {
             CabbyCodes.error('[CabbyCodes] Item Giver: Error drawing item at index ' + index + ': ' + (e?.message || e));
             CabbyCodes.error('[CabbyCodes] Item Giver: Stack: ' + (e?.stack || 'No stack trace'));
