@@ -19,7 +19,9 @@
         return;
     }
 
-    const BUTTON_WIDTH = 48;
+    const BUTTON_TARGET_SIZE = 40;
+    const BUTTON_MIN_SIZE = 30;
+    const BUTTON_MAX_SIZE = 46;
     const BUTTON_GAP = 8;
     const BUTTON_COLOR = '#1f2b38';
     const BUTTON_HIGHLIGHT = '#3ec793';
@@ -287,14 +289,128 @@
         if (!contents || !rect) {
             return;
         }
-        const prevOpacity = contents.paintOpacity;
-        contents.paintOpacity = enabled ? 255 : 160;
+        const previousOpacity = contents.paintOpacity;
+        contents.paintOpacity = enabled ? 255 : 200;
         contents.fillRect(rect.x, rect.y, rect.width, rect.height, BUTTON_BORDER);
         contents.fillRect(rect.x + 1, rect.y + 1, rect.width - 2, rect.height - 2, BUTTON_COLOR);
-        contents.paintOpacity = prevOpacity;
-        windowInstance.changeTextColor(enabled ? BUTTON_HIGHLIGHT : '#9aa5b5');
-        windowInstance.drawText('Edit', rect.x, rect.y, rect.width, 'center');
-        windowInstance.resetTextColor();
+        contents.paintOpacity = previousOpacity;
+        drawEditIcon(windowInstance, rect, enabled);
+    }
+
+    function drawEditIcon(windowInstance, rect, enabled) {
+        const contents = windowInstance.contents;
+        const ctx = contents?.context;
+        if (!ctx) {
+            return;
+        }
+
+        const centerX = rect.x + rect.width / 2;
+        const centerY = rect.y + rect.height / 2;
+        const iconSize = Math.min(rect.width, rect.height) - 6;
+        if (iconSize <= 0) {
+            return;
+        }
+
+        const colors = enabled
+            ? {
+                  sheetFill: '#101926',
+                  sheetBorder: '#2b3a4c',
+                  sheetShadow: 'rgba(0, 0, 0, 0.3)',
+                  pencilLight: '#ffd166',
+                  pencilDark: '#f4a259',
+                  ferrule: '#cdd6f4',
+                  eraser: '#fca5a5',
+                  wood: '#ffe8b5',
+                  lead: '#0f172a'
+              }
+            : {
+                  sheetFill: '#161e2a',
+                  sheetBorder: '#2a3342',
+                  sheetShadow: 'rgba(0, 0, 0, 0.2)',
+                  pencilLight: '#d9dce5',
+                  pencilDark: '#9aa6b8',
+                  ferrule: '#bfc5d6',
+                  eraser: '#c9ced6',
+                  wood: '#d7dae2',
+                  lead: '#4b5563'
+              };
+
+        ctx.save();
+        ctx.translate(centerX, centerY);
+        ctx.globalAlpha = enabled ? 1 : 0.8;
+
+        const sheetSize = iconSize * 0.78;
+        const sheetRadius = Math.max(3, sheetSize * 0.2);
+        ctx.fillStyle = colors.sheetShadow;
+        ctx.beginPath();
+        drawRoundedRectPath(ctx, -(sheetSize / 2) + 2, -(sheetSize / 2) + 2, sheetSize, sheetSize, sheetRadius);
+        ctx.fill();
+
+        ctx.fillStyle = colors.sheetFill;
+        ctx.strokeStyle = colors.sheetBorder;
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        drawRoundedRectPath(ctx, -sheetSize / 2, -sheetSize / 2, sheetSize, sheetSize, sheetRadius);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.save();
+        ctx.rotate(-Math.PI / 4);
+        const pencilWidth = Math.max(4, iconSize * 0.22);
+        const pencilLength = iconSize * 1.05;
+        const tipLength = pencilLength * 0.18;
+        const ferruleLength = Math.max(4, pencilLength * 0.1);
+        const eraserLength = Math.max(4, pencilLength * 0.12);
+        const shaftLength = Math.max(6, pencilLength - (tipLength + ferruleLength + eraserLength));
+        const startX = -pencilLength / 2;
+
+        ctx.fillStyle = colors.eraser;
+        ctx.fillRect(startX, -pencilWidth / 2, eraserLength, pencilWidth);
+
+        ctx.fillStyle = colors.ferrule;
+        ctx.fillRect(startX + eraserLength, -pencilWidth / 2, ferruleLength, pencilWidth);
+
+        const shaftX = startX + eraserLength + ferruleLength;
+        ctx.fillStyle = colors.pencilDark;
+        ctx.fillRect(shaftX, -pencilWidth / 2, shaftLength, pencilWidth);
+
+        ctx.fillStyle = colors.pencilLight;
+        ctx.fillRect(shaftX, -pencilWidth * 0.2, shaftLength, pencilWidth * 0.4);
+
+        const tipStart = shaftX + shaftLength;
+        ctx.fillStyle = colors.wood;
+        ctx.beginPath();
+        ctx.moveTo(tipStart, -pencilWidth / 2);
+        ctx.lineTo(tipStart + tipLength, 0);
+        ctx.lineTo(tipStart, pencilWidth / 2);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.fillStyle = colors.lead;
+        ctx.beginPath();
+        ctx.moveTo(tipStart + tipLength * 0.55, -pencilWidth / 2);
+        ctx.lineTo(tipStart + tipLength, 0);
+        ctx.lineTo(tipStart + tipLength * 0.55, pencilWidth / 2);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.restore();
+        ctx.restore();
+        contents._baseTexture?.update();
+    }
+
+    function drawRoundedRectPath(ctx, x, y, width, height, radius) {
+        const r = Math.max(0, Math.min(radius, width / 2, height / 2));
+        ctx.moveTo(x + r, y);
+        ctx.lineTo(x + width - r, y);
+        ctx.quadraticCurveTo(x + width, y, x + width, y + r);
+        ctx.lineTo(x + width, y + height - r);
+        ctx.quadraticCurveTo(x + width, y + height, x + width - r, y + height);
+        ctx.lineTo(x + r, y + height);
+        ctx.quadraticCurveTo(x, y + height, x, y + height - r);
+        ctx.lineTo(x, y + r);
+        ctx.quadraticCurveTo(x, y, x + r, y);
+        ctx.closePath();
     }
 
     //-------------------------------------------------------------------------
@@ -411,26 +527,29 @@
         }
 
         const rect = this.itemLineRect(index);
-        const buttonWidth = Math.min(BUTTON_WIDTH, Math.max(32, rect.width / 5));
-        const buttonHeight = Math.min(rect.height - 6, this.lineHeight() - 4);
+        const buttonSpace = Math.max(28, Math.floor(rect.width * 0.25));
+        const buttonHeight = Math.max(28, Math.min(rect.height - 4, this.lineHeight() - 4));
+        const maxAvailable = Math.max(BUTTON_MIN_SIZE, Math.min(BUTTON_MAX_SIZE, buttonSpace, buttonHeight));
+        const buttonSize = clamp(BUTTON_TARGET_SIZE, BUTTON_MIN_SIZE, maxAvailable);
         const buttonRect = new Rectangle(
             rect.x,
-            rect.y + Math.floor((rect.height - buttonHeight) / 2),
-            buttonWidth,
-            buttonHeight
+            rect.y + Math.floor((rect.height - buttonSize) / 2),
+            buttonSize,
+            buttonSize
         );
         ItemEditor.storeButtonRect(this, index, buttonRect);
 
         const numberWidth = this.numberWidth();
-        const offsetX = rect.x + buttonWidth + BUTTON_GAP;
-        const contentWidth = Math.max(0, rect.width - buttonWidth - BUTTON_GAP);
+        const offsetX = rect.x + buttonRect.width + BUTTON_GAP;
+        const contentWidth = Math.max(0, rect.width - buttonRect.width - BUTTON_GAP);
         const nameWidth = Math.max(0, contentWidth - numberWidth);
 
+        this.changePaintOpacity(true);
+        drawEditButton(this, buttonRect, true);
         this.changePaintOpacity(this.isEnabled(item));
-        drawEditButton(this, buttonRect, this.isEnabled(item));
         this.drawItemName(item, offsetX, rect.y, nameWidth);
         this.drawItemNumber(item, offsetX, rect.y, contentWidth);
-        this.changePaintOpacity(1);
+        this.changePaintOpacity(true);
     });
 
     CabbyCodes.override(Window_ItemList.prototype, 'onTouchOk', function() {
