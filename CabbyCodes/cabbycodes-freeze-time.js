@@ -1399,6 +1399,17 @@
         }
     );
 
+    function shouldSuppressImmediateMinuteRestore(interpreter) {
+        if (!interpreter) {
+            return false;
+        }
+        if (!isDoorZeroTimeActive()) {
+            return false;
+        }
+        const commonEventId = Number(interpreter._cabbycodesCommonEventId);
+        return Number.isFinite(commonEventId) && commonEventId === timePassesCommonEventId;
+    }
+
     CabbyCodes.override(
         Game_Interpreter.prototype,
         'command122',
@@ -1422,10 +1433,18 @@
                     minutesBefore = $gameVariables.value(19);
                 }
             }
+            const suppressMinuteRestore =
+                minutesBefore !== null && shouldSuppressImmediateMinuteRestore(this);
+
             const result = callOriginal(Game_Interpreter.prototype, 'command122', this, [
                 parameters
             ]);
-            if (minutesBefore !== null && typeof $gameVariables !== 'undefined' && $gameVariables) {
+            if (
+                minutesBefore !== null &&
+                !suppressMinuteRestore &&
+                typeof $gameVariables !== 'undefined' &&
+                $gameVariables
+            ) {
                 $gameVariables.setValue(19, minutesBefore);
                 freezeDebugLog(
                     `Restored variable 19 to ${minutesBefore} after zero-time command122 (interpreter ${describeInterpreter(
