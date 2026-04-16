@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node scripts/refresh-game-files.js --check)",
+      "Bash(echo \"exit=$?\")",
+      "Bash(node scripts/refresh-game-files.js)",
+      "Bash(node -e ' *)"
+    ]
+  }
+}
