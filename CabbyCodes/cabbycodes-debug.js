@@ -19,8 +19,22 @@
     // Call stack tracking for recursion detection
     const callStacks = new Map();
     const callCounts = new Map();
+    const recursionWarningsIssued = new Set();
     const MAX_STACK_DEPTH = 50;
     const RECURSION_THRESHOLD = 10;
+    const recursionOverrides = new Map([
+        // Game_Interpreter.update legitimately re-enters while events queue nested interpreters.
+        // Only warn when the depth becomes extreme, and log as a warning instead of an error.
+        [
+            'Game_Interpreter.update',
+            {
+                threshold: 250,
+                level: 'warn',
+                includeStack: false,
+                note: 'Large interpreter stacks are common when multiple parallel/child events are active.'
+            }
+        ]
+    ]);
 
     /**
      * Get a unique identifier for a function call
@@ -33,6 +47,22 @@
     /**
      * Track a function call entry
      */
+    function getRecursionOverride(callId) {
+        return recursionOverrides.get(callId) || null;
+    }
+
+    function getRecursionThreshold(callId) {
+        return getRecursionOverride(callId)?.threshold ?? RECURSION_THRESHOLD;
+    }
+
+    function getRecursionLogger(override) {
+        const level = override?.level || 'error';
+        if (typeof CabbyCodes[level] === 'function') {
+            return CabbyCodes[level];
+        }
+        return CabbyCodes.error;
+    }
+
     function trackCallEntry(callId) {
         const stack = callStacks.get(callId) || [];
         stack.push(new Error().stack);
@@ -48,16 +78,30 @@
         callCounts.set(callId, count + 1);
         
         // Check for recursion
-        if (stack.length >= RECURSION_THRESHOLD) {
-            CabbyCodes.error(`[CabbyCodes] Potential recursion detected: ${callId} called ${stack.length} times`);
-            CabbyCodes.error(`[CabbyCodes] Call stack for ${callId}:`);
-            stack.slice(-5).forEach((trace, idx) => {
-                CabbyCodes.error(`[CabbyCodes]   Call ${stack.length - 5 + idx + 1}:`);
-                const lines = trace.split('\n').slice(0, 5);
-                lines.forEach(line => {
-                    CabbyCodes.error(`[CabbyCodes]     ${line.trim()}`);
+        const override = getRecursionOverride(callId);
+        const threshold = override?.threshold ?? RECURSION_THRESHOLD;
+        const shouldWarn =
+            stack.length >= threshold && !recursionWarningsIssued.has(callId);
+        if (shouldWarn) {
+            recursionWarningsIssued.add(callId);
+            const log = getRecursionLogger(override);
+            log(`[CabbyCodes] Potential recursion detected: ${callId} called ${stack.length} times`);
+            if (override?.note) {
+                log(`[CabbyCodes]   Note: ${override.note}`);
+            }
+            if (override?.includeStack !== false) {
+                log(`[CabbyCodes] Call stack for ${callId}:`);
+                const detailCount = Number.isFinite(override?.stackEntries)
+                    ? override.stackEntries
+                    : 5;
+                stack.slice(-detailCount).forEach((trace, idx) => {
+                    log(`[CabbyCodes]   Call ${stack.length - detailCount + idx + 1}:`);
+                    const lines = trace.split('\n').slice(0, 5);
+                    lines.forEach(line => {
+                        log(`[CabbyCodes]     ${line.trim()}`);
+                    });
                 });
-            });
+            }
         }
         
         return stack.length;
@@ -70,7 +114,81 @@
         const stack = callStacks.get(callId);
         if (stack && stack.length > 0) {
             stack.pop();
+            if (stack.length === 0) {
+                recursionWarningsIssued.delete(callId);
+            }
             callStacks.set(callId, stack);
+        }
+    }
+
+    const STACK_OVERFLOW_RESET_DELAY_MS = 0;
+    let stackOverflowLogging = false;
+
+    function isStackOverflowError(error) {
+        return (
+            error instanceof RangeError &&
+            typeof error.message === 'string' &&
+            error.message.includes('Maximum call stack')
+        );
+    }
+
+    function logStackOverflowError(callId, depth, error, functionName) {
+        if (stackOverflowLogging) {
+            return;
+        }
+        stackOverflowLogging = true;
+        try {
+            CabbyCodes.error(`[CabbyCodes] ========================================`);
+            CabbyCodes.error(`[CabbyCodes] STACK OVERFLOW DETECTED`);
+            CabbyCodes.error(`[CabbyCodes] ========================================`);
+            CabbyCodes.error(`[CabbyCodes] Function: ${callId}`);
+            CabbyCodes.error(`[CabbyCodes] Call depth when error occurred: ${depth}`);
+            CabbyCodes.error(`[CabbyCodes] Total calls to this function: ${callCounts.get(callId) || 0}`);
+            CabbyCodes.error(`[CabbyCodes] Error message: ${error.message}`);
+            CabbyCodes.error(`[CabbyCodes] Full stack trace:`);
+            const stackLines = error.stack?.split('\n') || [];
+            stackLines.forEach(line => {
+                CabbyCodes.error(`[CabbyCodes]   ${line.trim()}`);
+            });
+            
+            const recentCalls = callStacks.get(callId) || [];
+            if (recentCalls.length > 0) {
+                CabbyCodes.error(`[CabbyCodes] Recent call history for ${callId} (showing last 3):`);
+                recentCalls.slice(-3).forEach((trace, idx) => {
+                    CabbyCodes.error(`[CabbyCodes]   --- Call ${recentCalls.length - 3 + idx + 1} ---`);
+                    const lines = trace.split('\n').slice(0, 10);
+                    lines.forEach(line => {
+                        CabbyCodes.error(`[CabbyCodes]     ${line.trim()}`);
+                    });
+                });
+            }
+            
+            CabbyCodes.error(`[CabbyCodes] Top 10 most called functions:`);
+            const stats = CabbyCodes.getCallStats();
+            stats.slice(0, 10).forEach(stat => {
+                CabbyCodes.error(`[CabbyCodes]   ${stat.callId}: ${stat.totalCalls} calls, current depth: ${stat.currentDepth}`);
+            });
+            
+            if (typeof CabbyCodes.getAppliedPatches === 'function') {
+                const patches = CabbyCodes.getAppliedPatches();
+                const relatedPatches = patches.filter(p => 
+                    p.function === functionName || 
+                    callId.includes(p.target) ||
+                    callId.includes(p.function)
+                );
+                if (relatedPatches.length > 0) {
+                    CabbyCodes.error(`[CabbyCodes] Related patches applied:`);
+                    relatedPatches.forEach(patch => {
+                        CabbyCodes.error(`[CabbyCodes]   - ${patch.type} on ${patch.target}.${patch.function}${patch.setting ? ` (${patch.setting})` : ''}`);
+                    });
+                }
+            }
+            
+            CabbyCodes.error(`[CabbyCodes] ========================================`);
+        } finally {
+            setTimeout(() => {
+                stackOverflowLogging = false;
+            }, STACK_OVERFLOW_RESET_DELAY_MS);
         }
     }
 
@@ -95,58 +213,8 @@
             } catch (error) {
                 trackCallExit(callId);
                 
-                // Log detailed error information
-                if (error instanceof RangeError && error.message && error.message.includes('Maximum call stack')) {
-                    CabbyCodes.error(`[CabbyCodes] ========================================`);
-                    CabbyCodes.error(`[CabbyCodes] STACK OVERFLOW DETECTED`);
-                    CabbyCodes.error(`[CabbyCodes] ========================================`);
-                    CabbyCodes.error(`[CabbyCodes] Function: ${callId}`);
-                    CabbyCodes.error(`[CabbyCodes] Call depth when error occurred: ${depth}`);
-                    CabbyCodes.error(`[CabbyCodes] Total calls to this function: ${callCounts.get(callId) || 0}`);
-                    CabbyCodes.error(`[CabbyCodes] Error message: ${error.message}`);
-                    CabbyCodes.error(`[CabbyCodes] Full stack trace:`);
-                    const stackLines = error.stack?.split('\n') || [];
-                    stackLines.forEach(line => {
-                        CabbyCodes.error(`[CabbyCodes]   ${line.trim()}`);
-                    });
-                    
-                    // Log recent call history
-                    const recentCalls = callStacks.get(callId) || [];
-                    if (recentCalls.length > 0) {
-                        CabbyCodes.error(`[CabbyCodes] Recent call history for ${callId} (showing last 3):`);
-                        recentCalls.slice(-3).forEach((trace, idx) => {
-                            CabbyCodes.error(`[CabbyCodes]   --- Call ${recentCalls.length - 3 + idx + 1} ---`);
-                            const lines = trace.split('\n').slice(0, 10);
-                            lines.forEach(line => {
-                                CabbyCodes.error(`[CabbyCodes]     ${line.trim()}`);
-                            });
-                        });
-                    }
-                    
-                    // Log all call statistics to see what else is being called
-                    CabbyCodes.error(`[CabbyCodes] Top 10 most called functions:`);
-                    const stats = CabbyCodes.getCallStats();
-                    stats.slice(0, 10).forEach(stat => {
-                        CabbyCodes.error(`[CabbyCodes]   ${stat.callId}: ${stat.totalCalls} calls, current depth: ${stat.currentDepth}`);
-                    });
-                    
-                    // Log applied patches that might be related
-                    if (typeof CabbyCodes.getAppliedPatches === 'function') {
-                        const patches = CabbyCodes.getAppliedPatches();
-                        const relatedPatches = patches.filter(p => 
-                            p.function === functionName || 
-                            callId.includes(p.target) ||
-                            callId.includes(p.function)
-                        );
-                        if (relatedPatches.length > 0) {
-                            CabbyCodes.error(`[CabbyCodes] Related patches applied:`);
-                            relatedPatches.forEach(patch => {
-                                CabbyCodes.error(`[CabbyCodes]   - ${patch.type} on ${patch.target}.${patch.function}${patch.setting ? ` (${patch.setting})` : ''}`);
-                            });
-                        }
-                    }
-                    
-                    CabbyCodes.error(`[CabbyCodes] ========================================`);
+                if (isStackOverflowError(error)) {
+                    logStackOverflowError(callId, depth, error, functionName);
                 }
                 
                 throw error;
