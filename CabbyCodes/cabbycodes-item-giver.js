@@ -182,7 +182,12 @@
         if (!itemData.item || typeof itemData.type !== 'string') {
             return false;
         }
-        const validator = ITEM_GIVER_TYPE_VALIDATORS[itemData.type];
+        // sourceType is the $data* array the entry was harvested from. It may differ from
+        // `type` when a rule re-homes items across UI categories (e.g. ranged armors that
+        // present as Weapons). Validation must always use the source, since DataManager's
+        // isItem/isWeapon/isArmor checks the underlying database.
+        const validatorKey = typeof itemData.sourceType === 'string' ? itemData.sourceType : itemData.type;
+        const validator = ITEM_GIVER_TYPE_VALIDATORS[validatorKey];
         if (typeof validator !== 'function') {
             return false;
         }
@@ -247,18 +252,21 @@
         { key: 'item-food',           label: 'Food',             type: 'item',   match: (it) => it && it.itypeId === 3 },
         { key: 'item-regular-tagged', label: 'Regular (Tagged)', type: 'item',   match: (it) => it && it.itypeId === 1 && hasAnyWDItemsTag(it) },
         { key: 'item-regular',        label: 'Regular',          type: 'item',   match: (it) => it && it.itypeId === 1 },
-        { key: 'weapon-1', label: 'Simple',            type: 'weapon', match: (it) => it && it.wtypeId === 1 },
-        { key: 'weapon-2', label: 'Bludgeon',          type: 'weapon', match: (it) => it && it.wtypeId === 2 },
-        { key: 'weapon-3', label: 'Slashing',          type: 'weapon', match: (it) => it && it.wtypeId === 3 },
-        { key: 'weapon-4', label: 'Piercing',          type: 'weapon', match: (it) => it && it.wtypeId === 4 },
-        { key: 'weapon-5', label: 'Two Handed Weapon', type: 'weapon', match: (it) => it && it.wtypeId === 5 },
-        { key: 'weapon-0', label: 'Uncategorized',     type: 'weapon', match: (it) => it && it.wtypeId === 0 },
-        { key: 'armor-2',  label: 'Ranged Weapons',    type: 'armor',  match: (it) => it && it.etypeId === 2 },
-        { key: 'armor-3',  label: 'Head',              type: 'armor',  match: (it) => it && it.etypeId === 3 },
-        { key: 'armor-4',  label: 'Body',              type: 'armor',  match: (it) => it && it.etypeId === 4 },
-        { key: 'armor-5',  label: 'Feet',              type: 'armor',  match: (it) => it && it.etypeId === 5 },
-        { key: 'armor-6',  label: 'Accessory',         type: 'armor',  match: (it) => it && it.etypeId === 6 },
-        { key: 'armor-7',  label: 'Jewelry',           type: 'armor',  match: (it) => it && it.etypeId === 7 }
+        { key: 'weapon-1',       label: 'Simple',            type: 'weapon', match: (it) => it && it.wtypeId === 1 },
+        { key: 'weapon-2',       label: 'Bludgeon',          type: 'weapon', match: (it) => it && it.wtypeId === 2 },
+        { key: 'weapon-3',       label: 'Slashing',          type: 'weapon', match: (it) => it && it.wtypeId === 3 },
+        { key: 'weapon-4',       label: 'Piercing',          type: 'weapon', match: (it) => it && it.wtypeId === 4 },
+        { key: 'weapon-5',       label: 'Two Handed Weapon', type: 'weapon', match: (it) => it && it.wtypeId === 5 },
+        { key: 'weapon-0',       label: 'Uncategorized',     type: 'weapon', match: (it) => it && it.wtypeId === 0 },
+        // etypeId=2 items live in $dataArmors for slot-equip purposes but are semantically
+        // ranged weapons. `sourceType: 'armor'` keeps the underlying DataManager.isArmor check
+        // valid; `uiType: 'weapon'` lists them under the Weapons category in the UI.
+        { key: 'weapon-ranged',  label: 'Ranged Weapons',    type: 'armor',  uiType: 'weapon', match: (it) => it && it.etypeId === 2 },
+        { key: 'armor-3',        label: 'Head',              type: 'armor',  match: (it) => it && it.etypeId === 3 },
+        { key: 'armor-4',        label: 'Body',              type: 'armor',  match: (it) => it && it.etypeId === 4 },
+        { key: 'armor-5',        label: 'Feet',              type: 'armor',  match: (it) => it && it.etypeId === 5 },
+        { key: 'armor-6',        label: 'Accessory',         type: 'armor',  match: (it) => it && it.etypeId === 6 },
+        { key: 'armor-7',        label: 'Jewelry',           type: 'armor',  match: (it) => it && it.etypeId === 7 }
     ];
 
     const ITEM_GIVER_SUBTYPE_FALLBACK = {
@@ -279,28 +287,34 @@
         return order;
     })();
 
-    function resolveSubtype(entry, categoryKey) {
+    function resolveSubtype(entry, sourceCategoryKey) {
         for (let i = 0; i < ITEM_GIVER_SUBTYPE_DEFINITIONS.length; i++) {
             const def = ITEM_GIVER_SUBTYPE_DEFINITIONS[i];
-            if (def.type !== categoryKey) {
+            if (def.type !== sourceCategoryKey) {
                 continue;
             }
             try {
                 if (def.match(entry)) {
-                    return { key: def.key, label: def.label };
+                    return {
+                        key: def.key,
+                        label: def.label,
+                        uiType: def.uiType || def.type
+                    };
                 }
             } catch (_) {
                 // fall through to fallback on unexpected matcher error
             }
         }
-        return ITEM_GIVER_SUBTYPE_FALLBACK[categoryKey] || { key: `${categoryKey}-other`, label: 'Other' };
+        const fb = ITEM_GIVER_SUBTYPE_FALLBACK[sourceCategoryKey] || { key: `${sourceCategoryKey}-other`, label: 'Other' };
+        return { key: fb.key, label: fb.label, uiType: sourceCategoryKey };
     }
 
-    function collectEntriesForSection(sectionDef, subsectionStore) {
+    function collectEntriesForSection(sectionDef, subsectionsByCategory) {
         const entries = [];
         const source = typeof sectionDef.dataAccessor === 'function' ? sectionDef.dataAccessor() : null;
-        const subsectionList = Array.isArray(subsectionStore) ? subsectionStore : null;
-        const subsectionSeen = new Set();
+        const subsectionSeen = subsectionsByCategory && subsectionsByCategory.__seen instanceof Set
+            ? subsectionsByCategory.__seen
+            : null;
 
         if (!Array.isArray(source)) {
             return entries;
@@ -328,7 +342,8 @@
 
             entries.push({
                 item: dbEntry,
-                type: sectionDef.key,
+                type: subtype.uiType,          // UI category (may differ from source for re-homed items)
+                sourceType: sectionDef.key,    // $data* array the item actually lives in — used for validation
                 id: dbEntry.id,
                 name: sanitizeDatabaseName(dbEntry.name),
                 subSectionKey: subtype.key,
@@ -336,12 +351,15 @@
                 sourceIndex: i
             });
 
-            if (subsectionList && !subsectionSeen.has(subtype.key)) {
+            const targetBucket = subsectionsByCategory && Array.isArray(subsectionsByCategory[subtype.uiType])
+                ? subsectionsByCategory[subtype.uiType]
+                : null;
+            if (targetBucket && subsectionSeen && !subsectionSeen.has(subtype.key)) {
                 subsectionSeen.add(subtype.key);
-                subsectionList.push({
+                targetBucket.push({
                     key: subtype.key,
                     label: subtype.label,
-                    type: sectionDef.key
+                    type: subtype.uiType
                 });
             }
         }
@@ -363,28 +381,52 @@
      * @returns {Array} Array of item objects with metadata
      */
     function collectAllItems() {
-        const orderedItems = [];
         const subsections = {};
-
+        const byUiCategory = {};
         ITEM_GIVER_SECTION_DEFINITIONS.forEach((sectionDef) => {
             subsections[sectionDef.key] = [];
-            const sectionEntries = collectEntriesForSection(sectionDef, subsections[sectionDef.key]);
+            byUiCategory[sectionDef.key] = [];
+        });
+        // Shared de-dup set so a subtype registered during one source pass isn't re-added
+        // if the same key shows up again (e.g. cross-section re-homing).
+        Object.defineProperty(subsections, '__seen', { value: new Set(), enumerable: false });
 
-            subsections[sectionDef.key].sort((a, b) => {
-                const ai = ITEM_GIVER_SUBTYPE_ORDER[a.key];
-                const bi = ITEM_GIVER_SUBTYPE_ORDER[b.key];
-                const av = typeof ai === 'number' ? ai : Number.MAX_SAFE_INTEGER;
-                const bv = typeof bi === 'number' ? bi : Number.MAX_SAFE_INTEGER;
-                return av - bv;
-            });
+        // Harvest from each $data* source; entries may land in a UI category different from
+        // their source (ranged-weapon armors are re-homed under Weapons).
+        ITEM_GIVER_SECTION_DEFINITIONS.forEach((sectionDef) => {
+            const sectionEntries = collectEntriesForSection(sectionDef, subsections);
+            for (let i = 0; i < sectionEntries.length; i++) {
+                const entry = sectionEntries[i];
+                const bucket = byUiCategory[entry.type] || byUiCategory[sectionDef.key];
+                bucket.push(entry);
+            }
+        });
 
-            if (sectionEntries.length > 0) {
+        // Emit in UI-category order so section headers group their entries coherently.
+        const orderedItems = [];
+        ITEM_GIVER_SECTION_DEFINITIONS.forEach((sectionDef) => {
+            const entries = byUiCategory[sectionDef.key];
+            if (entries && entries.length > 0) {
                 orderedItems.push({
                     isSectionHeader: true,
                     type: sectionDef.key,
                     name: sectionDef.label
                 });
-                orderedItems.push(...sectionEntries);
+                orderedItems.push(...entries);
+            }
+        });
+
+        // Sort each UI-category's dropdown list in declared taxonomy order.
+        Object.keys(subsections).forEach((categoryKey) => {
+            const list = subsections[categoryKey];
+            if (Array.isArray(list)) {
+                list.sort((a, b) => {
+                    const ai = ITEM_GIVER_SUBTYPE_ORDER[a.key];
+                    const bi = ITEM_GIVER_SUBTYPE_ORDER[b.key];
+                    const av = typeof ai === 'number' ? ai : Number.MAX_SAFE_INTEGER;
+                    const bv = typeof bi === 'number' ? bi : Number.MAX_SAFE_INTEGER;
+                    return av - bv;
+                });
             }
         });
 
