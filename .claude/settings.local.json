@@ -4,7 +4,9 @@
       "Bash(node scripts/refresh-game-files.js --check)",
       "Bash(echo \"exit=$?\")",
       "Bash(node scripts/refresh-game-files.js)",
-      "Bash(node -e ' *)"
+      "Bash(node -e ' *)",
+      "Bash(python3)",
+      "Bash(node -e \"const s=require\\('./System.json'\\); console.log\\('weaponTypes:',JSON.stringify\\(s.weaponTypes\\)\\); console.log\\('armorTypes:',JSON.stringify\\(s.armorTypes\\)\\); console.log\\('equipTypes:',JSON.stringify\\(s.equipTypes\\)\\);\")"
     ]
   }
 }

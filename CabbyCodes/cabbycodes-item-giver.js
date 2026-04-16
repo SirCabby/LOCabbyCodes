@@ -176,7 +176,7 @@
     }
 
     function isValidItemEntry(itemData) {
-        if (!itemData || itemData.isSectionHeader || itemData.isSubSectionHeader) {
+        if (!itemData || itemData.isSectionHeader) {
             return false;
         }
         if (!itemData.item || typeof itemData.type !== 'string') {
@@ -189,21 +189,125 @@
         return validator(itemData.item) && hasUsableName(itemData.item);
     }
 
+    // Subtype taxonomy: authoritative, first-match-wins rules per category. Replaces the old
+    // name-header scanner whose lack of end-of-section boundaries let items leak across subtypes.
+    const WD_ITEMS_TAG_REGEX = /<WD_Items:\s*([^>]+)>/i;
+
+    function getWDItemsBody(item) {
+        if (!item) {
+            return null;
+        }
+        if (item.meta && typeof item.meta.WD_Items === 'string' && item.meta.WD_Items.trim().length > 0) {
+            return item.meta.WD_Items.toLowerCase().trim();
+        }
+        if (typeof item.note === 'string' && item.note.length > 0) {
+            const match = item.note.match(WD_ITEMS_TAG_REGEX);
+            if (match && match[1]) {
+                return match[1].toLowerCase().trim();
+            }
+        }
+        return null;
+    }
+
+    function hasWDItemsTag(item, tagName) {
+        const body = getWDItemsBody(item);
+        if (!body || !tagName) {
+            return false;
+        }
+        const target = String(tagName).toLowerCase();
+        const tokens = body.split(/\s+/);
+        for (let i = 0; i < tokens.length; i++) {
+            if (tokens[i] === target) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    function hasAnyWDItemsTag(item) {
+        return getWDItemsBody(item) !== null;
+    }
+
+    const ITEM_GIVER_SUBTYPE_DEFINITIONS = [
+        // Tag-driven rules run first: the game's <WD_Items:...> note is the most specific
+        // signal and cross-cuts itypeId (e.g. `videogame` items use itypeId=3, `discObj`
+        // uses itypeId=2). Relying on itypeId alone would bury these specific buckets.
+        { key: 'item-medical',        label: 'Medical',          type: 'item',   match: (it) => it && hasWDItemsTag(it, 'medical') },
+        { key: 'item-snack',          label: 'Snacks',           type: 'item',   match: (it) => it && hasWDItemsTag(it, 'snack') },
+        { key: 'item-valuables',      label: 'Valuables',        type: 'item',   match: (it) => it && (hasWDItemsTag(it, 'valuables') || hasWDItemsTag(it, 'gift')) },
+        { key: 'item-recipe',         label: 'Recipes',          type: 'item',   match: (it) => it && hasWDItemsTag(it, 'recipe') },
+        { key: 'item-videogame',      label: 'Video Games',      type: 'item',   match: (it) => it && hasWDItemsTag(it, 'videogame') },
+        { key: 'item-email',          label: 'Emails',           type: 'item',   match: (it) => it && hasWDItemsTag(it, 'email') },
+        { key: 'item-disc',           label: 'Disc Objects',     type: 'item',   match: (it) => it && hasWDItemsTag(it, 'discobj') },
+        { key: 'item-coin',           label: 'Coins',            type: 'item',   match: (it) => it && hasWDItemsTag(it, 'coin') },
+        { key: 'item-craft',          label: 'Crafting',         type: 'item',   match: (it) => it && hasWDItemsTag(it, 'craft') },
+        { key: 'item-cooking',        label: 'Cooking',          type: 'item',   match: (it) => it && hasWDItemsTag(it, 'cook') },
+        { key: 'item-gamemode',       label: 'Game Modes',       type: 'item',   match: (it) => it && (it.itypeId === 4 || hasWDItemsTag(it, 'gamemode')) },
+        { key: 'item-key',            label: 'Key Items',        type: 'item',   match: (it) => it && it.itypeId === 2 },
+        { key: 'item-food',           label: 'Food',             type: 'item',   match: (it) => it && it.itypeId === 3 },
+        { key: 'item-regular-tagged', label: 'Regular (Tagged)', type: 'item',   match: (it) => it && it.itypeId === 1 && hasAnyWDItemsTag(it) },
+        { key: 'item-regular',        label: 'Regular',          type: 'item',   match: (it) => it && it.itypeId === 1 },
+        { key: 'weapon-1', label: 'Simple',            type: 'weapon', match: (it) => it && it.wtypeId === 1 },
+        { key: 'weapon-2', label: 'Bludgeon',          type: 'weapon', match: (it) => it && it.wtypeId === 2 },
+        { key: 'weapon-3', label: 'Slashing',          type: 'weapon', match: (it) => it && it.wtypeId === 3 },
+        { key: 'weapon-4', label: 'Piercing',          type: 'weapon', match: (it) => it && it.wtypeId === 4 },
+        { key: 'weapon-5', label: 'Two Handed Weapon', type: 'weapon', match: (it) => it && it.wtypeId === 5 },
+        { key: 'weapon-0', label: 'Uncategorized',     type: 'weapon', match: (it) => it && it.wtypeId === 0 },
+        { key: 'armor-2',  label: 'Ranged Weapons',    type: 'armor',  match: (it) => it && it.etypeId === 2 },
+        { key: 'armor-3',  label: 'Head',              type: 'armor',  match: (it) => it && it.etypeId === 3 },
+        { key: 'armor-4',  label: 'Body',              type: 'armor',  match: (it) => it && it.etypeId === 4 },
+        { key: 'armor-5',  label: 'Feet',              type: 'armor',  match: (it) => it && it.etypeId === 5 },
+        { key: 'armor-6',  label: 'Accessory',         type: 'armor',  match: (it) => it && it.etypeId === 6 },
+        { key: 'armor-7',  label: 'Jewelry',           type: 'armor',  match: (it) => it && it.etypeId === 7 }
+    ];
+
+    const ITEM_GIVER_SUBTYPE_FALLBACK = {
+        item:   { key: 'item-other',   label: 'Other' },
+        weapon: { key: 'weapon-other', label: 'Other' },
+        armor:  { key: 'armor-other',  label: 'Other' }
+    };
+
+    const ITEM_GIVER_SUBTYPE_ORDER = (() => {
+        const order = {};
+        ITEM_GIVER_SUBTYPE_DEFINITIONS.forEach((def, index) => {
+            order[def.key] = index;
+        });
+        const fallbackBase = ITEM_GIVER_SUBTYPE_DEFINITIONS.length;
+        Object.values(ITEM_GIVER_SUBTYPE_FALLBACK).forEach((fb, i) => {
+            order[fb.key] = fallbackBase + i;
+        });
+        return order;
+    })();
+
+    function resolveSubtype(entry, categoryKey) {
+        for (let i = 0; i < ITEM_GIVER_SUBTYPE_DEFINITIONS.length; i++) {
+            const def = ITEM_GIVER_SUBTYPE_DEFINITIONS[i];
+            if (def.type !== categoryKey) {
+                continue;
+            }
+            try {
+                if (def.match(entry)) {
+                    return { key: def.key, label: def.label };
+                }
+            } catch (_) {
+                // fall through to fallback on unexpected matcher error
+            }
+        }
+        return ITEM_GIVER_SUBTYPE_FALLBACK[categoryKey] || { key: `${categoryKey}-other`, label: 'Other' };
+    }
+
     function collectEntriesForSection(sectionDef, subsectionStore) {
         const entries = [];
         const source = typeof sectionDef.dataAccessor === 'function' ? sectionDef.dataAccessor() : null;
         const subsectionList = Array.isArray(subsectionStore) ? subsectionStore : null;
+        const subsectionSeen = new Set();
 
         if (!Array.isArray(source)) {
             return entries;
         }
 
-        let currentSubSection = null;
-        let subsectionCounter = 0;
-
         // SAFEGUARD: This function only collects items for display. It NEVER adds items to inventory.
-        // If $gameParty exists, verify no items are added during collection.
-        const partyBefore = typeof $gameParty !== 'undefined' && $gameParty ? 
+        const partyBefore = typeof $gameParty !== 'undefined' && $gameParty ?
             JSON.stringify($gameParty._items || {}) : null;
 
         for (let i = 0; i < source.length; i++) {
@@ -212,44 +316,36 @@
                 continue;
             }
 
-            const headerLabel = extractDataSectionLabel(dbEntry);
-            if (headerLabel) {
-                subsectionCounter += 1;
-                const sectionKey = `${sectionDef.key}-subsection-${subsectionCounter}`;
-                currentSubSection = {
-                    key: sectionKey,
-                    label: headerLabel
-                };
-                const headerEntry = {
-                    isSubSectionHeader: true,
-                    type: sectionDef.key,
-                    sectionKey: sectionKey,
-                    name: headerLabel,
-                    sourceId: dbEntry.id
-                };
-                entries.push(headerEntry);
-                if (subsectionList) {
-                    subsectionList.push({
-                        key: sectionKey,
-                        label: headerLabel,
-                        type: sectionDef.key
-                    });
-                }
+            // Drop in-data section-header rows (e.g. "== Swords ==" or names whose only payload
+            // is bracketing punctuation). They used to seed subsections for every item that
+            // followed them, which leaked items across subtypes. Classification is now driven
+            // entirely by itypeId / wtypeId / etypeId / <WD_Items:...> metadata.
+            if (extractDataSectionLabel(dbEntry)) {
                 continue;
             }
+
+            const subtype = resolveSubtype(dbEntry, sectionDef.key);
 
             entries.push({
                 item: dbEntry,
                 type: sectionDef.key,
                 id: dbEntry.id,
                 name: sanitizeDatabaseName(dbEntry.name),
-                subSectionKey: currentSubSection ? currentSubSection.key : null,
-                subSectionLabel: currentSubSection ? currentSubSection.label : null,
+                subSectionKey: subtype.key,
+                subSectionLabel: subtype.label,
                 sourceIndex: i
             });
+
+            if (subsectionList && !subsectionSeen.has(subtype.key)) {
+                subsectionSeen.add(subtype.key);
+                subsectionList.push({
+                    key: subtype.key,
+                    label: subtype.label,
+                    type: sectionDef.key
+                });
+            }
         }
 
-        // SAFEGUARD: Verify no items were accidentally added during collection
         if (partyBefore && typeof $gameParty !== 'undefined' && $gameParty) {
             const partyAfter = JSON.stringify($gameParty._items || {});
             if (partyBefore !== partyAfter) {
@@ -273,6 +369,15 @@
         ITEM_GIVER_SECTION_DEFINITIONS.forEach((sectionDef) => {
             subsections[sectionDef.key] = [];
             const sectionEntries = collectEntriesForSection(sectionDef, subsections[sectionDef.key]);
+
+            subsections[sectionDef.key].sort((a, b) => {
+                const ai = ITEM_GIVER_SUBTYPE_ORDER[a.key];
+                const bi = ITEM_GIVER_SUBTYPE_ORDER[b.key];
+                const av = typeof ai === 'number' ? ai : Number.MAX_SAFE_INTEGER;
+                const bv = typeof bi === 'number' ? bi : Number.MAX_SAFE_INTEGER;
+                return av - bv;
+            });
+
             if (sectionEntries.length > 0) {
                 orderedItems.push({
                     isSectionHeader: true,
@@ -907,7 +1012,6 @@
         const searchLower = (this._searchText || '').trim().toLowerCase();
         const hasSearch = searchLower.length > 0;
         const includeTopLevelHeaders = this._category === 'all' && !hasSearch && (!this._subSectionKey || this._subSectionKey === 'all');
-        const includeSubSectionHeaders = !hasSearch && (!this._subSectionKey || this._subSectionKey === 'all');
         const activeSubSectionKey = this._subSectionKey && this._subSectionKey !== 'all' ? this._subSectionKey : null;
 
         this._data = this._allItems.filter(itemData => {
@@ -917,13 +1021,6 @@
 
             if (itemData.isSectionHeader) {
                 return includeTopLevelHeaders;
-            }
-
-            if (itemData.isSubSectionHeader) {
-                if (activeSubSectionKey) {
-                    return itemData.sectionKey === activeSubSectionKey;
-                }
-                return includeSubSectionHeaders && (!this._category || this._category === 'all' || itemData.type === this._category);
             }
 
             if (!isValidItemEntry(itemData)) {
@@ -959,11 +1056,6 @@
 
             if (itemData.isSectionHeader) {
                 this.drawSectionHeader(itemData, rect);
-                return;
-            }
-
-            if (itemData.isSubSectionHeader) {
-                this.drawSubSectionHeader(itemData, rect);
                 return;
             }
 
@@ -1025,27 +1117,6 @@
             this.contents.paintOpacity = 255;
         }
 
-        this.resetTextColor();
-    };
-
-    Window_CabbyCodesItemGiverList.prototype.drawSubSectionHeader = function(itemData, rect) {
-        const headerText = itemData?.name || '';
-        const paddingX = rect.x + 30;
-        const textWidth = rect.width - 60;
-
-        this.resetTextColor();
-        this.changeTextColor(this.systemColor());
-        this.contents.fontBold = true;
-        this.drawText(headerText, paddingX, rect.y, textWidth, 'left');
-
-        if (this.contents) {
-            const lineY = rect.y + rect.height - 6;
-            this.contents.paintOpacity = 64;
-            this.contents.fillRect(paddingX, lineY, textWidth, 1, getGaugeBackColor());
-            this.contents.paintOpacity = 255;
-        }
-
-        this.contents.fontBold = false;
         this.resetTextColor();
     };
 
