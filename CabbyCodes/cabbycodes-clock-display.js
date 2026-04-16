@@ -22,7 +22,7 @@
     const MODULE_TAG = '[CabbyCodes][Clock]';
     const SETTING_KEY = 'showClock';
     const DEFAULT_TIME_TEXT = '--:--';
-    const CLOCK_WINDOW_HEIGHT = 48;
+    const CLOCK_WINDOW_HEIGHT = 32;
     const CLOCK_MARGIN_X = 0;
     const CLOCK_MARGIN_Y = 0;
     const CLOCK_MIN_WIDTH = 64;
@@ -131,6 +131,19 @@
         this.requestImmediateRefresh();
     };
 
+    // The default 12px window padding and 36px lineHeight leave only a 24px contents area
+    // for a 22px font — Bitmap.drawText's baseline lands below that canvas and clips the
+    // descender. Tighten padding and match lineHeight to the real contents area so
+    // drawText's built-in baseline math vertically centers the glyph with only a couple
+    // pixels of breathing room.
+    Window_CabbyCodesClock.prototype.updatePadding = function() {
+        this.padding = 4;
+    };
+
+    Window_CabbyCodesClock.prototype.lineHeight = function() {
+        return this.contentsHeight();
+    };
+
     Window_CabbyCodesClock.prototype.refreshPanelBackground = function() {
         if (!this.contentsBack) {
             return;
@@ -188,9 +201,7 @@
         this.resetFontSettings();
         this.contents.fontSize = TIME_FONT_SIZE;
         this.changeTextColor(TIME_COLOR);
-        const textHeight = this.lineHeight();
-        const timeY = Math.max(0, Math.floor((this.contentsHeight() - textHeight) / 2));
-        this.drawText(timeText, 0, timeY, this.contentsWidth(), 'center');
+        this.drawText(timeText, 0, 0, this.contentsWidth(), 'center');
     };
 
     Window_CabbyCodesClock.prototype.adjustSizeForText = function(timeText) {
