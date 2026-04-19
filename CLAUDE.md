@@ -84,7 +84,8 @@ Then **add the filename to the `scripts` array in `CabbyCodes.js`** — the load
 
 - Base-game variable/switch IDs live in `cabbycodes-freeze-time.js` and `cabbycodes-doorbell.js`. Add comments when you discover new ones.
 - Never write directly to `$gameVariables._data` — always `setValue(id, value)` so freeze-time interceptors fire.
-- New "freeze" features should register via `freezeTimeApi.registerVariableWriteInterceptor(handler)` instead of wrapping `Game_Variables.prototype.setValue` themselves.
+- New "freeze"-style features that want to **block** writes should register via `freezeTimeApi.registerVariableWriteInterceptor(handler)` instead of wrapping `Game_Variables.prototype.setValue` themselves.
+- Features that intentionally **write** to a frozen ID (e.g. the doorbell summoning a visitor) must hold a `CabbyCodes.freezeTime.exemptFromRestore({ variables, switches })` token across the write → game-reads-it window, and `.release()` it on an event-completion signal (usually a game-driven switch transition). Without the token, the ~250 ms restore debounce will revert the write before the game acts on it. See AGENTS.md §8 for the full list of frozen IDs and the restore timing.
 
 ## Reference data
 

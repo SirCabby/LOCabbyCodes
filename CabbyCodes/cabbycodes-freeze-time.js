@@ -81,9 +81,106 @@
     }
     freezeTimeApi.registerVariableWriteInterceptor = registerVariableWriteInterceptor;
 
+    function toIdArray(input) {
+        if (input === null || typeof input === 'undefined') {
+            return [];
+        }
+        const list = Array.isArray(input) ? input : [input];
+        const result = [];
+        for (const raw of list) {
+            const numeric = Number(raw);
+            if (Number.isFinite(numeric)) {
+                result.push(numeric);
+            }
+        }
+        return result;
+    }
+
+    function addExemptIds(refMap, ids) {
+        for (const id of ids) {
+            refMap.set(id, (refMap.get(id) || 0) + 1);
+        }
+    }
+
+    function removeExemptIds(refMap, ids, onCleared) {
+        for (const id of ids) {
+            if (!refMap.has(id)) {
+                continue;
+            }
+            const next = refMap.get(id) - 1;
+            if (next <= 0) {
+                refMap.delete(id);
+                if (typeof onCleared === 'function') {
+                    onCleared(id);
+                }
+            } else {
+                refMap.set(id, next);
+            }
+        }
+    }
+
+    function resyncSnapshotForVariable(id) {
+        if (!snapshotCaptured) {
+            return;
+        }
+        if (!Object.prototype.hasOwnProperty.call(frozenVariableValues, id)) {
+            return;
+        }
+        if (typeof $gameVariables === 'undefined' || !$gameVariables) {
+            return;
+        }
+        frozenVariableValues[id] = readVariableRaw(id);
+    }
+
+    function resyncSnapshotForSwitch(id) {
+        if (!snapshotCaptured) {
+            return;
+        }
+        if (!Object.prototype.hasOwnProperty.call(frozenSwitchValues, id)) {
+            return;
+        }
+        if (typeof $gameSwitches === 'undefined' || !$gameSwitches) {
+            return;
+        }
+        frozenSwitchValues[id] = $gameSwitches.value(id);
+    }
+
+    function exemptFromRestore(options) {
+        const varIds = toIdArray(options && options.variables);
+        const switchIds = toIdArray(options && options.switches);
+
+        if (varIds.length === 0 && switchIds.length === 0) {
+            return { release: () => {} };
+        }
+
+        addExemptIds(exemptVariableRefCounts, varIds);
+        addExemptIds(exemptSwitchRefCounts, switchIds);
+
+        let released = false;
+        return {
+            release() {
+                if (released) {
+                    return;
+                }
+                released = true;
+                removeExemptIds(exemptVariableRefCounts, varIds, resyncSnapshotForVariable);
+                removeExemptIds(exemptSwitchRefCounts, switchIds, resyncSnapshotForSwitch);
+            }
+        };
+    }
+    freezeTimeApi.exemptFromRestore = exemptFromRestore;
+
     // ----- State -----
     const frozenVariableValues = Object.create(null);
     const frozenSwitchValues = Object.create(null);
+
+    // Reference-counted exemptions: keys are numeric IDs, values are count of
+    // active tokens holding the exemption. While count > 0 the restore loop
+    // leaves the matching ID alone. On release we re-sync the snapshot to the
+    // variable/switch's current value so freeze resumes from wherever the game
+    // left things (prevents e.g. the door event from being replayed forever).
+    const exemptVariableRefCounts = new Map();
+    const exemptSwitchRefCounts = new Map();
 
     let timeDataInitialized = false;
     let snapshotCaptured = false;
@@ -168,6 +265,8 @@
         for (const key of Object.keys(frozenSwitchValues)) {
             delete frozenSwitchValues[key];
         }
+        exemptVariableRefCounts.clear();
+        exemptSwitchRefCounts.clear();
         snapshotCaptured = false;
         if (pendingRestoreTimer !== null) {
             clearTimeout(pendingRestoreTimer);
@@ -205,6 +304,9 @@
         restoringSnapshot = true;
         try {
             FROZEN_VARIABLE_IDS.forEach(id => {
+                if (exemptVariableRefCounts.has(id)) {
+                    return;
+                }
                 const target = frozenVariableValues[id];
                 if (typeof target === 'undefined') {
                     return;
@@ -222,6 +324,9 @@
             });
             if (typeof $gameSwitches !== 'undefined' && $gameSwitches) {
                 FROZEN_SWITCH_IDS.forEach(id => {
+                    if (exemptSwitchRefCounts.has(id)) {
+                        return;
+                    }
                     const target = frozenSwitchValues[id];
                     if (typeof target === 'undefined') {
                         return;
@@ -400,6 +505,9 @@
             return;
         }
         for (const id of FROZEN_VARIABLE_IDS) {
+            if (exemptVariableRefCounts.has(id)) {
+                continue;
+            }
             const target = frozenVariableValues[id];
             if (typeof target === 'undefined') {
                 continue;

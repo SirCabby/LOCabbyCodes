@@ -71,6 +71,39 @@
     const visitorTypeCache = new Map();
     let optionsHookInstalled = false;
 
+    // While a summoned visitor is pending, exempt the door-state IDs from the
+    // Freeze Time restore loop so vars 50/51/67 and switch 24 stick long enough
+    // for the player to reach the door. Released when switch 24 flips back to
+    // false (= encounter resolved), at which point freeze-time re-syncs its
+    // snapshot to the post-encounter values and resumes normal freezing.
+    const DOOR_EXEMPT_VARIABLE_IDS = [50, 51, 67];
+    const DOOR_EXEMPT_SWITCH_IDS = [doorKnockSwitchId];
+    let activeDoorExemption = null;
+
+    function acquireDoorExemption() {
+        const api = CabbyCodes.freezeTime;
+        if (!api || typeof api.exemptFromRestore !== 'function') {
+            return;
+        }
+        if (activeDoorExemption) {
+            activeDoorExemption.release();
+            activeDoorExemption = null;
+        }
+        activeDoorExemption = api.exemptFromRestore({
+            variables: DOOR_EXEMPT_VARIABLE_IDS,
+            switches: DOOR_EXEMPT_SWITCH_IDS
+        });
+    }
+
+    function releaseDoorExemption() {
+        if (!activeDoorExemption) {
+            return;
+        }
+        const token = activeDoorExemption;
+        activeDoorExemption = null;
+        token.release();
+    }
+
     const hasGameObjects = () =>
         typeof $gameVariables !== 'undefined' &&
         $gameVariables &&
@@ -277,6 +310,8 @@
     function activateDoorVisitor(visitorInfo) {
         const { encounterId, encounterType } = visitorInfo;
         const currentHour = readNumber($gameVariables.value(16));
+
+        acquireDoorExemption();
 
         $gameVariables.setValue(51, encounterId);
         $gameVariables.setValue(50, currentHour + 1);
@@ -1542,6 +1577,34 @@
     };
 
     window.Window_CabbyCodesDoorVisitorSubtype = Window_CabbyCodesDoorVisitorSubtype;
+
+    if (typeof Game_Switches !== 'undefined' && Game_Switches.prototype) {
+        CabbyCodes.override(
+            Game_Switches.prototype,
+            'setValue',
+            function(switchId, value) {
+                const numericId = Number(switchId);
+                const becameFalse =
+                    activeDoorExemption &&
+                    numericId === doorKnockSwitchId &&
+                    !value &&
+                    this.value(numericId);
+
+                const result = CabbyCodes.callOriginal(
+                    Game_Switches.prototype,
+                    'setValue',
+                    this,
+                    [switchId, value]
+                );
+
+                if (becameFalse) {
+                    releaseDoorExemption();
+                }
+
+                return result;
+            }
+        );
+    }
 
     CabbyCodes.log('[CabbyCodes] Doorbell module loaded');
 })();

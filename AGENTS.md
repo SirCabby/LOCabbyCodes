@@ -65,6 +65,10 @@ Guidelines for AI coding assistants (and human contributors) working in this rep
 - Variable and switch IDs used by the base game are concentrated in `cabbycodes-freeze-time.js` and `cabbycodes-doorbell.js`. When you discover a new ID, add it there with a comment describing what the game uses it for.
 - Never write directly to `$gameVariables._data` — always go through `$gameVariables.setValue(id, value)`. (Some freeze-time hooks intercept `setValue`; bypassing it defeats them.)
 - If you add a new "freeze"-style feature, reuse `freezeTimeApi.registerVariableWriteInterceptor(handler)` instead of wrapping `Game_Variables.prototype.setValue` yourself.
+- **The freeze-time snapshot covers more than clock vars.** It currently pins vars **10, 12–18, 20–22, 48–51, 67, 112, 122, 617** and switch **24** (door-knock pending). Before writing to any variable or switch from a new cheat, grep `FROZEN_VARIABLE_IDS` / `FROZEN_SWITCH_IDS` in `cabbycodes-freeze-time.js`. If your target is in the set, writes will be reverted by the restore loop within ~250 ms (debounced) / 500 ms (safety net).
+- **Use `CabbyCodes.freezeTime.exemptFromRestore({ variables, switches })` for intentional writes to frozen IDs.** It returns a token with `.release()`. While held, the restore loop skips those IDs; on release the snapshot re-syncs to current values so freeze resumes from the post-event state (prevents stuck-value loops such as the same door visitor being re-summoned forever). Release on a deterministic game-driven signal — typically the switch/variable transition the game itself writes when the event ends — not on a timer.
+- **`registerVariableWriteInterceptor` vs. `exemptFromRestore`:** the interceptor is for *blocking* writes (e.g. freeze-hygiene stopping stat decay); the exemption is for *keeping* writes (a cheat pushing a new state through freeze). Don't confuse them.
+- **Diagnostic pattern.** If a cheat's effect fires momentarily and then vanishes while Freeze Time is on (knock triggers but no visitor, summoned item disappears, etc.), the first thing to check is whether the write targets an ID in the freeze set. The symptom is almost always the restore loop stomping the write within half a second.
 
 ## 9. Performance guardrails
 
@@ -106,6 +110,7 @@ Guidelines for AI coding assistants (and human contributors) working in this rep
 - Several feature files hand-roll `callOriginal` by reading `target._cabbycodesOriginals?.fn`. That only works when *exactly one* module has patched that method. If you need to patch a method another module already patches, use `CabbyCodes.callOriginal` instead.
 - The options menu rebuilds only when `Scene_Options` is re-entered. If your feature unregisters or reorders settings at runtime, the player has to reopen Options to see the change.
 - The loader's 5-second `setInterval` fallback is defensive but almost never needed — MZ guarantees `PluginManager` by the time plugin scripts are evaluated. If you find yourself racing against it, something else is wrong.
+- Freeze-time's restore loop runs asynchronously on a debounce + safety-net tick. Any cheat that writes to a frozen var/switch and expects the value to persist past ~250 ms must hold an `exemptFromRestore` token across the write-to-game-reads-it window (see §8). This burned the doorbell's "Send Next Visitor" for a release — knock fired, but vars 50/51/67 + switch 24 were restored before the player reached the door.
 
 ## 14. Quick reference
 

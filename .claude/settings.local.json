@@ -9,7 +9,10 @@
       "Bash(node -e \"const s=require\\('./System.json'\\); console.log\\('weaponTypes:',JSON.stringify\\(s.weaponTypes\\)\\); console.log\\('armorTypes:',JSON.stringify\\(s.armorTypes\\)\\); console.log\\('equipTypes:',JSON.stringify\\(s.equipTypes\\)\\);\")",
       "Bash(awk -F: '{if\\($1 >= 71773 && $1 <= 76000\\) print}')",
       "Bash(awk '/^{/{p=1} p{if\\(/code.*122/\\){c122=1} if\\(c122\\){print; if\\(/parameters.*\\\\[/{print \"[checking params line]\"; if\\(/16,|17,|19,/\\){print \"FOUND TIME VAR!\"}}} /^}/{p=0}' game_files/data/Map006.json)",
-      "Bash(awk '/\"id\": [0-9]+/{id=$0} /\"name\": \"newDay\"/{print id}' game_files/data/CommonEvents.json)"
+      "Bash(awk '/\"id\": [0-9]+/{id=$0} /\"name\": \"newDay\"/{print id}' game_files/data/CommonEvents.json)",
+      "Bash(python3 -c \" import json with open\\('/c/Users/Joshua/workspace/GitHub/LOCabbyCodes/game_files/data/CommonEvents.json'\\) as f: data = json.load\\(f\\) for i, event in enumerate\\(data\\): if event is None: continue for j, cmd in enumerate\\(event.get\\('list', []\\)\\): if cmd['code'] == 122: # Control Variables if any\\(p == 67 for p in cmd.get\\('parameters', []\\)\\): print\\(f'Event {i}, line {j}, cmd 122 sets var 67'\\) print\\(f' params: {cmd.get\\(\\\\\"parameters\\\\\", []\\)[:3]}'\\) \")",
+      "Bash(node --check \"C:/Users/Joshua/workspace/GitHub/LOCabbyCodes/CabbyCodes/cabbycodes-freeze-time.js\")",
+      "Bash(node --check \"C:/Users/Joshua/workspace/GitHub/LOCabbyCodes/CabbyCodes/cabbycodes-doorbell.js\")"
     ]
   }
 }
