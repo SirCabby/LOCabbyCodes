@@ -98,6 +98,7 @@ Guidelines for AI coding assistants (and human contributors) working in this rep
 - When adding helper scripts under `scripts/`, mirror the existing style: tiny Node or Python CLI, documented usage in a leading comment, path to the game install configurable at the top.
 - Prefer small, reviewable commits that touch one feature file at a time. Tests do not exist; your changes must be readable and defensive enough to merge without one.
 - When in doubt about whether something is the "true original" vs. a wrapper, read `cabbycodes-patches.js` before writing more patches. Several subtle bugs listed in `IMPROVEMENTS.md` come from assuming otherwise.
+- **Keep `README.md`'s "Current Features" list in sync.** Any change that adds, removes, or renames a player-facing setting registered via `CabbyCodes.registerSetting` must also update the matching bullet in `README.md`. If you change a feature's behavior enough that the existing blurb is misleading, rewrite the blurb in the same commit. Support-only modules (`book-ui`, `item-editor`, `oven-navigation`, `version-display`, `time-advance-logger`, and the core/patches/settings/logger/session-state/debug infrastructure) do not get README entries.
 
 ## 13. Known traps (read before you patch)
 

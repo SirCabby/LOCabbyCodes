@@ -22,10 +22,12 @@
     const MODULE_TAG = '[CabbyCodes][Clock]';
     const SETTING_KEY = 'showClock';
     const DEFAULT_TIME_TEXT = '--:--';
+    const CURRENT_DAY_VARIABLE_ID = 15;
+    const CALENDAR_DAY_VARIABLE_ID = 14;
     const CLOCK_WINDOW_HEIGHT = 32;
     const CLOCK_MARGIN_X = 0;
     const CLOCK_MARGIN_Y = 0;
-    const CLOCK_MIN_WIDTH = 64;
+    const CLOCK_MIN_WIDTH = 128;
     const CLOCK_HORIZONTAL_PADDING = 12;
     const TIME_FONT_SIZE = 22;
     const REFRESH_INTERVAL_FRAMES = 12;
@@ -75,16 +77,33 @@
         if (typeof $gameVariables === 'undefined' || !$gameVariables) {
             return null;
         }
+        const dayPrefix = readDayPrefix();
         const displayLabel = sanitizeTimeLabel($gameVariables.value(12));
         if (displayLabel) {
-            return displayLabel;
+            return dayPrefix ? `${dayPrefix} ${displayLabel}` : displayLabel;
         }
         const hour = Number($gameVariables.value(16));
         const minute = Number($gameVariables.value(17));
         if (!Number.isFinite(hour) || !Number.isFinite(minute)) {
             return null;
         }
-        return formatNumericTime(hour, minute);
+        const time = formatNumericTime(hour, minute);
+        return dayPrefix ? `${dayPrefix} ${time}` : time;
+    }
+
+    function readDayPrefix() {
+        const primary = Number($gameVariables.value(CURRENT_DAY_VARIABLE_ID));
+        if (Number.isFinite(primary) && primary > 0) {
+            return `D${primary}`;
+        }
+        const fallback = Number($gameVariables.value(CALENDAR_DAY_VARIABLE_ID));
+        if (Number.isFinite(fallback) && fallback > 0) {
+            return `D${fallback}`;
+        }
+        if (Number.isFinite(primary)) {
+            return `D${primary}`;
+        }
+        return null;
     }
 
     function sanitizeTimeLabel(value) {

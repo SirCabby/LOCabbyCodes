@@ -6,7 +6,10 @@
       "Bash(node scripts/refresh-game-files.js)",
       "Bash(node -e ' *)",
       "Bash(python3)",
-      "Bash(node -e \"const s=require\\('./System.json'\\); console.log\\('weaponTypes:',JSON.stringify\\(s.weaponTypes\\)\\); console.log\\('armorTypes:',JSON.stringify\\(s.armorTypes\\)\\); console.log\\('equipTypes:',JSON.stringify\\(s.equipTypes\\)\\);\")"
+      "Bash(node -e \"const s=require\\('./System.json'\\); console.log\\('weaponTypes:',JSON.stringify\\(s.weaponTypes\\)\\); console.log\\('armorTypes:',JSON.stringify\\(s.armorTypes\\)\\); console.log\\('equipTypes:',JSON.stringify\\(s.equipTypes\\)\\);\")",
+      "Bash(awk -F: '{if\\($1 >= 71773 && $1 <= 76000\\) print}')",
+      "Bash(awk '/^{/{p=1} p{if\\(/code.*122/\\){c122=1} if\\(c122\\){print; if\\(/parameters.*\\\\[/{print \"[checking params line]\"; if\\(/16,|17,|19,/\\){print \"FOUND TIME VAR!\"}}} /^}/{p=0}' game_files/data/Map006.json)",
+      "Bash(awk '/\"id\": [0-9]+/{id=$0} /\"name\": \"newDay\"/{print id}' game_files/data/CommonEvents.json)"
     ]
   }
 }

@@ -52,16 +52,29 @@
     }
 
     /**
+     * Check whether a save slot currently has a save in it.
+     * Note: Window_SavefileList.isEnabled() returns true for every manual slot
+     * on the Save screen (so the player can save into empty slots), so it can't
+     * be used to answer "is this slot populated?". savefileInfo is the authoritative
+     * check — it's what MZ itself uses to gate Load-mode enablement — and it reads
+     * in-memory globalInfo so it's safe to call from per-frame drawing.
+     * @param {number} savefileId
+     * @returns {boolean}
+     */
+    function savefileHasData(savefileId) {
+        return Boolean(DataManager.savefileInfo && DataManager.savefileInfo(savefileId));
+    }
+
+    /**
      * Draw the delete button (X) for a save file item
      * @param {Window_SavefileList} window - The savefile list window
      * @param {number} index - The item index
      */
     function drawDeleteButton(window, index) {
         const savefileId = window.indexToSavefileId(index);
-        const isEnabled = window.isEnabled(savefileId);
-        
-        // Only show delete button if this save file exists (is enabled)
-        if (!isEnabled) {
+
+        // Only show delete button if this save slot has a save in it
+        if (!savefileHasData(savefileId)) {
             return;
         }
 
@@ -618,10 +631,9 @@
                         const index = topIndex + i;
                         if (index < this.maxItems()) {
                             const savefileId = this.indexToSavefileId(index);
-                            const isEnabled = this.isEnabled(savefileId);
-                            
-                            // Only allow deletion of existing saves (enabled items)
-                            if (isEnabled && isPointInDeleteButton(this, index, cx, cy)) {
+
+                            // Only allow deletion of slots that actually have a save in them
+                            if (savefileHasData(savefileId) && isPointInDeleteButton(this, index, cx, cy)) {
                                 try {
                                     // Clear the touch input first to prevent it from also triggering item selection
                                     TouchInput.clear();

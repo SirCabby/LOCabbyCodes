@@ -145,6 +145,7 @@ This is the most important step. You need to add the CabbyCodes plugin to the ga
 ## Current Features
 
 - **Invincibility Toggle:** Adds an "Invincibility" option to the CabbyCodes section of the Options menu. When enabled, any actor currently in the player's party is prevented from losing HP through combat damage, poison/regen ticks, scripted deaths, or other harmful effects. Toggle it on/off at any time while playing.
+- **Status Immunity:** Adds a toggle that blocks negative status effects from being applied to party actors, protecting them from action-restricting, parameter-reducing, or otherwise harmful states.
 - **Always Escape Battles:** Guarantees that the Escape party command succeeds instantly, bypassing the normal escape ratio so you can bail out of encounters without relying on luck.
 - **Stamina Control:** Prevents party actors from spending MP (stamina) when using skills, letting you cast freely without worrying about resource management.
 - **EXP Rate Slider:** Adds a CabbyCodes options-slider that scales all party EXP gains from 0x (no EXP) up through 10x, plus an "Instant Max" stop that gives enough EXP on the next event to hit the level cap immediately.
@@ -157,7 +158,13 @@ This is the most important step. You need to add the CabbyCodes plugin to the ga
 - **Free Vending Machines:** Instantly bypass the coin slot mini-game so every vending machine interaction jumps right to the purchase menu with a price of zero.
 - **Free Merchants:** Forces every shop menu entry to show a cost of zero, allowing you to buy gear, consumables, and upgrades without spending any gold while the toggle is enabled.
 - **Money Editor Button:** Adds a pencil icon button to the gold display on the main menu. Click it to open the same inline editor UI used for inventory items (without the delete option) and instantly set the party's bankroll to any value up to the normal gold cap.
-- **Freeze Time of Day:** Locks the in-game time variable so wandering, minigames, or scripted sequences no longer push the clock forward while enabled.
+- **Infinite Money:** Adds a toggle that blocks any reduction to the party's gold total. You still earn money normally from events, loot, and shop sales, but spending never lowers the balance while enabled.
+- **Give Item:** Adds a "Give Item" press option that opens an inline item-giver scene so you can browse every item, weapon, and armor in the game and grant any quantity directly to the party.
+- **Give Missing Items:** Adds a one-press option that fills in every item, weapon, and armor the party does not currently own, skipping anything you already have.
+- **Max Items in Inventory:** Adds a one-press option that tops every stack in your inventory up to the game's per-item limit (after a confirmation prompt).
+- **Save Anywhere:** Adds an "Enable Saving" toggle that bypasses difficulty-based save restrictions, letting you save from the main menu in situations where the game would normally forbid it.
+- **Delete Save Buttons:** Adds an X button to every row of the Load and Save screens. Clicking it prompts for confirmation and then deletes the selected save file without needing to start a new game.
+- **Freeze Time of Day:** Locks the in-world clock at its current value. Time-burning actions (cooking, opening the door, playing a videogame, etc.) still execute fully and any queued events run to completion, but the actual game time — not just the displayed clock — stays put, so hour/day side effects like stamina drain, day-segment shifts, and daily resets do not happen while the toggle is on.
 - **Video Games Cost No Time:** Lets you enjoy every console game in your apartment without advancing the in-game clock. The option automatically rewinds the time-of-day variable after each gaming session so the rest of the world remains in sync.
 - **Freeze Hygiene / Needs:** Locks all of the hidden personal-need meters (hygiene, hunger, vigor, morale, social, calm, plus the bad-breath counter) so they can’t tick downward, while still allowing positive actions like eating or showering to raise them.
 - **Hidden Needs HUD:** Adds a "Hidden Needs HUD" press option in the CabbyCodes settings. Select it to pop open a dedicated window with every hidden meter (hunger, fatigue, hygiene, morale, calm, social, and the breath-odor tracker), then press OK/Cancel to jump right back into the game.
@@ -165,6 +172,8 @@ This is the most important step. You need to add the CabbyCodes plugin to the ga
 - **Refill Status:** Adds a press-style option that immediately tops up every party member’s HP/MP and maxes out all hidden need meters (hunger, energy, hygiene, morale, calm, social, and breath odor) whenever you select it.
 - **Max Cooking Skill:** Adds a press-style option that, after an explicit warning, permanently sets your Cooking skill to the game’s top rank (currently Level 8, Amateur Chef) so you can skip the recipe grind.
 - **Oven Ingredient Checkboxes:** Overlays CabbyCodes-styled checkboxes onto the oven ingredient menus so you can instantly see which primary bases have every pairing finished and which secondary combinations you’ve already cooked (the "Nothing" option is always marked complete). Toggle it anytime from the CabbyCodes settings.
+- **Cook Book:** Adds a press-style option that opens a dedicated Cook Book scene listing every oven combination in the game, with completion state pulled straight from your save so you can see at a glance what you still need to cook.
+- **Recipe Book:** Adds a press-style option that opens a dedicated Recipe Book scene listing every recipe the game tracks, marked off as you discover them so you can plan what to make next without digging through in-game menus.
 
 ## Troubleshooting
 

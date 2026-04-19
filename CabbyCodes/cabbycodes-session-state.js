@@ -64,12 +64,16 @@
     }
 
     // Hook into core systems to toggle session state.
-    if (typeof DataManager !== 'undefined') {
-        const _DataManager_setupNewGame = DataManager.setupNewGame;
-        DataManager.setupNewGame = function() {
-            const result = _DataManager_setupNewGame.call(this);
+    // Note: DataManager.setupNewGame also fires during Scene_Boot and from the
+    // Hime_PreTitleEvents plugin (Scene_PretitleMap, a Scene_Map subclass shown
+    // before the title). Hooking it directly would mark the session active during
+    // the boot/pretitle window, which is before the player has actually entered a
+    // save. Instead, hook the player-driven entry points.
+    if (typeof Scene_Title !== 'undefined') {
+        const _Scene_Title_commandNewGame = Scene_Title.prototype.commandNewGame;
+        Scene_Title.prototype.commandNewGame = function() {
+            _Scene_Title_commandNewGame.call(this);
             markSessionActive();
-            return result;
         };
     }
 
