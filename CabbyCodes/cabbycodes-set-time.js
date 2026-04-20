@@ -168,9 +168,18 @@
             $gameVariables.setValue(MINUTES_PASS_VAR, 0);
             $gameVariables.setValue(CURRENT_DAY_VAR, newDay);
             $gameVariables.setValue(CALENDAR_DAY_VAR, newDay);
-            // Clear the HUD's cached time string so the clock display falls back
-            // to rendering from the freshly-written hour/minute.
-            $gameVariables.setValue(DISPLAYED_TIME_VAR, '');
+            // Refresh var 12 using the same formula as CE4 TimePasses idx 368:
+            //   sVr(12, gVr(16) + ":" + gVr(17).toString().padStart(2, "0"))
+            // Writing '' trips Game_Variables.value's `|| 0` fallback, so any
+            // `\V[12]` event (e.g. Map002 AlarmClock "It is \V[12].") renders
+            // "It is 0." until TimePasses runs again — which it doesn't under
+            // Freeze Time.
+            $gameVariables.setValue(
+                DISPLAYED_TIME_VAR,
+                $gameVariables.value(CURRENT_HOUR_VAR)
+                    + ':'
+                    + $gameVariables.value(CURRENT_MINUTE_VAR).toString().padStart(2, '0')
+            );
             if (CabbyCodes.clockDisplay && typeof CabbyCodes.clockDisplay.refreshActiveWindow === 'function') {
                 CabbyCodes.clockDisplay.refreshActiveWindow();
             }
