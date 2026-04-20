@@ -50,7 +50,6 @@
         COOKING_COOK_EVENT_ID,
         COOKING_SECONDARY_EVENT_ID
     ]);
-    const COOKING_RESTART_EVENT_ID = COOKING_COOK_EVENT_ID;
     const PRIMARY_CALL_ARGS = {
         linebreak: 'Settings ===',
         itemSelector: '{"selectorMode":"mode5","includeEquip":"mode1","metaTag":"69"}',
@@ -62,7 +61,6 @@
 
     const ENABLE_DEBUG_LOGS = false;
     const interpreterTracker = {
-        restartQueued: false,
         primaryInterpreter: null,
         controlInterpreter: null
     };
@@ -524,25 +522,13 @@
 
     function handleSecondaryBacktrack() {
         debugLog('handleSecondaryBacktrack invoked');
-        const abortSucceeded = abortCookingCommonEvent();
-        if (!abortSucceeded) {
-            debugLog('Primary abort path failed; attempting forced interpreter clear.');
-            if (!forceAbortCookingEvent()) {
-                debugLog('Forced abort failed; no interpreter to clear. Falling back to event restart.');
-                queueCookingRestart();
-                return;
-            }
-        }
-        interpreterTracker.restartQueued = false;
-        restartCookingControlFlow();
-    }
-
-    function abortCookingCommonEvent() {
-        const success = forceAbortCookingEvent();
-        if (!success) {
-            debugLog('abortCookingCommonEvent failed; interpreter not set');
-        }
-        return success;
+        // Best-effort: if we've tagged a cooking interpreter, clear it so the
+        // common event stops mid-flow. If we haven't (typical on the first cook
+        // of a session, since the Oven Control event starts via a map trigger
+        // rather than reserveCommonEvent/command117), the window-level cancel
+        // has already set the ingredient var to 0 and the common event will
+        // exit through its own "ingredient missing" branch.
+        forceAbortCookingEvent();
     }
 
     function identifyCommonEventContext(interpreter, list) {
@@ -571,31 +557,12 @@
             interpreterTracker.primaryInterpreter = interpreter;
             interpreterTracker.controlInterpreter = interpreter;
         }
-        interpreterTracker.restartQueued = false;
         debugLog(
             'Tracking cooking interpreter (setup path)',
             `eventId=${eventId}`,
             `depth=${interpreter._depth || 0}`,
             `commands=${eventList.length}`
         );
-    }
-
-    function queueCookingRestart() {
-        if (
-            interpreterTracker.restartQueued ||
-            typeof $gameTemp === 'undefined' ||
-            typeof $gameTemp.reserveCommonEvent !== 'function'
-        ) {
-            debugLog(
-                'queueCookingRestart skipped',
-                `pending=${interpreterTracker.restartQueued}`,
-                `$gameTemp=${typeof $gameTemp !== 'undefined'}`
-            );
-            return;
-        }
-        interpreterTracker.restartQueued = true;
-        $gameTemp.reserveCommonEvent(COOKING_RESTART_EVENT_ID);
-        debugLog('queueCookingRestart scheduled common event', `eventId=${COOKING_RESTART_EVENT_ID}`);
     }
 
     function markInterpreterAsCooking(interpreter, commonEventId, list = null) {
@@ -926,19 +893,11 @@
         if (WD_RESULT_SWITCH_ID > 0 && typeof $gameSwitches !== 'undefined' && $gameSwitches.setValue) {
             $gameSwitches.setValue(WD_RESULT_SWITCH_ID, false);
         }
-        const aborted = forceAbortCookingEvent();
-        if (!aborted) {
-            debugLog('processWdSecondaryCancel fallback: interpreter not found, queuing restart only.');
-        }
-        restartCookingControlFlow();
+        forceAbortCookingEvent();
         sceneInstance._cabbycodesBackRequest = null;
         if (SceneManager._scene === sceneInstance) {
             SceneManager.pop();
         }
-    }
-
-    function restartCookingControlFlow() {
-        interpreterTracker.restartQueued = false;
     }
 
     function fetchCookingCommandList(eventId) {
