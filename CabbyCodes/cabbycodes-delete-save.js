@@ -711,40 +711,15 @@
                         
                         // Call the parent onSavefileOk first (required for save logic)
                         Scene_File.prototype.onSavefileOk.call(scene);
-                        
-                        // Verify savefileId is still correct
+
                         const currentSavefileId = scene.savefileId();
-                        
-                        // Check if save is enabled
-                        const isEnabled = scene.isSavefileEnabled(currentSavefileId);
-                        
-                        if (isEnabled) {
-                            // Execute the save directly
-                            try {
-                                // Set savefileId in game system (required before save)
-                                $gameSystem.setSavefileId(currentSavefileId);
-                                
-                                // Call onBeforeSave (required for save logic)
-                                $gameSystem.onBeforeSave();
-                                
-                                // Call DataManager.saveGame directly
-                                const savePromise = DataManager.saveGame(currentSavefileId);
-                                
-                                if (savePromise && typeof savePromise.then === 'function') {
-                                    savePromise.then(() => {
-                                        scene.onSaveSuccess();
-                                    }).catch((error) => {
-                                        CabbyCodes.error('[CabbyCodes] Save failed: ' + (error ? (error.message || error) : 'unknown'));
-                                        scene.onSaveFailure(error);
-                                    });
-                                } else {
-                                    CabbyCodes.error('[CabbyCodes] DataManager.saveGame did not return a promise');
-                                    scene.onSaveFailure();
-                                }
-                            } catch (e) {
-                                CabbyCodes.error('[CabbyCodes] Exception during save: ' + (e.message || e));
-                                scene.onSaveFailure(e);
-                            }
+
+                        // Delegate to scene.executeSave so plugin-level overrides run — notably
+                        // bunchastuff's version clears vars 147/148 (last battle target/user) before
+                        // JsonEx.stringify. Bypassing executeSave here was crashing overwrite saves
+                        // after combat with "Cannot read properties of undefined (reading 'name')".
+                        if (scene.isSavefileEnabled(currentSavefileId)) {
+                            scene.executeSave(currentSavefileId);
                         } else {
                             scene.onSaveFailure();
                         }
