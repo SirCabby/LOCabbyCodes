@@ -3,13 +3,14 @@
 //=============================================================================
 /*:
  * @target MZ
- * @plugindesc CabbyCodes Infinite Items - Prevents consumable item loss
+ * @plugindesc CabbyCodes Infinite Items - Prevents item loss
  * @author CabbyCodes
  * @help
- * Adds an Options menu toggle that keeps consumable item counts from
- * decreasing. Items such as healing supplies, ammo, thrown weapons, and
- * cooking ingredients can still be gained normally, but using them no longer
- * reduces the party inventory while the toggle is enabled.
+ * Adds an Options menu toggle that keeps item counts from decreasing.
+ * Items can still be gained normally, but using them, handing them to
+ * visitors, or otherwise spending them no longer reduces the party
+ * inventory while the toggle is enabled. Weapons and armor are not
+ * affected by this toggle.
  */
 
 (() => {
@@ -39,92 +40,11 @@
     const isFeatureEnabled = () => CabbyCodes.getSetting(settingKey, false);
 
     /**
-     * Tracks every item id that is referenced by the built-in recipe metadata.
-     * Crafting stations consume those ingredients even if the items themselves
-     * are not flagged as `consumable`, so we treat them as protected when the
-     * infinite consumables option is enabled.
-     * @type {Set<number>}
-     */
-    const craftingIngredientIds = new Set();
-    let craftingCacheBuilt = false;
-    const recipeIngredientKeys = ['ing1', 'ing2', 'ing3', 'ing4', 'ing5'];
-
-    /**
-     * Hygiene interactions (showers, brushing teeth, etc.) consume the Soap
-     * and Toothpaste items even though they are not flagged as consumables.
-     * Simple Keys are removed by locked door events even though they are not
-     * flagged as consumables. Hardcode their ids so they stay protected when
-     * the cheat is enabled.
-     * @type {Set<number>}
-     */
-    const ALWAYS_PROTECTED_ITEM_IDS = new Set([173, 174, 320]);
-
-    /**
-     * Parses the recipe items (IDs 551-600 in the base game) to discover which
-     * ingredients they reference. We only need to do this once per session and
-     * only after the database has finished loading.
-     */
-    function ensureCraftingIngredientCache() {
-        if (craftingCacheBuilt) {
-            return;
-        }
-
-        const items = window.$dataItems;
-        if (!Array.isArray(items) || items.length === 0) {
-            return;
-        }
-
-        let sawValidEntry = false;
-        craftingIngredientIds.clear();
-
-        for (const recipe of items) {
-            if (!recipe || !recipe.meta) {
-                continue;
-            }
-            sawValidEntry = true;
-
-            for (const key of recipeIngredientKeys) {
-                if (!Object.prototype.hasOwnProperty.call(recipe.meta, key)) {
-                    continue;
-                }
-                const rawValue = recipe.meta[key];
-                const ingredientId = Number(rawValue);
-                if (Number.isFinite(ingredientId) && ingredientId > 0) {
-                    craftingIngredientIds.add(ingredientId);
-                }
-            }
-        }
-
-        if (sawValidEntry) {
-            craftingCacheBuilt = true;
-            if (craftingIngredientIds.size > 0) {
-                CabbyCodes.log(
-                    `[CabbyCodes] Tracked ${craftingIngredientIds.size} crafting ingredients for infinite consumables`
-                );
-            }
-        }
-    }
-
-    /**
-     * Determines whether the provided RPG item should be treated as a crafting
-     * ingredient for the purposes of the infinite consumables toggle.
-     * @param {RPG.Item | RPG.Weapon | RPG.Armor} item
-     * @returns {boolean}
-     */
-    function isCraftingIngredient(item) {
-        ensureCraftingIngredientCache();
-        if (!item || typeof item.id !== 'number') {
-            return false;
-        }
-        return craftingIngredientIds.has(item.id);
-    }
-
-    /**
      * Determines whether the provided item is one of the temporary
      * gamemode selector tokens that the base game injects into the
      * inventory during the new-game difficulty picker.
      * Those items use the WD_ItemUse "gamemode" meta tag and should
-     * never be protected by the infinite consumables toggle so that
+     * never be protected by the infinite items toggle so that
      * the scripted cleanup can always remove them.
      * @param {RPG.Item | RPG.Weapon | RPG.Armor} item
      * @returns {boolean}
@@ -159,25 +79,12 @@
     }
 
     /**
-     * Determines whether the provided item is one of the always-protected
-     * hygiene consumables (soap or toothpaste).
+     * Determines whether the provided item should be protected from
+     * decreasing counts while the infinite items toggle is on.
      * @param {RPG.Item | RPG.Weapon | RPG.Armor} item
      * @returns {boolean}
      */
-    function isAlwaysProtectedItem(item) {
-        if (!item || typeof item.id !== 'number') {
-            return false;
-        }
-        return ALWAYS_PROTECTED_ITEM_IDS.has(item.id);
-    }
-
-    /**
-     * Determines whether the provided item is a consumable that should be
-     * protected from decreasing counts.
-     * @param {RPG.Item | RPG.Weapon | RPG.Armor} item
-     * @returns {boolean}
-     */
-    function isProtectedConsumable(item) {
+    function isProtectedItem(item) {
         if (!isFeatureEnabled()) {
             return false;
         }
@@ -185,20 +92,13 @@
             return false;
         }
         try {
-            const isRpgItem = DataManager.isItem(item);
-            if (!isRpgItem) {
+            if (!DataManager.isItem(item)) {
                 return false;
             }
-
             if (isGamemodeSelectorItem(item)) {
                 return false;
             }
-
-            if (isAlwaysProtectedItem(item)) {
-                return true;
-            }
-
-            return !!item.consumable || isCraftingIngredient(item);
+            return true;
         } catch (err) {
             CabbyCodes.warn(`[CabbyCodes] Failed to inspect item: ${err?.message || err}`);
             return false;
@@ -228,8 +128,7 @@
         function(item, amount, includeEquip) {
             const normalizedAmount = typeof amount === 'number' ? amount : 0;
 
-            if (normalizedAmount < 0 && isProtectedConsumable(item)) {
-                // Skip the original logic so the inventory never decreases.
+            if (normalizedAmount < 0 && isProtectedItem(item)) {
                 return;
             }
 

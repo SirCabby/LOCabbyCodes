@@ -12,7 +12,9 @@
       "Bash(awk '/\"id\": [0-9]+/{id=$0} /\"name\": \"newDay\"/{print id}' game_files/data/CommonEvents.json)",
       "Bash(python3 -c \" import json with open\\('/c/Users/Joshua/workspace/GitHub/LOCabbyCodes/game_files/data/CommonEvents.json'\\) as f: data = json.load\\(f\\) for i, event in enumerate\\(data\\): if event is None: continue for j, cmd in enumerate\\(event.get\\('list', []\\)\\): if cmd['code'] == 122: # Control Variables if any\\(p == 67 for p in cmd.get\\('parameters', []\\)\\): print\\(f'Event {i}, line {j}, cmd 122 sets var 67'\\) print\\(f' params: {cmd.get\\(\\\\\"parameters\\\\\", []\\)[:3]}'\\) \")",
       "Bash(node --check \"C:/Users/Joshua/workspace/GitHub/LOCabbyCodes/CabbyCodes/cabbycodes-freeze-time.js\")",
-      "Bash(node --check \"C:/Users/Joshua/workspace/GitHub/LOCabbyCodes/CabbyCodes/cabbycodes-doorbell.js\")"
+      "Bash(node --check \"C:/Users/Joshua/workspace/GitHub/LOCabbyCodes/CabbyCodes/cabbycodes-doorbell.js\")",
+      "Bash(make deploy *)",
+      "Bash(awk 'NR>=59393 && NR<=70000 && /\"pages\"|\"list\": \\\\[|\"conditions\":/ {print NR\": \"$0}' \"C:/Users/Joshua/workspace/GitHub/LOCabbyCodes/game_files/data/Troops.json\")"
     ]
   }
 }

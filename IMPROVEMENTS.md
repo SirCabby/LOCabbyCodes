@@ -8,6 +8,16 @@ Pair this with `ARCHITECTURE.md` (design reference) and `AGENTS.md` (coding conv
 
 ## A. Patching system bugs
 
+### A0. `CabbyCodes.callOriginal` skipped chain links / recursed on 2+ overrides — **resolved**
+
+*File:* `CabbyCodes/cabbycodes-patches.js`.
+
+The previous implementation tried to "unwrap the debug wrapper" by walking `currentFunction._cabbycodesOriginal` while `_cabbycodesDebugWrapped` was set. But `debugWrap` copies `_cabbycodesOriginal` from the function it wraps, so on a debug wrapper that pointer already points at the *previous chain element*, not at the inner chainedFunction. The unwrap loop therefore hopped an entire chain layer each iteration and ended up calling the true original directly — middle overrides (e.g. `infinite-consumables` with `infinite-ammo` on top) were silently skipped. Naively removing the loop caused infinite recursion instead, because `target[fn]` is always the outermost wrapper, so a middle override's `callOriginal` would get back the same "previous" link no matter how deep the call.
+
+**Fix (shipped):** every `chainedFunction` push/pops itself onto `CabbyCodes._overrideCallStack` while running. `callOriginal` reads the stack top to identify the currently-executing link and delegates to *that link's* `_cabbycodesOriginal`. Chain dispatch now works for any depth, and hand-rolled local `callOriginal` helpers that read `_cabbycodesOriginals[fn]` still reach the true original cleanly.
+
+**Symptom this caused:** the door-visitor William event removed stimulants/meds despite "Infinite Items" being on, because infinite-ammo's override delegated straight to the rmmz original instead of through infinite-consumables. Any future "unwrap the debug wrapper" shortcut will bring the regression back.
+
 ### A1. `before` / `after` overwrite the stored "true original" — **high**
 
 *File:* `CabbyCodes/cabbycodes-patches.js` (around lines 268–272 and 313–317).

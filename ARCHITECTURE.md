@@ -73,16 +73,16 @@ Three public entry points, all of which take a `(target, functionName, impl, set
 Bookkeeping:
 - `target._cabbycodesOriginals[functionName]` stores the *true* original (set only on first `override`).
 - Each override wrapper is tagged `_cabbycodesIsOverride = true` and points at the previous function via `_cabbycodesOriginal` to form a chain.
-- `CabbyCodes.callOriginal(target, fn, ctx, args)` walks past debug wrappers and invokes the next link in the chain (or the true original if none).
+- Each override's `chainedFunction` pushes itself onto `CabbyCodes._overrideCallStack` on entry and pops on exit. `CabbyCodes.callOriginal` reads the top of that stack to learn *which link is currently executing* and delegates to *that link's* `_cabbycodesOriginal`. Walking `target[fn]` instead would always yield the outermost wrapper and cause middle overrides to recurse into themselves.
 - `CabbyCodes.callTrueOriginal(...)` skips the chain and calls the original game function directly.
-- `CabbyCodes.callPrevious(...)` is an alias for the "previous wrapper" behavior.
+- `CabbyCodes.callPrevious(...)` is a thin alias for `callOriginal`.
 
 A patch-tracking array (`CabbyCodes._appliedPatches`) logs every applied patch and warns once when the same `Class.fn` is patched multiple times.
 
 **Gotchas (see `IMPROVEMENTS.md` for fixes):**
 - `before / after` unconditionally overwrite `_cabbycodesOriginals[fn]`, which can clobber the true original stored by a previous `override`.
-- `before / after` wrappers do not set `_cabbycodesIsOverride`, so `callOriginal` does not treat them as links in the chain.
-- Many feature files bypass `CabbyCodes.callOriginal` and read `target._cabbycodesOriginals?.fn` directly. That works as long as the target is always patched exactly once.
+- `before / after` wrappers do not set `_cabbycodesIsOverride` and do not push onto `_overrideCallStack`, so `callOriginal` does not treat them as links in the chain. Inside a `before`/`after` hook body the stack is whatever outer override (if any) is running, not the hook itself.
+- Many feature files bypass `CabbyCodes.callOriginal` and read `target._cabbycodesOriginals?.fn` directly. That works as long as the target is always patched exactly once — `_cabbycodesOriginals[fn]` is the *true* original, not the previous link, so it silently skips intermediate overrides when multiple modules patch the same method.
 
 ### 4.4 Debug instrumentation (`cabbycodes-debug.js`)
 
@@ -91,7 +91,7 @@ A patch-tracking array (`CabbyCodes._appliedPatches`) logs every applied patch a
   - increments a total-call counter,
   - warns once when depth hits the recursion threshold (default 10, overridden to 250 for `Game_Interpreter.update`),
   - logs a richly annotated report on `RangeError: Maximum call stack` inside the wrapped call and on any top-level `window.onerror` / `unhandledrejection` that looks like a stack overflow.
-- Marks wrappers with `_cabbycodesDebugWrapped = true` and forwards chain markers so `callOriginal` can still traverse them.
+- Marks wrappers with `_cabbycodesDebugWrapped = true` and copies `_cabbycodesIsOverride` / `_cabbycodesOriginal` from the inner function so the outer debug wrapper looks like a normal chain link to `getPreviousInChain`. **Important:** because of that copy, a debug wrapper's `_cabbycodesOriginal` points at the *previous chain element*, not at the inner chainedFunction it wraps. Do not "unwrap debug wrappers" by walking `_cabbycodesOriginal` — it will skip an entire chain layer. `callOriginal` relies on `_overrideCallStack` to pick the right link instead.
 - Exposes `CabbyCodes.getCallStats()`, `logCallStats()`, `clearCallStats()`, `getAppliedPatches()`, `logAppliedPatches()` for live diagnostics.
 
 This module has measurable overhead — see performance notes below.

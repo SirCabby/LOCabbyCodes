@@ -20,6 +20,12 @@
     // Track applied patches for debugging
     CabbyCodes._appliedPatches = CabbyCodes._appliedPatches || [];
     CabbyCodes._duplicatePatchWarnings = CabbyCodes._duplicatePatchWarnings || new Set();
+
+    // Per-call stack of the chainedFunction currently executing. Lets
+    // CabbyCodes.callOriginal/callPrevious know which link of the chain invoked
+    // them, so middle overrides delegate to their own previous link instead of
+    // to the outermost wrapper (which would recurse forever).
+    CabbyCodes._overrideCallStack = CabbyCodes._overrideCallStack || [];
     
     /**
      * Log patch application for debugging
@@ -126,12 +132,14 @@
         // Create a wrapper that chains properly
         // If current is an override, we need to make sure our override can call it via callPrevious
         const chainedFunction = function(...args) {
-            // Call the new override function
-            // The new override can use callOriginal to get the true original,
-            // or callPrevious to get the previous override in the chain
-            return newFunction.apply(this, args);
+            CabbyCodes._overrideCallStack.push(chainedFunction);
+            try {
+                return newFunction.apply(this, args);
+            } finally {
+                CabbyCodes._overrideCallStack.pop();
+            }
         };
-        
+
         // Mark this as an override and store the previous function in the chain
         chainedFunction._cabbycodesIsOverride = true;
         chainedFunction._cabbycodesOriginal = currentFunction;
@@ -163,33 +171,21 @@
      * @returns {*} The return value of the original function
      */
     CabbyCodes.callOriginal = function(target, functionName, context, args) {
-        // Get the current function (which is the override calling this)
-        // This might be wrapped by debugWrap, so we need to follow the chain
-        let currentFunction = target[functionName];
-        
-        // If the current function is wrapped by debugWrap, we need to get the actual override
-        // The debug wrapper should have _cabbycodesOriginal pointing to the chained function
-        // Check for debug wrapper explicitly using _cabbycodesDebugWrapped
-        while (currentFunction && currentFunction._cabbycodesDebugWrapped && 
-               currentFunction._cabbycodesOriginal) {
-            // This is a debug wrapper, unwrap to get the actual override
-            currentFunction = currentFunction._cabbycodesOriginal;
+        // Delegate to the link directly below whichever override is currently
+        // executing. Reading target[fn] instead would always return the
+        // outermost wrapper and make middle overrides recurse into themselves.
+        const stack = CabbyCodes._overrideCallStack;
+        const activeLink = stack && stack.length > 0 ? stack[stack.length - 1] : null;
+        if (activeLink && typeof activeLink._cabbycodesOriginal === 'function') {
+            return activeLink._cabbycodesOriginal.apply(context, args);
         }
-        
-        // Now currentFunction should be the actual override (or original if no overrides)
-        // If current function is an override, try to get the previous in chain
-        const previous = getPreviousInChain(currentFunction);
-        if (previous && typeof previous === 'function') {
-            // Call the previous override in the chain
-            return previous.apply(context, args);
-        }
-        
-        // No previous override, call the true original
+
+        // No active override on the stack — fall back to the true original.
         const original = getTrueOriginal(target, functionName);
         if (original && typeof original === 'function') {
             return original.apply(context, args);
         }
-        
+
         return undefined;
     };
     
@@ -221,12 +217,6 @@
      * @returns {*} The return value of the previous function
      */
     CabbyCodes.callPrevious = function(target, functionName, context, args) {
-        const currentFunction = target[functionName];
-        const previous = getPreviousInChain(currentFunction);
-        if (previous && typeof previous === 'function') {
-            return previous.apply(context, args);
-        }
-        // If no previous override, fall back to true original
         return CabbyCodes.callOriginal(target, functionName, context, args);
     };
     
