@@ -594,7 +594,10 @@
             },
             unavailable: {
                 all: unavailableEntries.length,
-                force: 0
+                trader: 0,
+                general: 0,
+                special: 0,
+                rare: 0
             }
         };
 
@@ -614,8 +617,14 @@
         });
 
         unavailableEntries.forEach(entry => {
-            if (entry.source === 'unavailable') {
-                counts.unavailable.force += 1;
+            if (entry.type === 0) {
+                counts.unavailable.trader += 1;
+            } else if (entry.type === 1) {
+                counts.unavailable.general += 1;
+            } else if (entry.type === 2) {
+                counts.unavailable.special += 1;
+            } else if (entry.type === 3) {
+                counts.unavailable.rare += 1;
             }
         });
 
@@ -1183,8 +1192,17 @@
             }
         }
         if (categoryKey === 'unavailable') {
-            if (subtype === 'force') {
-                return entry.source === 'unavailable';
+            switch (subtype) {
+                case 'trader':
+                    return entry.type === 0;
+                case 'general':
+                    return entry.type === 1;
+                case 'special':
+                    return entry.type === 2;
+                case 'rare':
+                    return entry.type === 3;
+                default:
+                    return true;
             }
         }
         return true;
@@ -1460,7 +1478,7 @@
     };
 
     Window_CabbyCodesDoorVisitorSubtype.prototype.maxCols = function() {
-        return this._category === 'available' ? 6 : 2;
+        return this._category === 'available' ? 6 : 5;
     };
 
     Window_CabbyCodesDoorVisitorSubtype.prototype.updateArrows = function() {
@@ -1506,14 +1524,20 @@
         const normalized = categoryKey === 'unavailable' ? 'unavailable' : 'available';
         this._category = normalized;
         const requested = selection || 'all';
-        this._selection = requested;
-        this.refresh();
-        let index = this.findSymbol(this._selection);
+        this.clearCommandList();
+        this.makeCommandList();
+        let index = this.findSymbol(requested);
         if (index == null || index < 0) {
             this._selection = 'all';
-            index = this.findSymbol(this._selection) ?? 0;
+            index = this.findSymbol(this._selection);
+            if (index == null || index < 0) {
+                index = 0;
+            }
+        } else {
+            this._selection = requested;
         }
-        this._index = index;
+        this.refresh();
+        this.select(index);
     };
 
     Window_CabbyCodesDoorVisitorSubtype.prototype.setCounts = function(countMatrix) {
@@ -1537,7 +1561,10 @@
                   ]
                 : [
                       { name: 'All', symbol: 'all' },
-                      { name: 'Forced', symbol: 'force' }
+                      { name: 'Traders', symbol: 'trader' },
+                      { name: 'General', symbol: 'general' },
+                      { name: 'Special', symbol: 'special' },
+                      { name: 'Rare', symbol: 'rare' }
                   ];
         list.forEach(entry => this.addCommand(entry.name, entry.symbol));
     };

@@ -14,7 +14,15 @@
       "Bash(node --check \"C:/Users/Joshua/workspace/GitHub/LOCabbyCodes/CabbyCodes/cabbycodes-freeze-time.js\")",
       "Bash(node --check \"C:/Users/Joshua/workspace/GitHub/LOCabbyCodes/CabbyCodes/cabbycodes-doorbell.js\")",
       "Bash(make deploy *)",
-      "Bash(awk 'NR>=59393 && NR<=70000 && /\"pages\"|\"list\": \\\\[|\"conditions\":/ {print NR\": \"$0}' \"C:/Users/Joshua/workspace/GitHub/LOCabbyCodes/game_files/data/Troops.json\")"
+      "Bash(awk 'NR>=59393 && NR<=70000 && /\"pages\"|\"list\": \\\\[|\"conditions\":/ {print NR\": \"$0}' \"C:/Users/Joshua/workspace/GitHub/LOCabbyCodes/game_files/data/Troops.json\")",
+      "Bash(awk -F: '$2>=71280 && $2<=72160 {print}')",
+      "Bash(awk 'NR>=71280 && NR<=72160 {print NR\": \"$0}' \"C:/Users/Joshua/workspace/GitHub/LOCabbyCodes/game_files/data/Map003.json\")",
+      "Bash(awk 'NR>=71090 && NR<=72300' \"C:/Users/Joshua/workspace/GitHub/LOCabbyCodes/game_files/data/Map003.json\")",
+      "Bash(grep -rn 'setValue.*1005\\\\|\\\\$gameVariables\\\\..*1005\\\\|gameVar.*1005' C:/Users/Joshua/workspace/GitHub/LOCabbyCodes/game_files/)",
+      "Bash(awk 'NR>=70400 && NR<=71080' \"C:/Users/Joshua/workspace/GitHub/LOCabbyCodes/game_files/data/Troops.json\")",
+      "Bash(awk 'NR>=70520 && NR<=71080' \"C:/Users/Joshua/workspace/GitHub/LOCabbyCodes/game_files/data/Troops.json\")",
+      "Bash(awk 'NR>=70520 && NR<=72200' \"C:/Users/Joshua/workspace/GitHub/LOCabbyCodes/game_files/data/Troops.json\")",
+      "Bash(awk 'BEGIN{RS=\"}\"} /valuables/{print; print \"---\"}' \"C:/Users/Joshua/workspace/GitHub/LOCabbyCodes/game_files/data/Items.json\")"
     ]
   }
 }
