@@ -233,6 +233,32 @@
         return getWDItemsBody(item) !== null;
     }
 
+    // itypeId===4 and the <WD_Items:gamemode> tag mark the hidden game-mode selector
+    // entries the base game injects into $dataItems. They're internal plumbing, not
+    // player-facing loot — never list them in the giver UI.
+    function isGamemodeSelectorItem(item) {
+        return !!item && (item.itypeId === 4 || hasWDItemsTag(item, 'gamemode'));
+    }
+
+    // The <WD_Items: nothing> tag marks the placeholder entry the oven/paintable
+    // system uses to represent "no ingredient". Giving it to the player has no
+    // effect and clutters the UI.
+    function isInternalPlaceholderItem(item) {
+        return !!item && hasWDItemsTag(item, 'nothing');
+    }
+
+    // Ranged-weapon armors ship with both loaded and "[Empty]" variants
+    // (Pistol [Empty], SMG [Empty], etc.). The empty copies exist only so the
+    // game can swap to them when ammo runs out — giving one to the player is
+    // worse than giving nothing.
+    const EMPTY_VARIANT_NAME_SUFFIX_REGEX = /\s*\[empty]\s*$/i;
+    function isEmptyAmmoVariant(item) {
+        if (!item || typeof item.name !== 'string') {
+            return false;
+        }
+        return EMPTY_VARIANT_NAME_SUFFIX_REGEX.test(item.name);
+    }
+
     const ITEM_GIVER_SUBTYPE_DEFINITIONS = [
         // Tag-driven rules run first: the game's <WD_Items:...> note is the most specific
         // signal and cross-cuts itypeId (e.g. `videogame` items use itypeId=3, `discObj`
@@ -247,9 +273,7 @@
         { key: 'item-coin',           label: 'Coins',            type: 'item',   match: (it) => it && hasWDItemsTag(it, 'coin') },
         { key: 'item-craft',          label: 'Crafting',         type: 'item',   match: (it) => it && hasWDItemsTag(it, 'craft') },
         { key: 'item-cooking',        label: 'Cooking',          type: 'item',   match: (it) => it && hasWDItemsTag(it, 'cook') },
-        { key: 'item-gamemode',       label: 'Game Modes',       type: 'item',   match: (it) => it && (it.itypeId === 4 || hasWDItemsTag(it, 'gamemode')) },
         { key: 'item-key',            label: 'Key Items',        type: 'item',   match: (it) => it && it.itypeId === 2 },
-        { key: 'item-food',           label: 'Food',             type: 'item',   match: (it) => it && it.itypeId === 3 },
         { key: 'item-regular-tagged', label: 'Regular (Tagged)', type: 'item',   match: (it) => it && it.itypeId === 1 && hasAnyWDItemsTag(it) },
         { key: 'item-regular',        label: 'Regular',          type: 'item',   match: (it) => it && it.itypeId === 1 },
         { key: 'weapon-1',       label: 'Simple',            type: 'weapon', match: (it) => it && it.wtypeId === 1 },
@@ -327,6 +351,13 @@
         for (let i = 0; i < source.length; i++) {
             const dbEntry = source[i];
             if (!dbEntry || !sectionDef.validator(dbEntry) || !hasUsableName(dbEntry)) {
+                continue;
+            }
+
+            if (sectionDef.key === 'item' && isGamemodeSelectorItem(dbEntry)) {
+                continue;
+            }
+            if (isInternalPlaceholderItem(dbEntry) || isEmptyAmmoVariant(dbEntry)) {
                 continue;
             }
 
