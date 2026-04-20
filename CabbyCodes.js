@@ -58,6 +58,7 @@
             'cabbycodes-time-advance-logger.js',
             'cabbycodes-freeze-hygiene.js',
             'cabbycodes-item-giver.js',
+            'cabbycodes-set-time.js',
             'cabbycodes-max-cooking.js',
             'cabbycodes-item-editor.js',
             'cabbycodes-money-editor.js'
