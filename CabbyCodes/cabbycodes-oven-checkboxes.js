@@ -347,11 +347,13 @@
             if (pluginName === WD_PLUGIN_NAME && commandName === 'callItems') {
                 lastWdInvocation = resolveWdInvocation(args);
                 if (lastWdInvocation) {
+                    lastWdInvocation.mapEventName = captureCurrentMapEventName();
                     debugLog(
                         'Captured WD invocation',
                         `idVar=${lastWdInvocation.returnInfo?.idVar || 0}`,
                         `metaTagVar=${lastWdInvocation.selector?.metaTagVarId || 0}`,
-                        `meta=${lastWdInvocation.selector?.metaValue ?? 'null'}`
+                        `meta=${lastWdInvocation.selector?.metaValue ?? 'null'}`,
+                        `event=${lastWdInvocation.mapEventName ?? '<none>'}`
                     );
                 }
             }
@@ -565,6 +567,13 @@
         if (!normalizedMeta) {
             return null;
         }
+        // The Fridge and the Oven map events both open a WD_ItemUse window with
+        // meta="cook" to filter cookable items. Meta alone can't tell them apart,
+        // so only decorate when the calling map event actually looks like an oven
+        // (name matches /oven/i). Without this guard the fridge also gets checkboxes.
+        if (!isOvenCallerEvent(lastWdInvocation?.mapEventName)) {
+            return null;
+        }
         if (normalizedMeta === 'cook') {
             return 'primary';
         }
@@ -572,6 +581,26 @@
             return 'secondary';
         }
         return null;
+    }
+
+    function captureCurrentMapEventName() {
+        if (typeof $gameMap === 'undefined' || !$gameMap) {
+            return null;
+        }
+        const interpreter = $gameMap._interpreter;
+        const eventId = interpreter && typeof interpreter.eventId === 'function'
+            ? interpreter.eventId()
+            : interpreter?._eventId;
+        if (!eventId) {
+            return null;
+        }
+        const gameEvent = typeof $gameMap.event === 'function' ? $gameMap.event(eventId) : null;
+        const data = gameEvent && typeof gameEvent.event === 'function' ? gameEvent.event() : null;
+        return data?.name || null;
+    }
+
+    function isOvenCallerEvent(name) {
+        return typeof name === 'string' && /oven/i.test(name);
     }
 
     function drawWdWindowRow(windowInstance, index) {
