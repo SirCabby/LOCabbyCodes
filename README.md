@@ -145,6 +145,7 @@ This is the most important step. You need to add the CabbyCodes plugin to the ga
 ## Current Features
 
 - **Invincibility Toggle:** Adds an "Invincibility" option to the CabbyCodes section of the Options menu. When enabled, any actor currently in the player's party is prevented from losing HP through combat damage, poison/regen ticks, scripted deaths, or other harmful effects. Toggle it on/off at any time while playing.
+- **One Hit Kill Enemies:** Adds a toggle that amplifies any HP damage dealt to an enemy battler into a lethal blow, so a single hit drops even bosses. Party actors are never affected — healing, regen, and friendly HP changes pass through unchanged.
 - **Status Immunity:** Adds a toggle that blocks negative status effects from being applied to party actors, protecting them from action-restricting, parameter-reducing, or otherwise harmful states.
 - **Always Escape Battles:** Guarantees that the Escape party command succeeds instantly, bypassing the normal escape ratio so you can bail out of encounters without relying on luck.
 - **Stamina Control:** Prevents party actors from spending MP (stamina) when using skills, letting you cast freely without worrying about resource management.

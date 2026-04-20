@@ -43,6 +43,7 @@
             'cabbycodes-delete-save.js',
             'cabbycodes-infinite-money.js',
             'cabbycodes-invincibility.js',
+            'cabbycodes-one-hit-kill.js',
             'cabbycodes-status-immunity.js',
             'cabbycodes-always-escape.js',
             'cabbycodes-stamina.js',
