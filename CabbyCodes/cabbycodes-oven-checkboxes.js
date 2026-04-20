@@ -195,11 +195,18 @@
         }
         let total = 0;
         let discovered = 0;
+        // The Cooking common event sorts the two ingredient ids before dispatching
+        // to recipe branches, so each two-ingredient recipe lives in the cache under
+        // a single orientation (lower id as primary). Treat the item as participating
+        // whether it appears as the stored primary or the stored secondary.
         cache.comboMap.forEach(combo => {
-            if (combo.primaryId !== itemId) {
+            const isPrimary = combo.primaryId === itemId;
+            const isSecondary = combo.secondaryId === itemId;
+            if (!isPrimary && !isSecondary) {
                 return;
             }
-            const cookable = !combo.secondaryId || secondaryInInventory(combo.secondaryId);
+            const otherId = isPrimary ? combo.secondaryId : combo.primaryId;
+            const cookable = !otherId || secondaryInInventory(otherId);
             if (!combo.discovered && !cookable) {
                 return;
             }
@@ -237,8 +244,21 @@
         if (!primaryId || !cache) {
             return false;
         }
-        const combo = cache.comboMap.get(buildCombinationKey(primaryId, normalizedSecondaryId));
-        return !!(combo && combo.discovered);
+        // The Cooking common event sorts the two ingredient ids before resolving
+        // a recipe, so (A,B) and (B,A) always produce the same dish. The combo
+        // cache only stores one orientation; try the reverse when the direct
+        // lookup misses so the checkbox matches regardless of pick order.
+        const direct = cache.comboMap.get(buildCombinationKey(primaryId, normalizedSecondaryId));
+        if (direct && direct.discovered) {
+            return true;
+        }
+        if (primaryId !== normalizedSecondaryId) {
+            const reverse = cache.comboMap.get(buildCombinationKey(normalizedSecondaryId, primaryId));
+            if (reverse && reverse.discovered) {
+                return true;
+            }
+        }
+        return false;
     }
 
     function resolveCheckboxState(windowInstance, item) {
