@@ -97,6 +97,10 @@
         return windowInstance._cabbycodesChoiceVarId;
     }
 
+    function isFeatureEnabled() {
+        return true;
+    }
+
     function shouldDecorate(windowInstance) {
         if (!isFeatureEnabled() || !hasCookbookSupport()) {
             return false;
