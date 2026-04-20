@@ -48,12 +48,22 @@
                 return;
             }
             const result = attemptRefillStatus();
-            if (typeof $gameMessage !== 'undefined' && $gameMessage.add) {
-                $gameMessage.add(result.message);
-            }
+            pushRefillMessageLines(result.messageLines);
             CabbyCodes.setSetting(settingKey, false);
         }
     });
+
+    function pushRefillMessageLines(lines) {
+        if (typeof $gameMessage === 'undefined' || !$gameMessage || !$gameMessage.add) {
+            return;
+        }
+        if (!Array.isArray(lines) || lines.length === 0) {
+            return;
+        }
+        for (const line of lines) {
+            $gameMessage.add(String(line));
+        }
+    }
 
     /**
      * Retrieves the current playable party members.
@@ -130,27 +140,34 @@
         try {
             const partyResult = refillPartyMembers();
             const needsUpdated = refillHiddenNeeds();
-            const message = formatRefillSummary(partyResult, needsUpdated);
+            const lines = formatRefillSummaryLines(partyResult, needsUpdated);
+            const message = lines.join(' ');
             CabbyCodes.log(`[CabbyCodes] ${message}`);
-            return { success: true, message };
+            return { success: true, message, messageLines: lines };
         } catch (error) {
             const message = `Refill Status failed: ${error?.message || error}`;
             CabbyCodes.error(`[CabbyCodes] ${message}`);
-            return { success: false, message };
+            return { success: false, message, messageLines: ['Refill Status failed.', String(error?.message || error)] };
         }
     }
 
     /**
-     * Builds a friendly summary string for logs and user messaging.
+     * Builds a summary split into short lines that fit the message window
+     * (RPG Maker MZ's default window does not word-wrap).
      * @param {{hpRestored: number, mpRestored: number}} partyResult
      * @param {number} needsUpdated
-     * @returns {string}
+     * @returns {string[]}
      */
-    function formatRefillSummary(partyResult, needsUpdated) {
+    function formatRefillSummaryLines(partyResult, needsUpdated) {
         const hpPart = `${partyResult.hpRestored} actor${partyResult.hpRestored === 1 ? '' : 's'} HP-restored`;
         const mpPart = `${partyResult.mpRestored} actor${partyResult.mpRestored === 1 ? '' : 's'} MP-restored`;
         const needsPart = `${needsUpdated} hidden need${needsUpdated === 1 ? '' : 's'} maxed`;
-        return `Refill Status applied: ${hpPart}, ${mpPart}, ${needsPart}.`;
+        return [
+            'Refill Status applied:',
+            `${hpPart},`,
+            `${mpPart},`,
+            `${needsPart}.`
+        ];
     }
 
     function isGameActor(actor) {
@@ -332,9 +349,7 @@
 
     Scene_CabbyCodesRefillConfirm.prototype.onConfirm = function() {
         const result = attemptRefillStatus();
-        if (typeof $gameMessage !== 'undefined' && $gameMessage.add) {
-            $gameMessage.add(result.message);
-        }
+        pushRefillMessageLines(result.messageLines);
         SceneManager.pop();
     };
 
