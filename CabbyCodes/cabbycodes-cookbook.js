@@ -257,8 +257,12 @@
                 ? safeItemName(secondaryItem, entry.secondaryId)
                 : 'Solo';
             const variantNames = entry.variants.map(v => cleanCookbookText(v.dishName, 'Unknown Dish'));
+            // The game's eatCookedMeal event only records dish ids in cookArray when
+            // complexity (var 647) >= 1. Recipes whose variants all run at complexity 0
+            // can never be tracked, so treat them as discovered.
+            const hasTrackableVariant = entry.variants.some(v => Number(v.complexity) >= 1);
             const discovered =
-                hasAutoDiscovery(entry) ||
+                !hasTrackableVariant ||
                 (cookArray ? dishIds.some(id => !!cookArray[id]) : false);
             return {
                 combinationKey: `${entry.primaryId}-${entry.secondaryId || 'solo'}`,
@@ -363,8 +367,9 @@
         const combosByKey = new Map();
         const constraintStack = [];
         const complexityStack = [];
+        const pendingVariants = [];
 
-        for (const command of event.list) {
+        event.list.forEach((command, index) => {
             trimConstraintStack(constraintStack, command.indent);
             trimComplexityStack(complexityStack, command.indent);
 
@@ -397,14 +402,37 @@
                         };
                         combosByKey.set(key, combo);
                     }
-                    combo.variants.push({
+                    const variant = {
                         dishId,
                         dishName,
                         complexity: getCurrentComplexity(complexityStack)
-                    });
+                    };
+                    combo.variants.push(variant);
+                    pendingVariants.push({ variant, captureIndex: index, captureIndent: command.indent });
                 }
             }
-        }
+        });
+
+        // Post-process: each dish id assignment is followed by an unconditional var 647
+        // override in the same primary branch (same indent). The game's cookArray write
+        // (`if var 647 >= 1`) runs after all primary branches, so the effective complexity
+        // for trackability is the LAST same-or-shallower-indent var 647 assignment before
+        // we leave the variant's capturing branch.
+        pendingVariants.forEach(({ variant, captureIndex, captureIndent }) => {
+            let effectiveComplexity = variant.complexity;
+            for (let j = captureIndex + 1; j < event.list.length; j++) {
+                const cmd = event.list[j];
+                if (cmd.indent < captureIndent) break;
+                if (cmd.indent > captureIndent) continue;
+                if (cmd.code === 122 && isSettingComplexityValue(cmd)) {
+                    const v = Number(cmd.parameters?.[4]);
+                    if (Number.isFinite(v)) {
+                        effectiveComplexity = v;
+                    }
+                }
+            }
+            variant.complexity = effectiveComplexity;
+        });
 
         return Array.from(combosByKey.values());
     }
@@ -675,14 +703,6 @@
             return null;
         }
         return $dataCommonEvents.find(evt => evt && evt.name === name) || null;
-    }
-
-    function hasAutoDiscovery(comboEntry) {
-        if (!comboEntry) {
-            return false;
-        }
-        // Single-ingredient (solo) recipes never require discovery marks in-game
-        return !comboEntry.secondaryId;
     }
 
     /**

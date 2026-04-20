@@ -109,8 +109,16 @@
         if (!item || !item.id) {
             return null;
         }
+        if (isNothingItem(item)) {
+            return null;
+        }
         const value = Number(item.id);
         return value > 0 ? value : null;
+    }
+
+    function isNothingItem(item) {
+        const meta = item && item.meta && item.meta.WD_Items;
+        return typeof meta === 'string' && /\bnothing\b/i.test(meta);
     }
 
     function getCurrentPrimarySelection() {
@@ -185,8 +193,30 @@
         if (!cache || !itemId) {
             return false;
         }
-        const summary = cache.primarySummary.get(itemId);
-        return !!(summary && summary.total > 0 && summary.discovered === summary.total);
+        let total = 0;
+        let discovered = 0;
+        cache.comboMap.forEach(combo => {
+            if (combo.primaryId !== itemId) {
+                return;
+            }
+            const cookable = !combo.secondaryId || secondaryInInventory(combo.secondaryId);
+            if (!combo.discovered && !cookable) {
+                return;
+            }
+            total += 1;
+            if (combo.discovered) {
+                discovered += 1;
+            }
+        });
+        return total > 0 && discovered === total;
+    }
+
+    function secondaryInInventory(secondaryId) {
+        if (typeof $gameParty === 'undefined' || typeof $dataItems === 'undefined' || !$dataItems) {
+            return false;
+        }
+        const data = $dataItems[secondaryId];
+        return !!data && $gameParty.numItems(data) > 0;
     }
 
     function evaluateSecondaryCheck(windowInstance, item) {
@@ -196,7 +226,12 @@
 
     function evaluateSecondaryCheckById(cache, normalizedSecondaryId) {
         if (normalizedSecondaryId === null) {
-            return true;
+            const primaryId = getCurrentPrimarySelection();
+            if (!primaryId || !cache) {
+                return false;
+            }
+            const soloCombo = cache.comboMap.get(buildCombinationKey(primaryId, null));
+            return !soloCombo || !!soloCombo.discovered;
         }
         const primaryId = getCurrentPrimarySelection();
         if (!primaryId || !cache) {
@@ -465,6 +500,7 @@
 
         const originalRefresh = windowInstance.refresh;
         windowInstance.refresh = function() {
+            sharedCombinationCache = null;
             this._cabbycodesWdList = buildWdItemList(context.selector, this._cabbycodesWdContext.mode);
             return originalRefresh.apply(this, arguments);
         };
@@ -549,13 +585,18 @@
         const drawWidth = Math.max(0, textWidth - checkboxSize);
         windowInstance.drawTextEx(label, textX, rect.y, drawWidth);
 
-        const checked = resolveWdCheckboxState(windowInstance._cabbycodesWdContext, itemData);
-        drawCheckbox(windowInstance, checkboxX, checkboxY, checkboxSize, checked);
+        const context = windowInstance._cabbycodesWdContext;
+        const skipCheckbox = context.mode === 'primary' && isNothingItem(itemData?.data);
+        let checked = null;
+        if (!skipCheckbox) {
+            checked = resolveWdCheckboxState(context, itemData);
+            drawCheckbox(windowInstance, checkboxX, checkboxY, checkboxSize, checked);
+        }
         debugLog(
             'Drawing WD row',
-            `mode=${windowInstance._cabbycodesWdContext.mode}`,
+            `mode=${context.mode}`,
             `index=${index}`,
-            `checked=${checked}`,
+            `checked=${skipCheckbox ? 'skipped' : checked}`,
             `label=${label}`
         );
     }
@@ -569,10 +610,10 @@
             return evaluatePrimaryCheckById(cache, itemData?.id);
         }
         if (context.mode === 'secondary') {
-            if (!itemData || itemData.isNothing) {
-                return true;
-            }
-            const normalized = normalizeSecondaryId({ id: itemData.id });
+            const source = itemData?.isNothing
+                ? null
+                : (itemData?.data || (itemData?.id ? { id: itemData.id } : null));
+            const normalized = normalizeSecondaryId(source);
             return evaluateSecondaryCheckById(cache, normalized);
         }
         return false;
