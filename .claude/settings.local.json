@@ -22,7 +22,9 @@
       "Bash(awk 'NR>=70400 && NR<=71080' \"C:/Users/Joshua/workspace/GitHub/LOCabbyCodes/game_files/data/Troops.json\")",
       "Bash(awk 'NR>=70520 && NR<=71080' \"C:/Users/Joshua/workspace/GitHub/LOCabbyCodes/game_files/data/Troops.json\")",
       "Bash(awk 'NR>=70520 && NR<=72200' \"C:/Users/Joshua/workspace/GitHub/LOCabbyCodes/game_files/data/Troops.json\")",
-      "Bash(awk 'BEGIN{RS=\"}\"} /valuables/{print; print \"---\"}' \"C:/Users/Joshua/workspace/GitHub/LOCabbyCodes/game_files/data/Items.json\")"
+      "Bash(awk 'BEGIN{RS=\"}\"} /valuables/{print; print \"---\"}' \"C:/Users/Joshua/workspace/GitHub/LOCabbyCodes/game_files/data/Items.json\")",
+      "Bash(python -c ' *)",
+      "Bash(python *)"
     ]
   }
 }

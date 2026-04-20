@@ -38,8 +38,6 @@
         17,  // currentMinute
         18,  // roomsVisited / travel fatigue accumulator
         20,  // clockHour (rendered hour)
-        21,  // statSocial
-        22,  // statCalm
         48,  // Door event timer
         49,  // Door event label
         50,  // Door hour slot
