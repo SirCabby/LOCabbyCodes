@@ -51,6 +51,8 @@
     const PSEUDO_KEY_ITEM_IDS_UNPROTECTED = new Set([
         5,   // Rat Baby Thing
         128, // Marc-André (napping)
+        170, // Roach — hitchhiker pest; must drain naturally. Max-all-items
+             //   still tops it up because that path uses a positive delta.
         283, // Empty Lunchbox
         284, // Papineau's Lunch
         289, // Sapper Charge
@@ -165,13 +167,30 @@
         return undefined;
     }
 
+    // Counter so explicit user-driven edits (e.g. the item editor's delete /
+    // decrease buttons) can bypass the protection without turning the feature
+    // off. Uses a depth so nested bypasses work correctly.
+    let bypassDepth = 0;
+    CabbyCodes.infiniteConsumables = CabbyCodes.infiniteConsumables || {};
+    CabbyCodes.infiniteConsumables.withBypass = function(fn) {
+        if (typeof fn !== 'function') {
+            return undefined;
+        }
+        bypassDepth++;
+        try {
+            return fn();
+        } finally {
+            bypassDepth--;
+        }
+    };
+
     CabbyCodes.override(
         Game_Party.prototype,
         'gainItem',
         function(item, amount, includeEquip) {
             const normalizedAmount = typeof amount === 'number' ? amount : 0;
 
-            if (normalizedAmount < 0 && isProtectedItem(item)) {
+            if (normalizedAmount < 0 && bypassDepth === 0 && isProtectedItem(item)) {
                 return;
             }
 

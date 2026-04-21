@@ -179,7 +179,7 @@
             const targetQuantity = Math.max(1, newQuantity);
             const delta = targetQuantity - currentCount;
             if (delta !== 0) {
-                $gameParty.gainItem(item, delta);
+                bypassInfiniteItems(() => $gameParty.gainItem(item, delta));
             }
             this.refreshSceneData();
             this.reactivateSceneInputs();
@@ -209,7 +209,7 @@
             const { item } = this.sceneState;
             const currentCount = $gameParty.numItems(item);
             if (currentCount > 0) {
-                $gameParty.gainItem(item, -currentCount);
+                bypassInfiniteItems(() => $gameParty.gainItem(item, -currentCount));
             }
             this.refreshSceneData();
             this.reactivateSceneInputs();
@@ -1088,6 +1088,16 @@
 
     function clamp(value, min, max) {
         return Math.max(min, Math.min(max, value));
+    }
+
+    // User-driven edits must win over the Infinite Items toggle, which
+    // otherwise swallows every negative-delta gainItem for protected items.
+    function bypassInfiniteItems(fn) {
+        const wrapper = CabbyCodes.infiniteConsumables?.withBypass;
+        if (typeof wrapper === 'function') {
+            return wrapper(fn);
+        }
+        return fn();
     }
 
     CabbyCodes.log('[CabbyCodes] Item editor loaded');
