@@ -3271,7 +3271,13 @@
         if (!isValidItemEntry(entry)) {
             return false;
         }
-        return !isKeyItemData(entry.item);
+        if (isKeyItemData(entry.item)) {
+            return false;
+        }
+        if (isPseudoKeyCatalogItem(entry.item)) {
+            return false;
+        }
+        return true;
     }
 
     function isKeyItemData(item) {
@@ -3280,6 +3286,46 @@
         }
         const typeId = Number(item.itypeId);
         return Number.isFinite(typeId) && typeId === 2;
+    }
+
+    // Regular items (itypeId === 1) that the game treats as key-item-like:
+    // given/taken by scripted events in specific counts. Bulk shortcuts
+    // (Give Missing Items, Max Items in Inventory) must skip these so
+    // they do not desync quest counters. Individual granting through the
+    // main Item Giver UI is unaffected — it uses collectAllItems(), not
+    // isGrantableCatalogEntry().
+    const PSEUDO_KEY_CATALOG_ITEM_IDS = new Set([
+        5,   // Rat Baby Thing
+        128, // Marc-André (napping)
+        283, // Empty Lunchbox
+        284, // Papineau's Lunch
+        286, // Ice Melt Salt
+        289, // Sapper Charge
+        291, // Dog Tags
+        320, // Simple Key
+        354, // Eye
+        359, // Cassette Tape
+        361, // Four-Leaf Clover
+        367, // Tickle's Gift
+        372, // Tired Medic-in-a-Jar
+        375, // Rat Tail
+        379, // Plumbing Tools
+        381, // Potting Soil
+        382, // Worm Egg
+        396, // Rebreather
+        651, // green key
+        652, // red key
+        653, // yellow key
+        654, // blue key
+        655, // white key
+        656  // black key
+    ]);
+
+    function isPseudoKeyCatalogItem(item) {
+        if (!item) {
+            return false;
+        }
+        return PSEUDO_KEY_CATALOG_ITEM_IDS.has(item.id);
     }
 
     function ensureGamePartyForItemShortcuts(actionName) {

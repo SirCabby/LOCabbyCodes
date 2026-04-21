@@ -40,6 +40,37 @@
 
     const isFeatureEnabled = () => CabbyCodes.getSetting(settingKey, false);
 
+    // Regular items (itypeId === 1) that the game treats as key-item-like:
+    // given/taken by scripted events with counts that drive quest logic.
+    // Protecting them breaks progression, so the Infinite Items toggle
+    // must let their counts decrease normally.
+    //
+    // NOTE: narrower than the item-giver catalog exclusion on purpose —
+    // Ice Melt Salt (286), Simple Key (320), Rat Tail (375), Worm Egg (382)
+    // are collectibles the player wants refilled, so they stay protected.
+    const PSEUDO_KEY_ITEM_IDS_UNPROTECTED = new Set([
+        5,   // Rat Baby Thing
+        128, // Marc-André (napping)
+        283, // Empty Lunchbox
+        284, // Papineau's Lunch
+        289, // Sapper Charge
+        291, // Dog Tags
+        354, // Eye
+        359, // Cassette Tape
+        361, // Four-Leaf Clover
+        367, // Tickle's Gift
+        372, // Tired Medic-in-a-Jar
+        379, // Plumbing Tools
+        381, // Potting Soil
+        396, // Rebreather
+        651, // green key
+        652, // red key
+        653, // yellow key
+        654, // blue key
+        655, // white key
+        656  // black key
+    ]);
+
     /**
      * Determines whether the provided item is one of the temporary
      * gamemode selector tokens that the base game injects into the
@@ -81,9 +112,11 @@
 
     /**
      * Determines whether the provided item should be protected from
-     * decreasing counts while the infinite items toggle is on. Key items
-     * (itypeId === 2) are excluded so quest scripting can still consume
-     * them, alongside the hidden gamemode selector tokens.
+     * decreasing counts while the infinite items toggle is on. Excludes
+     * key items (itypeId === 2), the hidden gamemode selector tokens,
+     * and a curated set of regular items that the game takes away by
+     * event (PSEUDO_KEY_ITEM_IDS_UNPROTECTED) so quest scripting still
+     * works.
      * @param {RPG.Item | RPG.Weapon | RPG.Armor} item
      * @returns {boolean}
      */
@@ -103,6 +136,9 @@
             }
             const typeId = Number(item.itypeId);
             if (Number.isFinite(typeId) && typeId === 2) {
+                return false;
+            }
+            if (PSEUDO_KEY_ITEM_IDS_UNPROTECTED.has(item.id)) {
                 return false;
             }
             return true;
