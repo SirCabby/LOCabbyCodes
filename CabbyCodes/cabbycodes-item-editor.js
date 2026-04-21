@@ -533,7 +533,7 @@
         const maxAvailable = Math.max(BUTTON_MIN_SIZE, Math.min(BUTTON_MAX_SIZE, buttonSpace, buttonHeight));
         const buttonSize = clamp(BUTTON_TARGET_SIZE, BUTTON_MIN_SIZE, maxAvailable);
         const buttonRect = new Rectangle(
-            rect.x,
+            rect.x + rect.width - buttonSize,
             rect.y + Math.floor((rect.height - buttonSize) / 2),
             buttonSize,
             buttonSize
@@ -541,15 +541,14 @@
         ItemEditor.storeButtonRect(this, index, buttonRect);
 
         const numberWidth = this.numberWidth();
-        const offsetX = rect.x + buttonRect.width + BUTTON_GAP;
         const contentWidth = Math.max(0, rect.width - buttonRect.width - BUTTON_GAP);
         const nameWidth = Math.max(0, contentWidth - numberWidth);
 
         this.changePaintOpacity(true);
         drawEditButton(this, buttonRect, true);
         this.changePaintOpacity(this.isEnabled(item));
-        this.drawItemName(item, offsetX, rect.y, nameWidth);
-        this.drawItemNumber(item, offsetX, rect.y, contentWidth);
+        this.drawItemName(item, rect.x, rect.y, nameWidth);
+        this.drawItemNumber(item, rect.x, rect.y, contentWidth);
         this.changePaintOpacity(true);
     });
 
