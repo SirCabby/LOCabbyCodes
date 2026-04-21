@@ -9,8 +9,9 @@
  * Adds an Options menu toggle that keeps item counts from decreasing.
  * Items can still be gained normally, but using them, handing them to
  * visitors, or otherwise spending them no longer reduces the party
- * inventory while the toggle is enabled. Weapons and armor are not
- * affected by this toggle.
+ * inventory while the toggle is enabled. Weapons, armor, and key items
+ * are not affected by this toggle — key items are quest progression
+ * currency and must be consumed for scripted events to advance.
  */
 
 (() => {
@@ -80,7 +81,9 @@
 
     /**
      * Determines whether the provided item should be protected from
-     * decreasing counts while the infinite items toggle is on.
+     * decreasing counts while the infinite items toggle is on. Key items
+     * (itypeId === 2) are excluded so quest scripting can still consume
+     * them, alongside the hidden gamemode selector tokens.
      * @param {RPG.Item | RPG.Weapon | RPG.Armor} item
      * @returns {boolean}
      */
@@ -96,6 +99,10 @@
                 return false;
             }
             if (isGamemodeSelectorItem(item)) {
+                return false;
+            }
+            const typeId = Number(item.itypeId);
+            if (Number.isFinite(typeId) && typeId === 2) {
                 return false;
             }
             return true;
