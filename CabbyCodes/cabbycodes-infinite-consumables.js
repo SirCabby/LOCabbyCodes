@@ -50,6 +50,13 @@
     // are collectibles the player wants refilled, so they stay protected.
     const PSEUDO_KEY_ITEM_IDS_UNPROTECTED = new Set([
         5,   // Rat Baby Thing
+        41,  // Coffee — CE 6 newDay runs a "while Coffee in party, remove 1
+             //   Coffee + add 1 Cold Coffee" loop (CommonEvents.json CE6
+             //   cmd66-76). The loop exits on the in-party check, not a
+             //   counter, so protecting Coffee makes newDay spin forever
+             //   and hard-freeze the game the first time you sleep past
+             //   midnight with a coffee in your inventory. Coffee is
+             //   decremented nowhere else in the game data.
         128, // Marc-André (napping)
         170, // Roach — hitchhiker pest; must drain naturally. Max-all-items
              //   still tops it up because that path uses a positive delta.
