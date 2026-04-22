@@ -87,6 +87,7 @@ IDs 1–5 are `-Reserved N-`. Notable named slots used heavily by the engine:
 | 68–69 | `varmetaTag*` | Populated from `<varmetaTag:...>` note-tag reads |
 | 70–79 | Crafting / oven state (`ItemCooking1/2`, `itemCreated`, `recipeIndex`, etc.) | Kitchen mini-game |
 | 81–101 | Named per-videogame sessions (`Super Jumplad`, `Catafalque`, etc.) | Arcade-cabinet state |
+| 187 | `armChoice` | Arm-sacrifice outcome: `0` = both arms, `1` = lost right hand, `2` = lost left hand. Enforced by `TunicateScripts.js` (also in `bunchastuff_old.js`): `canEquipWeapon` / `canEquipArmor` block gear, `Window_StatusBase.actorSlotName` renames the slot to "Gnawed Off", and `Game_Actor.setCharacterImage` / `Game_CharacterBase.setImage` append `_MissingRightarm` or `_MissingLeftarm` to actor 1's `_characterName`. Separately, States 33 ("Mangled right hand", code-54 sealing equipType 1) and 34 ("Mangled left hand", code-54 sealing equipType 2) seal the actual equip slot itself so the menu greys it out — the in-game arm-loss event applies these via a path not visible to static grep (no code-313, no skill/item effects, no plugin `addState` reference). Toggling var 187 via cheat needs four reconciles on actor 1: (a) `removeState(33)` + `removeState(34)` to unseal the slot, (b) `releaseUnequippableItems(false)` to drop now-illegal gear, (c) strip the `_Missing(Right\|Left)arm$` suffix and re-call `setCharacterImage(baseName, idx)` so the suffix matches the new value (the override only triggers when the input name is in `arm_change_sprites = ["Chara_Player"]`, so the suffixed name is sticky), and (d) `$gamePlayer.refresh()` + `$gamePlayer.followers().refresh()` to repaint the on-map sprite. |
 
 Cross-check before writing: `cabbycodes-freeze-time.js`, `cabbycodes-doorbell.js`,
 and `cabbycodes-hidden-stats-display.js` already hardcode these IDs. When a
@@ -114,9 +115,46 @@ patch shifts an ID, grep those files first.
 | 68 | `needAmmoSpend` | Ammo-consume request from a skill |
 | 78 | `DISABLEPARALLEL` | Global kill-switch for parallel common events |
 
-Recruitment flags (`recruitedDan`, `recruitedJoel`, `recruitedLeigh`,
-`recruitedHellen`, `recruitedShadow`) live at IDs 27, 32–35 and are safe to
-read for feature gating but should **not** be toggled by the mod.
+### Recruit-tracking switches
+
+The game gates each recruitable companion behind a `recruitedX` switch.
+Flipping the switch ON does **not** add the actor to the party by itself —
+the in-game recruit Common Event runs `code:121 Set Switch` *and then*
+`code:129 Add Party Member`. The cheat (`cabbycodes-story-flags.js`)
+mirrors that pairing so a toggle "actually" recruits.
+
+IDs computed from `System.json` line numbers using offset 362 (`someoneAtDoor`
+line 386 ↔ switch ID 24), cross-checked against the dev "Recruit ALL" menu
+at `Map003.json:23690+` which labels each branch by character name.
+
+| Switch ID | Name | Actor ID | Notes |
+| --- | --- | --- | --- |
+| 27  | `recruitedShadow`     | (none)        | Shadow is summoned, not a normal party actor |
+| 32  | `recruitedDan`        | 6             | Dev menu confirms `"Recruit Dan"` → switch 32 |
+| 33  | `recruitedJoel`       | 4             | High-traffic flag; gated by lots of dialogue |
+| 34  | `recruitedLeigh`      | 5             | Dev menu confirms `"Recruit Leigh"` → switch 34 |
+| 35  | `recruitedHellen`     | 7             | Dev menu confirms `"Recruit Hellen"` → switch 35 |
+| 361 | `recruitedErnest`     | 11            | Pairs with `ErnestTempRecruit` (792, probationary) |
+| 362 | `recruitedSophie`     | 12            | Dev menu confirms `"Recruit Sophie"` → switch 362 |
+| 363 | `recruitedGoths`      | (multi)       | Covers ≥2 goth actors (user-confirmed). Leave `actorId` unset in the cheat so only the switch flips. |
+| 369 | `recruitedRoaches`    | 10            | |
+| 370 | `recruitedRoachesFull`| —             | **Dead** (never written, barely read). Skip. |
+| 371 | `recruitedMorton`     | 16            | |
+| 372 | `recruitedKindface`   | —             | **Dead** (no matching actor). Skip. |
+| 373 | `recruitedMelted`     | 18 (Melt)     | **Dead** switch — Melt is recruited via a different path |
+| 374 | `recruitedAster`      | 3             | |
+| 375 | `recruitedSpider`     | 19            | |
+| 376 | `recruitedLyle`       | 2             | |
+| 377 | `recruitedWretch`     | 9 (Wretch)    | **Dead** switch — Wretch is recruited via a different path |
+| 378 | `recruitedPapineau`   | 13            | |
+| 379 | `recruitedPhilippe`   | 26            | |
+| 380 | `recruitedAudrey`     | 22            | |
+| 792 | `ErnestTempRecruit`   | 11            | Probationary state; toggle does **not** call addActor |
+
+Read flags freely for feature gating. Writes are now mod-managed via the
+Story Flags cheat — when adding new features that mutate recruit state,
+go through the same flag definitions to keep the switch + actor party
+membership in sync.
 
 ---
 

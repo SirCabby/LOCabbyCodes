@@ -65,7 +65,8 @@
             'cabbycodes-set-danger.js',
             'cabbycodes-max-cooking.js',
             'cabbycodes-item-editor.js',
-            'cabbycodes-money-editor.js'
+            'cabbycodes-money-editor.js',
+            'cabbycodes-story-flags.js'
         ];
         
         scripts.forEach((scriptName) => {
