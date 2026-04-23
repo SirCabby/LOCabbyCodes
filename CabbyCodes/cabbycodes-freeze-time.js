@@ -168,6 +168,58 @@
     }
     freezeTimeApi.exemptFromRestore = exemptFromRestore;
 
+    // Scoped bypass for a caller that *wants* TimePasses to cascade while
+    // freeze is on (e.g., the Set Time cheat jumping forward so sleep-style
+    // HourPassed / newDay events fire). While any token is active:
+    //   - the var-19 drain is suppressed (delta minutes survive)
+    //   - command117 does NOT block HourPassed / newDay under TimePasses
+    //   - the restore loop and safety-net drift check stay paused
+    // On release (refcount → 0) we re-snapshot the frozen IDs from current
+    // game state so freeze resumes at the advanced moment instead of rubber-
+    // banding back to the pre-advance values.
+    let advanceModeRefCount = 0;
+
+    function advanceModeActive() {
+        return advanceModeRefCount > 0;
+    }
+
+    function resyncAllFrozenSnapshot() {
+        if (!snapshotCaptured) {
+            return;
+        }
+        if (typeof $gameVariables === 'undefined' || !$gameVariables) {
+            return;
+        }
+        for (const id of FROZEN_VARIABLE_IDS) {
+            frozenVariableValues[id] = readVariableRaw(id);
+        }
+        if (typeof $gameSwitches !== 'undefined' && $gameSwitches) {
+            for (const id of FROZEN_SWITCH_IDS) {
+                frozenSwitchValues[id] = $gameSwitches.value(id);
+            }
+        }
+        lastRestoreAt = nowMs();
+    }
+
+    function beginAdvance() {
+        advanceModeRefCount += 1;
+        let released = false;
+        return {
+            release() {
+                if (released) {
+                    return;
+                }
+                released = true;
+                advanceModeRefCount = Math.max(0, advanceModeRefCount - 1);
+                if (advanceModeRefCount === 0) {
+                    resyncAllFrozenSnapshot();
+                }
+            }
+        };
+    }
+    freezeTimeApi.beginAdvance = beginAdvance;
+    freezeTimeApi.isAdvanceActive = advanceModeActive;
+
     // ----- State -----
     const frozenVariableValues = Object.create(null);
     const frozenSwitchValues = Object.create(null);
@@ -265,6 +317,7 @@
         }
         exemptVariableRefCounts.clear();
         exemptSwitchRefCounts.clear();
+        advanceModeRefCount = 0;
         snapshotCaptured = false;
         if (pendingRestoreTimer !== null) {
             clearTimeout(pendingRestoreTimer);
@@ -292,7 +345,7 @@
     }
 
     function enforceSnapshot() {
-        if (!isFreezeEnabled() || !snapshotCaptured) {
+        if (!isFreezeEnabled() || !snapshotCaptured || advanceModeActive()) {
             return false;
         }
         if (typeof $gameVariables === 'undefined' || !$gameVariables) {
@@ -349,7 +402,7 @@
     }
 
     function scheduleRestore() {
-        if (!isFreezeEnabled() || !snapshotCaptured) {
+        if (!isFreezeEnabled() || !snapshotCaptured || advanceModeActive()) {
             return;
         }
         const elapsed = nowMs() - lastRestoreAt;
@@ -443,6 +496,7 @@
         if (
             !drainingVar19 &&
             !restoringSnapshot &&
+            !advanceModeActive() &&
             numericId === MINUTES_PASS_VAR &&
             isFreezeEnabled() &&
             snapshotCaptured
@@ -462,12 +516,15 @@
     });
 
     // ----- command117: suppress HourPassed / newDay ONLY when cascading from TimePasses.
-    //       Direct calls from story events (e.g. Map 3 event 9) still fire normally. -----
+    //       Direct calls from story events (e.g. Map 3 event 9) still fire normally.
+    //       Advance-mode tokens (e.g. Set Time forward-jump under freeze) skip the
+    //       block so sleep-style cascades do run when a caller explicitly asks. -----
     CabbyCodes.override(Game_Interpreter.prototype, 'command117', function(parameters) {
         const ceId = Number(Array.isArray(parameters) ? parameters[0] : NaN);
 
         if (
             isFreezeEnabled() &&
+            !advanceModeActive() &&
             (ceId === HOUR_PASSED_COMMON_EVENT || ceId === NEW_DAY_COMMON_EVENT) &&
             this._cabbycodesInTimePasses
         ) {
@@ -487,7 +544,7 @@
 
     // ----- Restore on interpreter terminate (debounced) -----
     CabbyCodes.after(Game_Interpreter.prototype, 'terminate', function() {
-        if (!isFreezeEnabled() || !snapshotCaptured) {
+        if (!isFreezeEnabled() || !snapshotCaptured || advanceModeActive()) {
             return;
         }
         scheduleRestore();
@@ -495,7 +552,7 @@
 
     // ----- Safety-net: low-frequency drift check on the map update -----
     CabbyCodes.after(Game_Map.prototype, 'update', function() {
-        if (!isFreezeEnabled() || !snapshotCaptured) {
+        if (!isFreezeEnabled() || !snapshotCaptured || advanceModeActive()) {
             return;
         }
         const elapsed = nowMs() - lastRestoreAt;

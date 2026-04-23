@@ -9,14 +9,23 @@
  * Adds a "Set Game Time" press option that opens a picker with three
  * dropdowns (hour 0-23, minute in 15-minute steps matching the in-game
  * clock, and absolute day). A confirmation prompt appears before the new
- * values are written. Cooperates with Freeze Time by acquiring an
- * exempt-from-restore token across the writes, so picking a time while
- * frozen re-freezes at the chosen moment instead of snapping back.
+ * values are written.
  *
- * Note: writing the day counter directly does NOT reset per-day switches
- * (daily quests, news posts, etc.) because the game's newDay common
- * event only fires on hour 24 -> 0 rollover. Use the bedroom to get
- * normal sleep semantics.
+ * Forward jumps feed the delta into the pending-minutes accumulator
+ * (var 19) and run the TimePasses common event — the same pattern used
+ * by in-game activities like crosswords. HourPassed (stat decay, quest
+ * timers, door spawns) fires per hour and newDay (daily resets, shop
+ * refreshes, plant health) fires on each 4 AM crossing. With Freeze
+ * Time off the cascade is reserved on the common-event queue; with
+ * Freeze Time on the cascade runs synchronously inside a freeze-time
+ * advance-mode token (see cabbycodes-freeze-time.js::beginAdvance) so
+ * the var-19 drain, HourPassed/newDay block, and restore loop stand
+ * aside only for this explicit call. Normal time-burning activities
+ * (crossword, cooking, laptop) stay suppressed under freeze.
+ *
+ * Backward/zero-delta jumps still fall back to a direct variable
+ * write with no cascade, holding an exempt-from-restore token across
+ * the write so the frozen clock re-freezes at the chosen moment.
  */
 
 (() => {
@@ -28,6 +37,7 @@
     }
 
     const SETTING_KEY = 'setGameTime';
+    const FREEZE_SETTING_KEY = 'freezeTimeOfDay';
     const LOG_PREFIX = '[CabbyCodes][SetTime]';
     const DISPLAYED_TIME_VAR = 12;
     const CALENDAR_DAY_VAR = 14;
@@ -35,6 +45,10 @@
     const CURRENT_HOUR_VAR = 16;
     const CURRENT_MINUTE_VAR = 17;
     const MINUTES_PASS_VAR = 19;
+    const TIME_PASSES_COMMON_EVENT = 4;
+    const NEW_DAY_COMMON_EVENT = 6;
+    const MINUTES_PER_DAY = 24 * 60;
+    const FOUR_AM_MINUTES = 4 * 60;
     const MINUTE_STEP = 15;
     const DAY_MIN = 0;
     const DAY_MIN_CEILING = 20;
@@ -138,16 +152,195 @@
         SceneManager.push(Scene_CabbyCodesSetTime);
     }
 
+    function canReserveTimePasses() {
+        return (
+            typeof $gameTemp !== 'undefined' &&
+            $gameTemp &&
+            typeof $gameTemp.reserveCommonEvent === 'function' &&
+            Array.isArray(window.$dataCommonEvents) &&
+            window.$dataCommonEvents[TIME_PASSES_COMMON_EVENT]
+        );
+    }
+
+    function canRunCommonEventSync(commonEventId) {
+        return (
+            typeof Game_Interpreter !== 'undefined' &&
+            Array.isArray(window.$dataCommonEvents) &&
+            window.$dataCommonEvents[commonEventId] &&
+            Array.isArray(window.$dataCommonEvents[commonEventId].list)
+        );
+    }
+
+    // Drives a Game_Interpreter to completion in the current call stack so the
+    // caller knows exactly when the cascade finishes. Safe for TimePasses /
+    // HourPassed / newDay because they contain no waits, messages, or scene
+    // transfers — only variable/switch ops, conditional branches, loops,
+    // scripts, SE playback, and CALL Common Event. Used by the freeze-on
+    // forward-jump path so advance-mode tokens can be released immediately
+    // after the cascade instead of needing an async idle detector.
+    function runCommonEventSynchronously(commonEventId) {
+        if (!canRunCommonEventSync(commonEventId)) {
+            return false;
+        }
+        const ce = window.$dataCommonEvents[commonEventId];
+        const interpreter = new Game_Interpreter();
+        interpreter.setup(ce.list, 0);
+        // Disable the per-frame 100k-command freeze guard; our loop runs the
+        // interpreter across what the game would consider many frames at once.
+        interpreter.checkFreeze = () => false;
+        const MAX_UPDATES = 1000;
+        let updates = 0;
+        while (interpreter.isRunning() && updates < MAX_UPDATES) {
+            interpreter.update();
+            updates += 1;
+        }
+        if (interpreter.isRunning()) {
+            CabbyCodes.warn(
+                `${LOG_PREFIX} Common Event ${commonEventId} exceeded the sync `
+                    + `update budget (${MAX_UPDATES}); aborting cascade.`
+            );
+            return false;
+        }
+        return true;
+    }
+
+    // TimePasses' drain loop only fires newDay once per call (gated by switch
+    // 40, which resets at the start of every TimePasses). For a multi-day
+    // jump, count how many 4 AM boundaries fall inside (oldMin, newMin] and
+    // queue one extra newDay for each boundary past the first.
+    function countFourAmCrossings(oldTotalMin, newTotalMin) {
+        if (newTotalMin <= oldTotalMin) {
+            return 0;
+        }
+        const dayOfOld = Math.floor(oldTotalMin / MINUTES_PER_DAY);
+        let nextFourAm = dayOfOld * MINUTES_PER_DAY + FOUR_AM_MINUTES;
+        if (nextFourAm <= oldTotalMin) {
+            nextFourAm += MINUTES_PER_DAY;
+        }
+        if (nextFourAm > newTotalMin) {
+            return 0;
+        }
+        return Math.floor((newTotalMin - nextFourAm) / MINUTES_PER_DAY) + 1;
+    }
+
     function applyTime(newHour, newMinute, newDay) {
         if (!isSessionReady()) {
             return false;
         }
         const api = CabbyCodes.freezeTime;
-        // Exempt vars 12 (displayedTime string) and 14 (calendarDay) alongside the
-        // primary hour/minute/day/accumulator. If Freeze Time is on, its snapshot
-        // was captured before we changed anything, so leaving 12/14 restricted
-        // would let the restore loop overwrite the HUD time string and day prefix
-        // back to their pre-change values.
+        const freezeActive = CabbyCodes.getSetting(FREEZE_SETTING_KEY, false);
+        const current = readCurrentTime();
+        const oldTotalMin =
+            current.day * MINUTES_PER_DAY + current.hour * 60 + current.minute;
+        const newTotalMin = newDay * MINUTES_PER_DAY + newHour * 60 + newMinute;
+        const deltaMin = newTotalMin - oldTotalMin;
+
+        // Forward-in-time jump with Freeze Time off: mirror what in-game
+        // activities (cooking, crosswords, laptop) do — feed the delta into
+        // the minutes-pass accumulator and reserve TimePasses. The drain
+        // loop inside TimePasses advances the clock one hour at a time,
+        // firing HourPassed each iteration (stat decay, quest timers, door
+        // spawns) and newDay at the 4 AM rollover. Extra newDay events are
+        // queued for jumps that span multiple 4 AM boundaries.
+        if (deltaMin > 0 && !freezeActive && canReserveTimePasses()) {
+            try {
+                const pendingBefore =
+                    Number($gameVariables.value(MINUTES_PASS_VAR)) || 0;
+                $gameVariables.setValue(MINUTES_PASS_VAR, pendingBefore + deltaMin);
+                $gameTemp.reserveCommonEvent(TIME_PASSES_COMMON_EVENT);
+                const extraNewDays = Math.max(
+                    0,
+                    countFourAmCrossings(oldTotalMin, newTotalMin) - 1
+                );
+                for (let i = 0; i < extraNewDays; i += 1) {
+                    $gameTemp.reserveCommonEvent(NEW_DAY_COMMON_EVENT);
+                }
+                CabbyCodes.log(
+                    `${LOG_PREFIX} Queued TimePasses to ${formatDayTime(newDay, newHour, newMinute)}: `
+                        + `+${deltaMin}min, extraNewDays=${extraNewDays}`
+                );
+                return true;
+            } catch (error) {
+                CabbyCodes.error(
+                    `${LOG_PREFIX} Queue failed, falling back to direct write: `
+                        + `${error?.message || error}`
+                );
+                // Fall through to the direct-write path below.
+            }
+        }
+
+        // Forward-in-time jump with Freeze Time on: fire the same cascade as
+        // above, but synchronously inside a freeze-time advance-mode token so
+        // the var-19 drain, HourPassed/newDay block, restore loop, and safety
+        // net all step aside for the duration of the cascade. After the
+        // cascade, releasing the token re-snapshots freeze-time at the new
+        // moment — the frozen clock resumes at the chosen time instead of
+        // rubber-banding back. Background activities (cooking, crosswords,
+        // parallel TickTock) stay suppressed because the advance flag is only
+        // held across this explicit call.
+        if (
+            deltaMin > 0 &&
+            freezeActive &&
+            api &&
+            typeof api.beginAdvance === 'function' &&
+            canRunCommonEventSync(TIME_PASSES_COMMON_EVENT)
+        ) {
+            const advanceToken = api.beginAdvance();
+            let cascadeOk = false;
+            try {
+                const pendingBefore =
+                    Number($gameVariables.value(MINUTES_PASS_VAR)) || 0;
+                $gameVariables.setValue(MINUTES_PASS_VAR, pendingBefore + deltaMin);
+                cascadeOk = runCommonEventSynchronously(TIME_PASSES_COMMON_EVENT);
+                if (cascadeOk) {
+                    const extraNewDays = Math.max(
+                        0,
+                        countFourAmCrossings(oldTotalMin, newTotalMin) - 1
+                    );
+                    for (let i = 0; i < extraNewDays; i += 1) {
+                        if (!runCommonEventSynchronously(NEW_DAY_COMMON_EVENT)) {
+                            cascadeOk = false;
+                            break;
+                        }
+                    }
+                }
+                if (cascadeOk) {
+                    if (
+                        CabbyCodes.clockDisplay &&
+                        typeof CabbyCodes.clockDisplay.refreshActiveWindow === 'function'
+                    ) {
+                        CabbyCodes.clockDisplay.refreshActiveWindow();
+                    }
+                    CabbyCodes.log(
+                        `${LOG_PREFIX} Advanced (frozen) to `
+                            + `${formatDayTime(newDay, newHour, newMinute)}: +${deltaMin}min`
+                    );
+                    return true;
+                }
+                CabbyCodes.warn(
+                    `${LOG_PREFIX} Frozen advance cascade failed; falling back to direct write.`
+                );
+            } catch (error) {
+                CabbyCodes.error(
+                    `${LOG_PREFIX} Frozen advance threw, falling back to direct write: `
+                        + `${error?.message || error}`
+                );
+            } finally {
+                advanceToken.release();
+            }
+            // Fall through to the direct-write path on cascade failure.
+        }
+
+        // Direct-write path: backward/zero delta, or both forward paths above
+        // declined (missing $dataCommonEvents, $gameTemp, beginAdvance, or
+        // cascade failure). No HourPassed/newDay fires — backward jumps by
+        // design, other cases because the game lacks the plumbing.
+        //
+        // Exempt vars 12 (displayedTime string) and 14 (calendarDay) alongside
+        // the primary hour/minute/day/accumulator. If Freeze Time is on, its
+        // snapshot was captured before we changed anything, so leaving 12/14
+        // restricted would let the restore loop overwrite the HUD time string
+        // and day prefix back to their pre-change values.
         const token = (api && typeof api.exemptFromRestore === 'function')
             ? api.exemptFromRestore({
                 variables: [
@@ -551,9 +744,9 @@
     //----------------------------------------------------------------------
 
     const CONFIRMATION_HEADER = 'Apply new game time?';
-    const DAY_CHANGE_WARNING_LINES = [
-        'Changing the day does NOT reset per-day switches',
-        '(daily quests, news). Use the bed for normal sleep.'
+    const BACKWARD_WARNING_LINES = [
+        'Backward jumps skip HourPassed / newDay cascades.',
+        'Per-day switches (daily quests, news) will NOT reset.'
     ];
 
     function Scene_CabbyCodesSetTimeConfirm() {
@@ -584,14 +777,19 @@
         const start = this._start;
         const sel = this._selection;
         const dayChanged = start.day !== sel.day;
+        const oldTotalMin =
+            start.day * MINUTES_PER_DAY + start.hour * 60 + start.minute;
+        const newTotalMin =
+            sel.day * MINUTES_PER_DAY + sel.hour * 60 + sel.minute;
+        const goingBackward = newTotalMin < oldTotalMin;
         const lines = [
             CONFIRMATION_HEADER,
             `Current: ${formatDayTime(start.day, start.hour, start.minute)}`,
             `New:     ${formatDayTime(sel.day, sel.hour, sel.minute)}`
         ];
-        if (dayChanged) {
+        if (dayChanged && goingBackward) {
             lines.push('');
-            DAY_CHANGE_WARNING_LINES.forEach(line => lines.push(line));
+            BACKWARD_WARNING_LINES.forEach(line => lines.push(line));
         }
         return lines;
     };
