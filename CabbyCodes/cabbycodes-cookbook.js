@@ -33,6 +33,7 @@
 
     let ovenCombinationCache = null;
     let dishMetadataCache = null;
+    let ingredientCompatCache = null;
 
     // Window constants
     const WINDOW_WIDTH = Number.isFinite(bookUiDefaults.windowWidth)
@@ -207,6 +208,7 @@
     moduleApi.resetCombinationCache = () => {
         ovenCombinationCache = null;
         dishMetadataCache = null;
+        ingredientCompatCache = null;
     };
 
     function scheduleReset() {
@@ -434,7 +436,71 @@
             variant.complexity = effectiveComplexity;
         });
 
-        return Array.from(combosByKey.values());
+        // CE 44 contains dead branches for ingredient pairs the oven UI filter
+        // will never let the player select (e.g. Frozen Veggies + Raw Chicken:
+        // Chicken's WD_Items lacks ckVEG, so the second menu hides it). Drop
+        // those so the cookbook only surfaces combos that are actually cookable.
+        return Array.from(combosByKey.values()).filter(combo =>
+            isCombinationReachable(combo.primaryId, combo.secondaryId)
+        );
+    }
+
+    /**
+     * Build a map<itemId, {ckCode, accepts}> from $dataItems. Mirrors the
+     * oven's WD_ItemUse mode5 filter: the second ingredient menu lists only
+     * items whose WD_Items meta string contains "ck<primary.ckCode>".
+     */
+    function getIngredientCompat() {
+        if (ingredientCompatCache) {
+            return ingredientCompatCache;
+        }
+        const map = new Map();
+        if (typeof $dataItems === 'undefined' || !Array.isArray($dataItems)) {
+            return map;
+        }
+        for (const item of $dataItems) {
+            if (!item || !item.meta) {
+                continue;
+            }
+            const ckCodeRaw = item.meta.ckCode;
+            if (typeof ckCodeRaw !== 'string') {
+                continue;
+            }
+            const ckCode = ckCodeRaw.trim();
+            if (!ckCode) {
+                continue;
+            }
+            const wdItems = typeof item.meta.WD_Items === 'string' ? item.meta.WD_Items : '';
+            const accepts = new Set();
+            for (const token of wdItems.split(/\s+/)) {
+                if (token.startsWith('ck') && token.length > 2) {
+                    accepts.add(token.slice(2));
+                }
+            }
+            map.set(item.id, { ckCode, accepts });
+        }
+        ingredientCompatCache = map;
+        return map;
+    }
+
+    /**
+     * Solo recipes (no secondary ingredient) are always reachable. For
+     * two-ingredient combos we apply the oven's actual filter rule: the
+     * secondary ingredient's WD_Items must list the primary's ckCode.
+     * If metadata for either item is missing we fail-open — rather than
+     * hide a real recipe after a game patch shifts the tag scheme.
+     */
+    function isCombinationReachable(primaryId, secondaryId) {
+        if (!secondaryId) {
+            return true;
+        }
+        const compat = getIngredientCompat();
+        const primary = compat.get(primaryId);
+        const secondary = compat.get(secondaryId);
+        if (!primary || !secondary) {
+            return true;
+        }
+        return secondary.accepts.has(primary.ckCode);
     }
 
     function trimConstraintStack(stack, indent) {

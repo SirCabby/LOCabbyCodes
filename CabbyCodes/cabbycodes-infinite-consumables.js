@@ -62,7 +62,6 @@
              //   still tops it up because that path uses a positive delta.
         283, // Empty Lunchbox
         284, // Papineau's Lunch
-        289, // Sapper Charge
         291, // Dog Tags
         354, // Eye
         359, // Cassette Tape
