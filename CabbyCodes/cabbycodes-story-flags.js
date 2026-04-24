@@ -456,14 +456,19 @@
 
     // Mirrors the "normal" branch of CommonEvents.json CE 75
     // "updatePlayerAssets" so the change is visible immediately in the
-    // overworld and the save-slot preview without waiting for a parallel
-    // refresh. Cat mode (var 28 == 2) and tree-transformation stages
-    // (var 467 >= 1) own their own character sheet/index, so we leave Sam
-    // alone there — the game's own logic will repaint him when those states
-    // clear. Also leaves the character sheet at 'Chara_Player' (no suffix),
-    // which means a concurrent arm-loss state's `_MissingRightarm`/
-    // `_MissingLeftarm` suffix will be cleared; re-apply via Arm State if
-    // that combination is in play.
+    // overworld and the save-slot preview without waiting for the Fungus
+    // Lair's FungusFade parallel event (CE 82, switch 10) to run. Cat mode
+    // (var 28 == 2) and tree-transformation stages (var 467 >= 1) own their
+    // own character sheet/index, so we leave Sam alone there — the game's
+    // own logic will repaint him when those states clear. Also leaves the
+    // character sheet at 'Chara_Player' (no suffix), which means a concurrent
+    // arm-loss state's `_MissingRightarm`/`_MissingLeftarm` suffix will be
+    // cleared; re-apply via Arm State if that combination is in play.
+    //
+    // We also reserve CE 75 itself as a belt-and-suspenders: when the player
+    // returns to the map interpreter, the game's own updatePlayerAssets runs
+    // and repaints the sprite from the authoritative path. Our direct call
+    // above is needed anyway so the save-slot preview updates immediately.
     function reconcileSamAfterDizzyshroomChange(newValue) {
         if (typeof $gameActors === 'undefined' || !$gameActors) {
             return;
@@ -482,6 +487,7 @@
         const treeState = Number($gameVariables.value(467)) || 0;
         if (playerMode !== 0 || treeState >= 1) {
             CabbyCodes.warn(`${LOG_PREFIX} Spore sprite refresh skipped: playerMode=${playerMode}, treeState=${treeState}.`);
+            reserveUpdatePlayerAssets();
             return;
         }
         const sw103 = Boolean($gameSwitches.value(103));
@@ -503,9 +509,31 @@
             if (typeof $gamePlayer !== 'undefined' && $gamePlayer && typeof $gamePlayer.refresh === 'function') {
                 $gamePlayer.refresh();
             }
-            CabbyCodes.warn(`${LOG_PREFIX} Sam spore sprite reconciled: Chara_Player index=${charIndex} for dizzyshroom=${newValue} (sw103=${sw103}, sw197=${sw197}).`);
+            if (typeof $gameMap !== 'undefined' && $gameMap && typeof $gameMap.requestRefresh === 'function') {
+                $gameMap.requestRefresh();
+            }
+            reserveUpdatePlayerAssets();
+            CabbyCodes.warn(`${LOG_PREFIX} Sam spore sprite reconciled: Chara_Player index=${charIndex} for dizzyshroom=${newValue} (sw103=${sw103}, sw197=${sw197}). Stored name now="${sam._characterName}", index=${sam._characterIndex}.`);
         } catch (error) {
             CabbyCodes.warn(`${LOG_PREFIX} reconcileSamAfterDizzyshroomChange failed: ${error?.message || error}`);
+        }
+    }
+
+    // CE 75 "updatePlayerAssets" has trigger: 0 (None), so it only runs when
+    // explicitly invoked. Queue it on $gameTemp so the next map interpreter
+    // tick re-runs the game's own sprite-selection logic against the new
+    // var 240 value. No-op if $gameTemp is unavailable (pre-session).
+    function reserveUpdatePlayerAssets() {
+        if (typeof $gameTemp === 'undefined' || !$gameTemp) {
+            return;
+        }
+        if (typeof $gameTemp.reserveCommonEvent !== 'function') {
+            return;
+        }
+        try {
+            $gameTemp.reserveCommonEvent(75);
+        } catch (error) {
+            CabbyCodes.warn(`${LOG_PREFIX} reserveCommonEvent(75) failed: ${error?.message || error}`);
         }
     }
 
