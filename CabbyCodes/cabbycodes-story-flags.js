@@ -101,7 +101,12 @@
         // AND switch 103 is off. Shown in the overworld AND save-slot preview.
         // Presented as On/Off via `displayAs: 'switch'` since the scalar value
         // has no gameplay meaning beyond "has spores" vs "doesn't".
-        { id: 'sporeHead',  label: 'Spore Head',      kind: 'variable', varId: 240, options: DIZZYSHROOM_OPTIONS, displayAs: 'switch', onApplyExtra: (v) => reconcileSamAfterDizzyshroomChange(v) },
+        // readDisplayValue mirrors CE 75's visibility gate (var 240 >= 1 AND
+        // switch 103 off) so the list row reports what's actually on-screen.
+        // FungusFade (CE 82) decay is parallel-gated by switch 10, which is
+        // only set on Fungus Lair maps — outside those maps var 240 can sit
+        // at a residual nonzero value indefinitely without the sprite showing.
+        { id: 'sporeHead',  label: 'Spore Head',      kind: 'variable', varId: 240, options: DIZZYSHROOM_OPTIONS, displayAs: 'switch', readDisplayValue: () => (readVar(240) >= 1 && !readSwitch(103)) ? 1 : 0, onApplyExtra: (v) => reconcileSamAfterDizzyshroomChange(v) },
     ];
 
     // Recruit switches verified via System.json line offsets AND cross-checked
@@ -229,6 +234,18 @@
             return readSwitch(flag.switchId);
         }
         return readVar(flag.varId);
+    }
+
+    // Some flags (e.g. Spore Head) have a visible in-game state that depends
+    // on more than the single variable we write to. A `readDisplayValue()` on
+    // the flag descriptor overrides `readFlag` for list rows and the value
+    // picker's "Current:" line so the cheat reflects what the player sees
+    // rather than the raw backing variable.
+    function readFlagForDisplay(flag) {
+        if (flag && typeof flag.readDisplayValue === 'function') {
+            return flag.readDisplayValue();
+        }
+        return readFlag(flag);
     }
 
     function flagOptions(flag) {
@@ -783,7 +800,7 @@
         if (!flag) {
             return;
         }
-        const current = readFlag(flag);
+        const current = readFlagForDisplay(flag);
         const valueText = rendersAsSwitch(flag)
             ? (current ? 'On' : 'Off')
             : `= ${current}`;
@@ -839,7 +856,7 @@
         const label = this._flag ? this._flag.label : 'Story Flag';
         const target = this._flag ? flagTargetLabel(this._flag) : '?';
         const currentDisplay = rendersAsSwitch(this._flag)
-            ? (this._initialValue ? 'On' : 'Off')
+            ? (this._flag && readFlagForDisplay(this._flag) ? 'On' : 'Off')
             : this._initialValue;
         this._helpWindow.setText(`${label} (${target})\nCurrent: ${currentDisplay}`);
         this.addWindow(this._helpWindow);
