@@ -80,10 +80,28 @@
     //                                              after-write side effects
     //                                              (e.g. arm sprite reconcile)
 
+    // Value set for Spore Head = 'On'. Var 240 (dizzyshroom) is incremented
+    // by 10..15 each Fungus Lair SporePop and decays by 1/step while
+    // sporemotherDead (switch 199) is on, so 15 mirrors the in-game max and
+    // gives a meaningful buffer if the decay loop is currently active. Any
+    // value >= 1 triggers the mushroom sprite via CommonEvents.json CE 75
+    // "updatePlayerAssets".
+    const DIZZYSHROOM_ON_VALUE = 15;
+    const DIZZYSHROOM_OPTIONS = [
+        { value: 0, label: 'Off' },
+        { value: DIZZYSHROOM_ON_VALUE, label: 'On' }
+    ];
+
     const SACRIFICE_FLAGS = [
         { id: 'arm',        label: 'Arm State',       kind: 'variable', varId: 187, options: ARM_OPTIONS, onApplyExtra: (v) => reconcileSamAfterArmChange(v) },
         { id: 'sacrifices', label: 'Sacrifice Count', kind: 'variable', varId: 156, options: numericRange(0, 4) },
         { id: 'goodSacs',   label: 'Good Sacrifices', kind: 'variable', varId: 157, options: numericRange(0, 4) },
+        // Dizzyshroom (var 240): CE 75 swaps Chara_Player to index 1 (if
+        // sporeControl switch 197 is on) or 2 (if off) whenever var 240 >= 1
+        // AND switch 103 is off. Shown in the overworld AND save-slot preview.
+        // Presented as On/Off via `displayAs: 'switch'` since the scalar value
+        // has no gameplay meaning beyond "has spores" vs "doesn't".
+        { id: 'sporeHead',  label: 'Spore Head',      kind: 'variable', varId: 240, options: DIZZYSHROOM_OPTIONS, displayAs: 'switch', onApplyExtra: (v) => reconcileSamAfterDizzyshroomChange(v) },
     ];
 
     // Recruit switches verified via System.json line offsets AND cross-checked
@@ -151,7 +169,7 @@
     ];
 
     const CATEGORIES = [
-        { id: 'sacrifices', label: 'Sacrifices...',   helpText: 'Arm state, sacrifice counters.', flags: SACRIFICE_FLAGS },
+        { id: 'sacrifices', label: 'Sacrifices...',   helpText: 'Body state & sacrifice counters.', flags: SACRIFICE_FLAGS },
         { id: 'recruits',   label: 'Recruits...',     helpText: 'Toggle companions.', flags: RECRUIT_FLAGS },
         { id: 'quests',     label: 'Quest States...', helpText: 'Per-questline progression variables.', flags: QUEST_FLAGS },
     ];
@@ -218,6 +236,17 @@
             return flag.options;
         }
         return flag.kind === 'switch' ? SWITCH_OPTIONS : DEFAULT_VALUE_OPTIONS;
+    }
+
+    // A variable-backed flag may opt into switch-style On/Off rendering via
+    // `displayAs: 'switch'`. The value itself is still stored as a number
+    // (e.g. var 240 writes 0 or 15), but the list row and value-picker header
+    // read "On"/"Off" instead of "= 15".
+    function rendersAsSwitch(flag) {
+        if (!flag) {
+            return false;
+        }
+        return flag.kind === 'switch' || flag.displayAs === 'switch';
     }
 
     function flagTargetLabel(flag) {
@@ -418,6 +447,65 @@
             CabbyCodes.warn(`${LOG_PREFIX} Sam reconciled. base sprite="${baseName}", arm value=${newValue}, stored name now="${sam._characterName}".${erasedNote}`);
         } catch (error) {
             CabbyCodes.warn(`${LOG_PREFIX} reconcileSamAfterArmChange failed: ${error?.message || error}`);
+        }
+    }
+
+    //----------------------------------------------------------------------
+    // Dizzyshroom / Spore Head reconcile
+    //----------------------------------------------------------------------
+
+    // Mirrors the "normal" branch of CommonEvents.json CE 75
+    // "updatePlayerAssets" so the change is visible immediately in the
+    // overworld and the save-slot preview without waiting for a parallel
+    // refresh. Cat mode (var 28 == 2) and tree-transformation stages
+    // (var 467 >= 1) own their own character sheet/index, so we leave Sam
+    // alone there — the game's own logic will repaint him when those states
+    // clear. Also leaves the character sheet at 'Chara_Player' (no suffix),
+    // which means a concurrent arm-loss state's `_MissingRightarm`/
+    // `_MissingLeftarm` suffix will be cleared; re-apply via Arm State if
+    // that combination is in play.
+    function reconcileSamAfterDizzyshroomChange(newValue) {
+        if (typeof $gameActors === 'undefined' || !$gameActors) {
+            return;
+        }
+        if (typeof $gameVariables === 'undefined' || !$gameVariables) {
+            return;
+        }
+        if (typeof $gameSwitches === 'undefined' || !$gameSwitches) {
+            return;
+        }
+        const sam = $gameActors.actor(1);
+        if (!sam) {
+            return;
+        }
+        const playerMode = Number($gameVariables.value(28)) || 0;
+        const treeState = Number($gameVariables.value(467)) || 0;
+        if (playerMode !== 0 || treeState >= 1) {
+            CabbyCodes.warn(`${LOG_PREFIX} Spore sprite refresh skipped: playerMode=${playerMode}, treeState=${treeState}.`);
+            return;
+        }
+        const sw103 = Boolean($gameSwitches.value(103));
+        const sw197 = Boolean($gameSwitches.value(197));
+        let charIndex = 0;
+        if (Number(newValue) >= 1 && !sw103) {
+            charIndex = sw197 ? 1 : 2;
+        }
+        try {
+            if (typeof sam.setCharacterImage === 'function') {
+                sam.setCharacterImage('Chara_Player', charIndex);
+            }
+            if (typeof sam.setFaceImage === 'function') {
+                sam.setFaceImage('Portrait_Player', 0);
+            }
+            if (typeof sam.refresh === 'function') {
+                sam.refresh();
+            }
+            if (typeof $gamePlayer !== 'undefined' && $gamePlayer && typeof $gamePlayer.refresh === 'function') {
+                $gamePlayer.refresh();
+            }
+            CabbyCodes.warn(`${LOG_PREFIX} Sam spore sprite reconciled: Chara_Player index=${charIndex} for dizzyshroom=${newValue} (sw103=${sw103}, sw197=${sw197}).`);
+        } catch (error) {
+            CabbyCodes.warn(`${LOG_PREFIX} reconcileSamAfterDizzyshroomChange failed: ${error?.message || error}`);
         }
     }
 
@@ -668,7 +756,7 @@
             return;
         }
         const current = readFlag(flag);
-        const valueText = flag.kind === 'switch'
+        const valueText = rendersAsSwitch(flag)
             ? (current ? 'On' : 'Off')
             : `= ${current}`;
         const valueWidth = this.textWidth('= 000000');
@@ -722,7 +810,7 @@
         this._helpWindow = new Window_Help(rect);
         const label = this._flag ? this._flag.label : 'Story Flag';
         const target = this._flag ? flagTargetLabel(this._flag) : '?';
-        const currentDisplay = this._flag && this._flag.kind === 'switch'
+        const currentDisplay = rendersAsSwitch(this._flag)
             ? (this._initialValue ? 'On' : 'Off')
             : this._initialValue;
         this._helpWindow.setText(`${label} (${target})\nCurrent: ${currentDisplay}`);
