@@ -135,8 +135,9 @@ at `Map003.json:23690+` which labels each branch by character name.
 | 34  | `recruitedLeigh`      | 5             | Dev menu confirms `"Recruit Leigh"` → switch 34 |
 | 35  | `recruitedHellen`     | 7             | Dev menu confirms `"Recruit Hellen"` → switch 35 |
 | 361 | `recruitedErnest`     | 11            | Pairs with `ErnestTempRecruit` (792, probationary) |
-| 362 | `recruitedSophie`     | 12            | Dev menu confirms `"Recruit Sophie"` → switch 362 |
+| 362 | `recruitedSophie`     | 12            | Dev menu confirms `"Recruit Sophie"` → switch 362. Pairs with `SophieBackHome` (364); the Sophie cheat exposes both as a single Off/Recruited/Home tri-state. |
 | 363 | `recruitedGoths`      | (multi)       | Covers ≥2 goth actors (user-confirmed). Leave `actorId` unset in the cheat so only the switch flips. |
+| 364 | `SophieBackHome`      | 12 (NPC)      | Set ON by the Harriet-reunion troop event in `Troops.json` (which simultaneously flips 362 OFF and removes actor 12). When ON, Sophie spawns as an NPC in `Apt22_Harriet` (Map334) instead of following Sam. |
 | 369 | `recruitedRoaches`    | 10            | |
 | 370 | `recruitedRoachesFull`| —             | **Dead** (never written, barely read). Skip. |
 | 371 | `recruitedMorton`     | 16            | |

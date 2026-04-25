@@ -124,6 +124,24 @@
     // logically represents a group; leaving actorId unset means the cheat
     // only flips the switch and leaves party membership to the game's own
     // event logic (or to the user toggling the individual recruit flags).
+    //
+    // Sophie has a third "Home" state in addition to Off/Recruited. After
+    // the Harriet-reunion troop event in Troops.json the game flips
+    // `recruitedSophie` (362) OFF and `SophieBackHome` (364) ON, then removes
+    // actor 12 from the party — Sophie now stands as an NPC in
+    // Apt22_Harriet (Map334) instead of following Sam. A pure on/off toggle
+    // on switch 362 alone can't represent or restore that state, so the
+    // Sophie entry uses custom readValue/applyValue that drive both
+    // switches as a single tri-state and keep the party in sync.
+    const SOPHIE_SWITCH_RECRUITED = 362;
+    const SOPHIE_SWITCH_HOME = 364;
+    const SOPHIE_ACTOR_ID = 12;
+    const SOPHIE_OPTIONS = [
+        { value: 0, label: 'Off' },
+        { value: 1, label: 'Recruited' },
+        { value: 2, label: 'Home' }
+    ];
+
     const RECRUIT_FLAGS = [
         { id: 'shadow',     label: 'Shadow',                kind: 'switch', switchId: 27 },
         { id: 'dan',        label: 'Dan',                   kind: 'switch', switchId: 32,  actorId: 6 },
@@ -131,7 +149,11 @@
         { id: 'leigh',      label: 'Leigh',                 kind: 'switch', switchId: 34,  actorId: 5 },
         { id: 'hellen',     label: 'Hellen',                kind: 'switch', switchId: 35,  actorId: 7 },
         { id: 'ernest',     label: 'Ernest',                kind: 'switch', switchId: 361, actorId: 11 },
-        { id: 'sophie',     label: 'Sophie',                kind: 'switch', switchId: 362, actorId: 12 },
+        { id: 'sophie',     label: 'Sophie',                kind: 'switch', switchId: SOPHIE_SWITCH_RECRUITED, actorId: SOPHIE_ACTOR_ID,
+          options: SOPHIE_OPTIONS,
+          targetLabel: `switches ${SOPHIE_SWITCH_RECRUITED}+${SOPHIE_SWITCH_HOME}`,
+          readValue: () => readSophieRecruitState(),
+          applyValue: (v) => applySophieRecruitState(v) },
         { id: 'goths',      label: 'Goths',                 kind: 'switch', switchId: 363 },
         { id: 'roaches',    label: 'Roaches',               kind: 'switch', switchId: 369, actorId: 10 },
         { id: 'morton',     label: 'Morton',                kind: 'switch', switchId: 371, actorId: 16 },
@@ -255,6 +277,9 @@
     }
 
     function readFlag(flag) {
+        if (flag && typeof flag.readValue === 'function') {
+            return flag.readValue();
+        }
         if (flag.kind === 'switch') {
             return readSwitch(flag.switchId);
         }
@@ -292,9 +317,26 @@
     }
 
     function flagTargetLabel(flag) {
+        if (flag && typeof flag.targetLabel === 'string' && flag.targetLabel) {
+            return flag.targetLabel;
+        }
         return flag.kind === 'switch'
             ? `switch ${flag.switchId}`
             : `var ${flag.varId}`;
+    }
+
+    // Switch-style flags default to On/Off rendering, but when a custom
+    // `options` list is supplied (e.g. Sophie's Off/Recruited/Home tri-state)
+    // we want the row + picker header to show the matching option label
+    // instead. Falls back to On/Off if no option matches the current value.
+    function switchValueLabel(flag, value) {
+        if (flag && Array.isArray(flag.options) && flag.options.length > 0) {
+            const matched = flag.options.find(o => o.value === value);
+            if (matched) {
+                return matched.label;
+            }
+        }
+        return value ? 'On' : 'Off';
     }
 
     // Resolve the protagonist's current display name. The default is "Sam",
@@ -362,6 +404,9 @@
         if (!isSessionReady()) {
             return false;
         }
+        if (flag && typeof flag.applyValue === 'function') {
+            return flag.applyValue(newValue);
+        }
         if (flag.kind === 'switch') {
             return applySwitchFlag(flag, newValue);
         }
@@ -406,6 +451,59 @@
             return true;
         } catch (error) {
             CabbyCodes.error(`${LOG_PREFIX} Apply failed for ${flag.label}: ${error?.message || error}`);
+            return false;
+        } finally {
+            token.release();
+        }
+    }
+
+    // ---- Sophie tri-state (Off / Recruited / Home) ----
+    //
+    // Mirrors the Harriet-reunion troop event: when Sophie returns home the
+    // game flips switch 362 OFF and switch 364 ON, then removes actor 12 from
+    // the party. We expose all three states as a single picker value so
+    // selecting "Home" reproduces the post-reunion state without the player
+    // having to play through the encounter, and so a save with switch 364
+    // already ON reads as "Home" in the list (instead of misleadingly "Off").
+
+    function readSophieRecruitState() {
+        if (readSwitch(SOPHIE_SWITCH_RECRUITED)) {
+            return 1;
+        }
+        if (readSwitch(SOPHIE_SWITCH_HOME)) {
+            return 2;
+        }
+        return 0;
+    }
+
+    function sophieStateLabel(value) {
+        const opt = SOPHIE_OPTIONS.find(o => o.value === value);
+        return opt ? opt.label : String(value);
+    }
+
+    function applySophieRecruitState(newValue) {
+        if (!isSessionReady()) {
+            return false;
+        }
+        const wantRecruited = newValue === 1;
+        const wantHome = newValue === 2;
+        const oldState = readSophieRecruitState();
+        const api = CabbyCodes.freezeTime;
+        const token = (api && typeof api.exemptFromRestore === 'function')
+            ? api.exemptFromRestore({ switches: [SOPHIE_SWITCH_RECRUITED, SOPHIE_SWITCH_HOME] })
+            : { release: () => {} };
+        try {
+            $gameSwitches.setValue(SOPHIE_SWITCH_RECRUITED, wantRecruited);
+            $gameSwitches.setValue(SOPHIE_SWITCH_HOME, wantHome);
+            // Sophie is only in the party while "Recruited"; "Home" and "Off"
+            // both leave actor 12 out (Home = standing in Apt22_Harriet,
+            // Off = pre-recruit baseline).
+            const partyNote = syncActorParty({ actorId: SOPHIE_ACTOR_ID, label: 'Sophie' }, wantRecruited);
+            const readBack = readSophieRecruitState();
+            CabbyCodes.warn(`${LOG_PREFIX} Sophie (switches ${SOPHIE_SWITCH_RECRUITED}+${SOPHIE_SWITCH_HOME}): ${sophieStateLabel(oldState)} -> ${sophieStateLabel(newValue)}. Read-back: ${sophieStateLabel(readBack)}.${partyNote}`);
+            return true;
+        } catch (error) {
+            CabbyCodes.error(`${LOG_PREFIX} Apply failed for Sophie: ${error?.message || error}`);
             return false;
         } finally {
             token.release();
@@ -867,7 +965,7 @@
         }
         const current = readFlagForDisplay(flag);
         const valueText = rendersAsSwitch(flag)
-            ? (current ? 'On' : 'Off')
+            ? switchValueLabel(flag, current)
             : `= ${current}`;
         const valueWidth = this.textWidth('= 000000');
         const labelWidth = Math.max(0, rect.width - valueWidth - 8);
@@ -921,7 +1019,7 @@
         const label = this._flag ? this._flag.label : 'Story Flag';
         const target = this._flag ? flagTargetLabel(this._flag) : '?';
         const currentDisplay = rendersAsSwitch(this._flag)
-            ? (this._flag && readFlagForDisplay(this._flag) ? 'On' : 'Off')
+            ? switchValueLabel(this._flag, this._flag ? readFlagForDisplay(this._flag) : 0)
             : this._initialValue;
         this._helpWindow.setText(`${label} (${target})\nCurrent: ${currentDisplay}`);
         this.addWindow(this._helpWindow);
