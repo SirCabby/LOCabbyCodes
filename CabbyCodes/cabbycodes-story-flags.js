@@ -341,6 +341,62 @@
     ];
     const ROACH_QUEST_OPTIONS = ROACH_QUEST_STATES.map(s => ({ value: s.value, label: s.label }));
 
+    // Juicebox's card-trick quest. Two variables drive it together:
+    //   var 741 `juiceboxCardTrick` — the canonical card-trick state (0..3)
+    //   var 287 `juiceboxTalk` — Juicebox's relationship-talk dialog stage,
+    //                            which gates whether the trick can fire
+    //
+    // Natural progression:
+    //   var 741 = 0  Not Started
+    //   var 741 = 1  Card Trick Played — Map002 ev48 page 0 sets this when
+    //                the player reaches dialog stage var 287 == 6: Juicebox
+    //                shows the trick, the card "disappears" from the deck.
+    //                The same dialog increments var 287 to 7.
+    //   var 741 = 2  Card Retrieved — Map006 ev25 (Floor 1 vending machine)
+    //                sets this when the player buys Cheese Stix (item 21)
+    //                AND var 741 == 1; the trick card falls out alongside.
+    //   var 741 = 3  Complete — Map002 ev48 page 0 top auto-advances 2 -> 3
+    //                on the next bedroom visit; Juicebox bows and lets the
+    //                player keep the card as a gift.
+    //
+    // To make "the trick can fire" a reachable state, the cheat manages
+    // var 287 alongside var 741:
+    //   - Not Started clamps var 287 down to <= 5 so the prerequisite isn't
+    //     met (preserves any lower natural value).
+    //   - Ready to Play sets var 287 = 6 exactly so the next bedroom visit
+    //     fires the trick scene naturally.
+    //   - Played / Retrieved / Complete bump var 287 to >= 7 (one past the
+    //     trick stage), preserving any higher natural relationship arc the
+    //     player has already reached.
+    //
+    // Vending-machine purchase (1 -> 2) is still bypassed when jumping
+    // directly to "Card Retrieved" or "Complete" — the cheat doesn't grant
+    // the Cheese Stix or the card item.
+    const JUICEBOX_VAR_CARDTRICK = 741;
+    const JUICEBOX_VAR_TALK = 287;
+    const JUICEBOX_QUEST_STATES = [
+        // talkClampMax: cap var 287 to this value if currently higher
+        // talkExact:   set var 287 to exactly this value
+        // talkMin:     bump var 287 up to this value if currently lower
+        { value: 0, label: 'Not Started',       cardtrick: 0, talkClampMax: 5 },
+        { value: 1, label: 'Ready to Play',     cardtrick: 0, talkExact: 6    },
+        { value: 2, label: 'Card Trick Played', cardtrick: 1, talkMin: 7      },
+        { value: 3, label: 'Card Retrieved',    cardtrick: 2, talkMin: 7      },
+        { value: 4, label: 'Complete',          cardtrick: 3, talkMin: 7      }
+    ];
+    const JUICEBOX_QUEST_OPTIONS = JUICEBOX_QUEST_STATES.map(s => ({ value: s.value, label: s.label }));
+
+    // Lyle's "Mazes and Wizards" quest is a session-count quest: var 701
+    // `sessionNb` is the number of completed sessions, incremented by CE 239
+    // (MWCore) at the end of each tabletop session. Each value 1..6 maps to
+    // one of the campaign's six adventures (each with distinct dialog and
+    // location intros in CE 240); reaching 6 triggers the CE 247 CharaClosing
+    // wrap-up branch. Var 700 (`MazesWizardsTalk`) and switch 1002
+    // (`primeMWgame`) are transient setup mechanics — they cycle on/off
+    // around each individual session start and don't represent quest
+    // progression — so the picker leaves them alone.
+    const MW_VAR_SESSION = 701;
+
     // Quest-state variables. Each entry needs a real understanding of what
     // the variable drives in-game; speculative entries on under-investigated
     // variables previously lived here (Joel/Shadow/Papineau/Lyle/Nestor/
@@ -380,6 +436,25 @@
           targetLabel: `var ${ROACH_QUEST_VAR} + switch ${ROACH_QUEST_SWITCH_SCHISM} + state ${ROACH_QUEST_STATE_SCHISM} on actor ${ROACH_QUEST_ACTOR}`,
           readValue: () => readRoachQuestState(),
           applyValue: (v) => applyRoachQuestState(v) },
+        // Juicebox's card-trick quest. See the JUICEBOX_* block above.
+        { id: 'juiceboxQuest', label: 'Juicebox Quest',       kind: 'variable', varId: JUICEBOX_VAR_CARDTRICK,
+          options: JUICEBOX_QUEST_OPTIONS,
+          displayAs: 'switch',
+          targetLabel: `vars ${JUICEBOX_VAR_CARDTRICK}+${JUICEBOX_VAR_TALK}`,
+          readValue: () => readJuiceboxQuestState(),
+          applyValue: (v) => applyJuiceboxQuestState(v) },
+        // Lyle's Mazes and Wizards campaign — sessions completed (var 701).
+        // Each session is a distinct adventure; 6 = wrap-up.
+        { id: 'mazesWizardsQuest', label: 'Mazes and Wizards', kind: 'variable', varId: MW_VAR_SESSION,
+          options: [
+              { value: 0, label: '0 / Not Started' },
+              { value: 1, label: '1 / Tavern Village' },
+              { value: 2, label: '2 / Wilderness' },
+              { value: 3, label: '3 / Mysterious Temple' },
+              { value: 4, label: '4 / City of Daggerback' },
+              { value: 5, label: '5 / Death Barrens' },
+              { value: 6, label: '6 / Complete' }
+          ] },
     ];
 
     // The 'sacrifices' category label is rebuilt at menu-open time from the
@@ -999,6 +1074,66 @@
             return true;
         } catch (error) {
             CabbyCodes.error(`${LOG_PREFIX} Apply failed for Roaches Quest: ${error?.message || error}`);
+            return false;
+        } finally {
+            token.release();
+        }
+    }
+
+    // ---- Juicebox Quest (var 741 card-trick + var 287 prerequisite) ----
+    //
+    // Read priority: var 741 dominates because the card-trick variable has
+    // unambiguous values (1..3 each map to one outcome). Only when var 741
+    // is 0 do we look at var 287 to distinguish "Ready to Play" (>=6, the
+    // dialog stage where the trick auto-fires) from "Not Started" (<6).
+
+    function readJuiceboxQuestState() {
+        const cardtrick = readVar(JUICEBOX_VAR_CARDTRICK);
+        if (cardtrick >= 3) return 4;     // Complete
+        if (cardtrick === 2) return 3;    // Card Retrieved
+        if (cardtrick === 1) return 2;    // Card Trick Played
+        const talk = readVar(JUICEBOX_VAR_TALK);
+        if (talk >= 6) return 1;          // Ready to Play
+        return 0;                          // Not Started
+    }
+
+    function juiceboxQuestStateLabel(value) {
+        const s = JUICEBOX_QUEST_STATES.find(st => st.value === value);
+        return s ? s.label : String(value);
+    }
+
+    function applyJuiceboxQuestState(newValue) {
+        if (!isSessionReady()) {
+            return false;
+        }
+        const target = JUICEBOX_QUEST_STATES.find(s => s.value === newValue);
+        if (!target) {
+            return false;
+        }
+        const oldValue = readJuiceboxQuestState();
+        const api = CabbyCodes.freezeTime;
+        const token = (api && typeof api.exemptFromRestore === 'function')
+            ? api.exemptFromRestore({ variables: [JUICEBOX_VAR_CARDTRICK, JUICEBOX_VAR_TALK] })
+            : { release: () => {} };
+        try {
+            $gameVariables.setValue(JUICEBOX_VAR_CARDTRICK, target.cardtrick);
+            // Reconcile var 287 per the state's clamp/exact/min directive.
+            const curTalk = readVar(JUICEBOX_VAR_TALK);
+            let newTalk = curTalk;
+            if (typeof target.talkExact === 'number') {
+                newTalk = target.talkExact;
+            } else if (typeof target.talkMin === 'number' && curTalk < target.talkMin) {
+                newTalk = target.talkMin;
+            } else if (typeof target.talkClampMax === 'number' && curTalk > target.talkClampMax) {
+                newTalk = target.talkClampMax;
+            }
+            if (newTalk !== curTalk) {
+                $gameVariables.setValue(JUICEBOX_VAR_TALK, newTalk);
+            }
+            CabbyCodes.warn(`${LOG_PREFIX} Juicebox Quest: ${juiceboxQuestStateLabel(oldValue)} -> ${juiceboxQuestStateLabel(newValue)}. var ${JUICEBOX_VAR_CARDTRICK}=${target.cardtrick}, var ${JUICEBOX_VAR_TALK}=${newTalk}${newTalk !== curTalk ? ` (was ${curTalk})` : ''}.`);
+            return true;
+        } catch (error) {
+            CabbyCodes.error(`${LOG_PREFIX} Apply failed for Juicebox Quest: ${error?.message || error}`);
             return false;
         } finally {
             token.release();
