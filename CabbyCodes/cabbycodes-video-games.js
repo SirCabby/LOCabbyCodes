@@ -507,7 +507,7 @@
         }
         const ext = this.currentExt();
         if (ext === ACTION_EXT_BULK) {
-            this._helpWindow.setText('Video Games\nFor every cartridge whose skill is not yet learned, choose 1 Left or Earned, then confirm.');
+            this._helpWindow.setText('Video Games\nBulk-set every unfinished cartridge.');
             return;
         }
         const game = VIDEO_GAMES[ext];

@@ -3120,10 +3120,6 @@
     const ITEM_GIVER_SETTING_SYMBOL = `${CABBYCODES_OPTION_SYMBOL_PREFIX}itemGiver`;
     const GIVE_ALL_ITEMS_SYMBOL = `${CABBYCODES_OPTION_SYMBOL_PREFIX}${GIVE_ALL_ITEMS_SETTING_KEY}`;
     const MAX_ALL_ITEMS_SYMBOL = `${CABBYCODES_OPTION_SYMBOL_PREFIX}${MAX_ALL_ITEMS_SETTING_KEY}`;
-    const GIVE_ALL_ITEMS_CONFIRMATION_TEXT =
-        'WARNING:\n' +
-        'This gives one copy of every missing non-key catalog item to your party.\n' +
-        'Proceed?';
     const MAX_ALL_ITEMS_CONFIRMATION_TEXT =
         'WARNING:\n' +
         'This fills every grantable item you already have in your inventory to its maximum stack size.\n' +
@@ -3226,7 +3222,7 @@
         };
     }
 
-    function iterateGainableItemCatalog(visitor) {
+    function iterateGainableItemCatalog(visitor, filterFn) {
         if (typeof visitor !== 'function') {
             return 0;
         }
@@ -3244,6 +3240,9 @@
                 continue;
             }
             if (shouldSkipCatalogEntry(entry)) {
+                continue;
+            }
+            if (typeof filterFn === 'function' && !filterFn(entry)) {
                 continue;
             }
 
@@ -3376,18 +3375,37 @@
         return Math.max(0, Math.floor(numeric));
     }
 
-    function performGiveMissingItems() {
-        const party = ensureGamePartyForItemShortcuts('Give Missing Items');
+    function entryMatchesGiveMissingFilter(entry, filter) {
+        if (!filter) {
+            return true;
+        }
+        if (filter.type && entry?.type !== filter.type) {
+            return false;
+        }
+        if (filter.subtype && entry?.subSectionKey !== filter.subtype) {
+            return false;
+        }
+        return true;
+    }
+
+    function performGiveMissingItems(filter, optionLabel) {
+        const actionLabel = optionLabel
+            ? `Give Missing Items (${optionLabel})`
+            : 'Give Missing Items';
+        const party = ensureGamePartyForItemShortcuts(actionLabel);
         if (!party) {
             return { success: false, processed: 0, granted: 0 };
         }
         if (typeof party.numItems !== 'function') {
             CabbyCodes.warn(
-                '[CabbyCodes] Give Missing Items: numItems is unavailable; cannot determine owned quantities.'
+                `[CabbyCodes] ${actionLabel}: numItems is unavailable; cannot determine owned quantities.`
             );
             return { success: false, processed: 0, granted: 0 };
         }
         let granted = 0;
+        const filterFn = filter
+            ? entry => entryMatchesGiveMissingFilter(entry, filter)
+            : null;
         const processed = iterateGainableItemCatalog(item => {
             const owned = clampPositiveInteger(party.numItems(item), 0);
             if (owned > 0) {
@@ -3398,23 +3416,23 @@
                 granted += 1;
             } catch (error) {
                 CabbyCodes.error(
-                    `[CabbyCodes] Give Missing Items: Failed to add ${item?.name || 'Unknown Item'}: ${
+                    `[CabbyCodes] ${actionLabel}: Failed to add ${item?.name || 'Unknown Item'}: ${
                         error?.message || error
                     }`
                 );
             }
-        });
+        }, filterFn);
         if (processed === 0) {
             CabbyCodes.warn(
-                '[CabbyCodes] Give Missing Items: No catalog entries were processed. Make sure game data is loaded.'
+                `[CabbyCodes] ${actionLabel}: No catalog entries were processed. Make sure game data is loaded.`
             );
         } else if (granted === 0) {
             CabbyCodes.log(
-                '[CabbyCodes] Give Missing Items: Inventory already contains every catalog entry.'
+                `[CabbyCodes] ${actionLabel}: Inventory already contains every catalog entry in this category.`
             );
         } else {
             CabbyCodes.log(
-                `[CabbyCodes] Give Missing Items granted ${granted} previously missing entries (out of ${processed} catalog entries).`
+                `[CabbyCodes] ${actionLabel} granted ${granted} previously missing entries (out of ${processed} catalog entries).`
             );
         }
         playBulkItemShortcutSound(granted > 0);
@@ -3482,8 +3500,8 @@
         return { success: catalogEntries > 0, processed, adjusted };
     }
 
-    function triggerGiveMissingItemsShortcut() {
-        const result = performGiveMissingItems();
+    function triggerGiveMissingItemsShortcut(filter, optionLabel) {
+        const result = performGiveMissingItems(filter, optionLabel);
         if (!result.success) {
             CabbyCodes.warn(
                 '[CabbyCodes] Give Missing Items could not run. Load a save before pressing this option.'
@@ -3491,6 +3509,68 @@
         }
         scheduleBulkItemShortcutReset(GIVE_ALL_ITEMS_SETTING_KEY);
         return result;
+    }
+
+    function buildGiveMissingItemsMenuOptions() {
+        const options = [
+            { id: 'all', label: 'All', filter: null }
+        ];
+        let catalog;
+        try {
+            catalog = collectAllItems();
+        } catch (error) {
+            CabbyCodes.warn(
+                '[CabbyCodes] Give Missing Items: Failed to enumerate categories: ' +
+                    (error?.message || error)
+            );
+            return options;
+        }
+        const subsections = catalog && catalog.subsections;
+        if (!subsections) {
+            return options;
+        }
+        ITEM_GIVER_SECTION_DEFINITIONS.forEach(sectionDef => {
+            const subs = subsections[sectionDef.key];
+            if (!Array.isArray(subs) || subs.length === 0) {
+                return;
+            }
+            options.push({
+                id: `type:${sectionDef.key}`,
+                label: `All ${sectionDef.label}`,
+                filter: { type: sectionDef.key }
+            });
+            subs.forEach(sub => {
+                if (!sub || !sub.key) {
+                    return;
+                }
+                options.push({
+                    id: `sub:${sub.key}`,
+                    label: `  ${sub.label || sub.key}`,
+                    filter: { type: sectionDef.key, subtype: sub.key }
+                });
+            });
+        });
+        return options;
+    }
+
+    function tryOpenGiveMissingItemsSelectScene() {
+        if (typeof Scene_CabbyCodesGiveMissingItemsSelect === 'undefined') {
+            CabbyCodes.warn(
+                '[CabbyCodes] Give Missing Items: Selection scene unavailable.'
+            );
+            return false;
+        }
+        if (
+            typeof SceneManager === 'undefined' ||
+            typeof SceneManager.push !== 'function'
+        ) {
+            CabbyCodes.warn(
+                '[CabbyCodes] Give Missing Items: SceneManager is not available.'
+            );
+            return false;
+        }
+        SceneManager.push(Scene_CabbyCodesGiveMissingItemsSelect);
+        return true;
     }
 
     function triggerMaxItemsInInventoryShortcut() {
@@ -3529,13 +3609,6 @@
     });
 
     const BULK_ITEM_SHORTCUT_CONFIGS = {
-        [GIVE_ALL_ITEMS_SYMBOL]: {
-            label: 'Give Missing Items',
-            confirmText: GIVE_ALL_ITEMS_CONFIRMATION_TEXT,
-            confirmLabel: 'Yes, give them',
-            cancelLabel: 'No, go back',
-            execute: triggerGiveMissingItemsShortcut
-        },
         [MAX_ALL_ITEMS_SYMBOL]: {
             label: MAX_ALL_ITEMS_LABEL,
             confirmText: MAX_ALL_ITEMS_CONFIRMATION_TEXT,
@@ -3605,6 +3678,10 @@
         if (symbol === ITEM_GIVER_SETTING_SYMBOL) {
             itemGiverDebugLog('[CabbyCodes] Item Giver: Opening scene');
             return tryOpenItemGiverScene();
+        }
+        if (symbol === GIVE_ALL_ITEMS_SYMBOL) {
+            itemGiverDebugLog('[CabbyCodes] Item Giver: Opening Give Missing Items selector');
+            return tryOpenGiveMissingItemsSelectScene();
         }
         if (openBulkItemShortcutConfirmation(symbol)) {
             itemGiverDebugLog(`[CabbyCodes] Item Giver: Opened confirmation for ${symbol}`);
@@ -3789,6 +3866,121 @@
         lines.forEach(line => {
             this.drawText(line, 0, y, maxWidth);
             y += this.lineHeight();
+        });
+    };
+
+    //--------------------------------------------------------------------------
+    // Give Missing Items Selection Scene
+    //--------------------------------------------------------------------------
+
+    const GIVE_MISSING_ITEMS_SELECT_INFO_TEXT =
+        'Give Missing Items\n' +
+        'Pick a category. One copy of each missing non-key item in that\n' +
+        'category will be added. Press Cancel to leave.';
+    const GIVE_MISSING_ITEMS_SELECT_INFO_LINES = 3;
+    const GIVE_MISSING_ITEMS_SELECT_VISIBLE_ROWS = 10;
+
+    function Scene_CabbyCodesGiveMissingItemsSelect() {
+        this.initialize(...arguments);
+    }
+
+    window.Scene_CabbyCodesGiveMissingItemsSelect = Scene_CabbyCodesGiveMissingItemsSelect;
+
+    Scene_CabbyCodesGiveMissingItemsSelect.prototype = Object.create(Scene_MenuBase.prototype);
+    Scene_CabbyCodesGiveMissingItemsSelect.prototype.constructor = Scene_CabbyCodesGiveMissingItemsSelect;
+
+    Scene_CabbyCodesGiveMissingItemsSelect.prototype.helpAreaHeight = function() {
+        return 0;
+    };
+
+    Scene_CabbyCodesGiveMissingItemsSelect.prototype.create = function() {
+        Scene_MenuBase.prototype.create.call(this);
+        this.createInfoWindow();
+        this.createCommandWindow();
+    };
+
+    Scene_CabbyCodesGiveMissingItemsSelect.prototype.createInfoWindow = function() {
+        const ww = Math.min(Graphics.boxWidth - 96, 640);
+        const wx = (Graphics.boxWidth - ww) / 2;
+        const wy = this.buttonAreaBottom() + 12;
+        const wh = this.calcWindowHeight(GIVE_MISSING_ITEMS_SELECT_INFO_LINES, false);
+        const rect = new Rectangle(wx, wy, ww, wh);
+        this._infoWindow = new Window_CabbyCodesBulkItemInfo(rect);
+        this._infoWindow.setText(GIVE_MISSING_ITEMS_SELECT_INFO_TEXT);
+        this.addWindow(this._infoWindow);
+    };
+
+    Scene_CabbyCodesGiveMissingItemsSelect.prototype.createCommandWindow = function() {
+        const options = buildGiveMissingItemsMenuOptions();
+        const ww = 360;
+        const spacing = 18;
+        const wy = this._infoWindow
+            ? this._infoWindow.y + this._infoWindow.height + spacing
+            : this.buttonAreaBottom() + spacing;
+        const wx = (Graphics.boxWidth - ww) / 2;
+        const optionCount = Math.max(options.length, 1);
+        const oneRow = this.calcWindowHeight(1, true);
+        const twoRows = this.calcWindowHeight(2, true);
+        const rowExtra = Math.max(0, twoRows - oneRow);
+        const frame = Math.max(0, oneRow - rowExtra);
+        const availableHeight = Math.max(oneRow, Graphics.boxHeight - wy - spacing);
+        const fitRows = Math.max(1, Math.floor((availableHeight - frame) / Math.max(rowExtra, 1)));
+        const visibleRows = Math.min(
+            optionCount,
+            GIVE_MISSING_ITEMS_SELECT_VISIBLE_ROWS,
+            fitRows
+        );
+        const wh = this.calcWindowHeight(visibleRows, true);
+        const rect = new Rectangle(wx, wy, ww, wh);
+        this._commandWindow = new Window_CabbyCodesGiveMissingItemsSelect(rect, options);
+        this._commandWindow.setHandler('select', this.onSelect.bind(this));
+        this._commandWindow.setHandler('cancel', this.popScene.bind(this));
+        this.addWindow(this._commandWindow);
+        this._commandWindow.select(0);
+        this._commandWindow.activate();
+    };
+
+    Scene_CabbyCodesGiveMissingItemsSelect.prototype.onSelect = function() {
+        const ext = this._commandWindow ? this._commandWindow.currentExt() : null;
+        if (!ext) {
+            if (this._commandWindow) {
+                this._commandWindow.activate();
+            }
+            return;
+        }
+        try {
+            performGiveMissingItems(ext.filter, ext.label);
+        } catch (error) {
+            CabbyCodes.error(
+                '[CabbyCodes] Give Missing Items: Selection failed: ' +
+                    (error?.message || error)
+            );
+        }
+        SceneManager.pop();
+    };
+
+    function Window_CabbyCodesGiveMissingItemsSelect() {
+        this.initialize(...arguments);
+    }
+
+    window.Window_CabbyCodesGiveMissingItemsSelect = Window_CabbyCodesGiveMissingItemsSelect;
+
+    Window_CabbyCodesGiveMissingItemsSelect.prototype = Object.create(Window_Command.prototype);
+    Window_CabbyCodesGiveMissingItemsSelect.prototype.constructor = Window_CabbyCodesGiveMissingItemsSelect;
+
+    Window_CabbyCodesGiveMissingItemsSelect.prototype.initialize = function(rect, options) {
+        this._giveMissingOptions = Array.isArray(options) ? options : [];
+        Window_Command.prototype.initialize.call(this, rect);
+    };
+
+    Window_CabbyCodesGiveMissingItemsSelect.prototype.makeCommandList = function() {
+        const opts = this._giveMissingOptions || [];
+        if (opts.length === 0) {
+            this.addCommand('All', 'select', true, { id: 'all', label: 'All', filter: null });
+            return;
+        }
+        opts.forEach(opt => {
+            this.addCommand(opt.label, 'select', true, opt);
         });
     };
 

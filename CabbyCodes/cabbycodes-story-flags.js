@@ -194,7 +194,7 @@
         { id: 'sacrifices', label: 'Sam...',          helpText: 'Body state of the protagonist.', flags: SACRIFICE_FLAGS },
         { id: 'recruits',   label: 'Recruits...',     helpText: 'Toggle companions.', flags: RECRUIT_FLAGS },
         { id: 'quests',     label: 'Quest States...', helpText: 'Per-questline progression variables.', flags: QUEST_FLAGS },
-        { id: 'videoGames', label: 'Video Games...',  helpText: 'Plays remaining and skill earned per cartridge.', onSelect: () => {
+        { id: 'videoGames', label: 'Video Games...',  helpText: 'Plays left and skill per cartridge.', onSelect: () => {
             if (typeof CabbyCodes.openVideoGamesScene === 'function') {
                 return CabbyCodes.openVideoGamesScene();
             }
@@ -783,7 +783,7 @@
         this._helpWindow = new Window_Help(rect);
         const cat = this.activeCategory();
         const heading = cat ? cat.label.replace(/\.\.\.$/, '') : 'Story Flags';
-        this._helpWindow.setText(`${heading}\nPick a flag to inspect or change its value.`);
+        this._helpWindow.setText(`${heading}\nPick a flag to change its value.`);
         this.addWindow(this._helpWindow);
     };
 
