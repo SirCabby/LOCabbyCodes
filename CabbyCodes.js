@@ -66,7 +66,8 @@
             'cabbycodes-max-cooking.js',
             'cabbycodes-item-editor.js',
             'cabbycodes-money-editor.js',
-            'cabbycodes-story-flags.js'
+            'cabbycodes-story-flags.js',
+            'cabbycodes-fast-credits.js'
         ];
         
         scripts.forEach((scriptName) => {

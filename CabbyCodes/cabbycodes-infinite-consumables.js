@@ -79,6 +79,28 @@
         656  // black key
     ]);
 
+    function hasWDItemsTag(item, tagName) {
+        if (!item || !item.meta || !tagName) {
+            return false;
+        }
+        const rawTag = item.meta.WD_Items;
+        if (!rawTag) {
+            return false;
+        }
+        const target = String(tagName).toLowerCase();
+        const tags = Array.isArray(rawTag)
+            ? rawTag
+            : typeof rawTag === 'string'
+                ? [rawTag]
+                : [];
+        return tags.some(tag => {
+            if (typeof tag !== 'string') {
+                return false;
+            }
+            return tag.trim().toLowerCase() === target;
+        });
+    }
+
     /**
      * Determines whether the provided item is one of the temporary
      * gamemode selector tokens that the base game injects into the
@@ -90,32 +112,17 @@
      * @returns {boolean}
      */
     function isGamemodeSelectorItem(item) {
-        if (!item || !item.meta) {
-            return false;
-        }
+        return hasWDItemsTag(item, 'gamemode');
+    }
 
-        const rawTag = item.meta.WD_Items;
-        if (!rawTag) {
-            return false;
-        }
-
-        const normalize = value => {
-            if (Array.isArray(value)) {
-                return value;
-            }
-            if (typeof value === 'string') {
-                return [value];
-            }
-            return [];
-        };
-
-        const tags = normalize(rawTag);
-        return tags.some(tag => {
-            if (typeof tag !== 'string') {
-                return false;
-            }
-            return tag.trim().toLowerCase() === 'gamemode';
-        });
+    // Planet / puzzle discs (<WD_Items: discObj>) are itypeId === 2 key
+    // items but the disc-socket puzzle decrements them via gainItem(-1)
+    // when inserted. Without protection, the Infinite Items toggle would
+    // still let the inventory count drain — users expect collectible discs
+    // to stay put. The socket state lives in variables 250–272, not the
+    // inventory count, so protecting the discs does not break the puzzle.
+    function isDiscObjItem(item) {
+        return hasWDItemsTag(item, 'discobj');
     }
 
     /**
@@ -124,7 +131,9 @@
      * key items (itypeId === 2), the hidden gamemode selector tokens,
      * and a curated set of regular items that the game takes away by
      * event (PSEUDO_KEY_ITEM_IDS_UNPROTECTED) so quest scripting still
-     * works.
+     * works. Planet / puzzle discs are re-included (despite being key
+     * items) because they are inventory collectibles with no quest
+     * counter semantics.
      * @param {RPG.Item | RPG.Weapon | RPG.Armor} item
      * @returns {boolean}
      */
@@ -141,6 +150,9 @@
             }
             if (isGamemodeSelectorItem(item)) {
                 return false;
+            }
+            if (isDiscObjItem(item)) {
+                return true;
             }
             const typeId = Number(item.itypeId);
             if (Number.isFinite(typeId) && typeId === 2) {

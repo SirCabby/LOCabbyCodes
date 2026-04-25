@@ -3271,7 +3271,10 @@
         if (!isValidItemEntry(entry)) {
             return false;
         }
-        if (isKeyItemData(entry.item)) {
+        // Planet / puzzle discs are itypeId === 2 but are collectibles the
+        // player expects bulk shortcuts to cover — they have no quest-counter
+        // semantics, so granting missing ones is safe.
+        if (isKeyItemData(entry.item) && !hasWDItemsTag(entry.item, 'discobj')) {
             return false;
         }
         if (isPseudoKeyCatalogItem(entry.item)) {
