@@ -52,6 +52,7 @@
             'cabbycodes-exp-rate.js',
             'cabbycodes-infinite-consumables.js',
             'cabbycodes-unbreakable-items.js',
+            'cabbycodes-unstick-equipment.js',
             'cabbycodes-infinite-ammo.js',
             'cabbycodes-friendly-door-visitors.js',
             'cabbycodes-free-vending.js',
