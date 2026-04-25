@@ -282,33 +282,73 @@
     ];
     const HELLEN_OPTIONS = HELLEN_STATES.map(s => ({ value: s.value, label: s.label }));
 
-    // Quest-state variables. Presets are tightened based on actual writes
-    // grepped from CommonEvents.json, Map*.json, and Troops.json. Values
-    // that appear nowhere in the data (e.g. 50, 100) are not in the pickers.
-    // Where no writes were found at all, we still expose the variable with
-    // the default 0..20 picker so the user can experiment.
+    // Dan's NeoDuo quest. Phase var 896 (`danQuestState`) drives the
+    // progression. Only the four states the player meaningfully controls
+    // are exposed; the natural game ticks through intermediate phases
+    // (3 at the Floor 2 apt door, 4 inside the apt, 5 with NeoDuo in hand,
+    // 6 during Mom's confrontation, 10 on the way out — see Map007 EV058,
+    // Map015 EV041/EV042, Map016 EV003) but those transitions all fire
+    // automatically once the player is on the right map, and toggling them
+    // mid-progression doesn't represent a useful intervention. Phase 1 is
+    // the dead-end "I declined" branch — CE 237 has no branch for it, but
+    // the cheat still exposes it so the user can drop into that state.
+    const DAN_VAR_QUEST = 896;
+    const DAN_STATES = [
+        // value is the picker ordinal; phase is the var 896 value to write.
+        { value: 0, label: 'Not Started',    phase: 0   },
+        { value: 1, label: 'Declined',       phase: 1   },
+        { value: 2, label: 'Accepted',       phase: 2   },
+        { value: 3, label: 'Complete',       phase: 100 }
+    ];
+    const DAN_OPTIONS = DAN_STATES.map(s => ({ value: s.value, label: s.label }));
+
+    // Roaches' political quest. Phase var 899 (`roachQuest`) plus switch
+    // 1095 (`roachesSchism`) plus state 227 (`RoachSchism` on actor 10):
+    //   0   Not Started
+    //   1   Bickering Day 1 (set by CE 6 newDay once recruit switch 249 ON)
+    //   2   After Day 1 chastisement (Map003 BickeringRoaches)
+    //   3   Bickering Day 2 + schism flips ON (CE 6 newDay also adds state
+    //       227 to actor 10 — the in-battle debuff that nerfs Roaches'
+    //       element rates by 40-50% while he's politically split)
+    //   4   After Day 2 chastisement (Map003 roachFriend)
+    //   5   Decision Day (CE 6 newDay) — vote dialog branches in roachFriend
+    //   100 Schism outcome — player declined to choose, switch 1095 stays
+    //       ON, state 227 stays applied
+    //   101 King outcome — Papier-Mâché Crown (armor 330) granted, state
+    //       227 removed, switch 1095 OFF
+    //   102 Prime Minister outcome — Official Sash (armor 331) granted,
+    //       state 227 removed, switch 1095 OFF
+    //
+    // The cheat exposes six picker states covering the meaningful control
+    // points; the in-progress phases 1-4 collapse to "Bickering" (the
+    // intermediate phase is set by Map003 events the player interacts
+    // with anyway). Armor rewards are NOT replicated — pick the outcome
+    // here for state and use the item editor cheat for the crown/sash if
+    // you want the actual gear.
+    const ROACH_QUEST_VAR = 899;
+    const ROACH_QUEST_SWITCH_SCHISM = 1095;
+    const ROACH_QUEST_STATE_SCHISM = 227;
+    const ROACH_QUEST_ACTOR = 10;
+    const ROACH_QUEST_STATES = [
+        // value: picker ordinal; phase: var 899; schism: switch 1095;
+        // debuff: state 227 on actor 10.
+        { value: 0, label: 'Not Started',       phase: 0,   schism: false, debuff: false },
+        { value: 1, label: 'Bickering',         phase: 1,   schism: false, debuff: false },
+        { value: 2, label: 'Decision Pending',  phase: 5,   schism: true,  debuff: true  },
+        { value: 3, label: 'Schism',            phase: 100, schism: true,  debuff: true  },
+        { value: 4, label: 'King',              phase: 101, schism: false, debuff: false },
+        { value: 5, label: 'Prime Minister',    phase: 102, schism: false, debuff: false }
+    ];
+    const ROACH_QUEST_OPTIONS = ROACH_QUEST_STATES.map(s => ({ value: s.value, label: s.label }));
+
+    // Quest-state variables. Each entry needs a real understanding of what
+    // the variable drives in-game; speculative entries on under-investigated
+    // variables previously lived here (Joel/Shadow/Papineau/Lyle/Nestor/
+    // Goth/WarBomb/RatHole/RatInteract/ErnestTimes/SpiderHusk/Sybil/Dan)
+    // and were removed because their semantics weren't load-bearing for
+    // any actual cheat workflow. Add new entries here only when there's a
+    // verified mapping from option values to in-game state.
     const QUEST_FLAGS = [
-        // Written to 8 and 20 in Troops.json dialogue branches.
-        { id: 'joelState',     label: 'Joel State',           kind: 'variable', varId: 107 },
-        // Written to 2, 4, 6, 8 per earlier usage scan.
-        { id: 'shadowState',   label: 'Shadow State',         kind: 'variable', varId: 150, options: numericRange(0, 10) },
-        { id: 'papineauState', label: 'Papineau State',       kind: 'variable', varId: 171 },
-        // Written to 1 in CommonEvents.json. Likely 0/1 binary but leaving
-        // the default picker in case other writes exist.
-        { id: 'lyleState',     label: 'Lyle Recruit State',   kind: 'variable', varId: 193 },
-        // Written to 10 and 11 in Map094.json.
-        { id: 'nestor',        label: 'Nestor State',         kind: 'variable', varId: 281, options: [0, 1, 10, 11].map(v => ({ value: v, label: String(v) })) },
-        { id: 'goth',          label: 'Goth State',           kind: 'variable', varId: 298 },
-        // Written to 1, 2, 3 (and up to 6 per earlier usage scan) in Map184.json.
-        { id: 'warBomb',       label: 'War Bomb State',       kind: 'variable', varId: 357, options: numericRange(0, 6) },
-        { id: 'ratHole',       label: 'Rat Hole State',       kind: 'variable', varId: 440 },
-        { id: 'ratInteract',   label: 'Rat Interact State',   kind: 'variable', varId: 614 },
-        { id: 'ernestTimes',   label: 'Ernest Recruit Times', kind: 'variable', varId: 642 },
-        // Written to 20, 25, 27 per earlier usage scan.
-        { id: 'spiderHusk',    label: 'Spider Husk State',    kind: 'variable', varId: 874, options: numericRange(0, 30) },
-        { id: 'sybil',         label: 'Sybil State',          kind: 'variable', varId: 890, options: numericRange(0, 4) },
-        // Written to 1, 2 and checked against 100 (end state). Non-sequential.
-        { id: 'danQuest',      label: 'Dan Quest State',      kind: 'variable', varId: 896, options: [0, 1, 2, 3, 4, 5, 6, 9, 10, 100].map(v => ({ value: v, label: String(v) })) },
         // Audrey's advice can stock (var 751 `vendingMachf1_Advice`). CE 216
         // sets the initial stock to 8, decrements by 1 per interaction, and
         // grants a one-shot +99 when the player completes the restock branch
@@ -326,6 +366,20 @@
           targetLabel: `var ${HELLEN_VAR_PHASE} + switches ${HELLEN_SWITCH_MISSED_WATER}+${HELLEN_SWITCH_SPAWNED}+${HELLEN_SWITCH_CHASED_KILLED}`,
           readValue: () => readHellenGardenState(),
           applyValue: (v) => applyHellenGardenState(v) },
+        // Dan's NeoDuo retrieval quest. See the DAN_* constants block above.
+        { id: 'danQuest',      label: 'Dan Quest',            kind: 'variable', varId: DAN_VAR_QUEST,
+          options: DAN_OPTIONS,
+          displayAs: 'switch',
+          targetLabel: `var ${DAN_VAR_QUEST}`,
+          readValue: () => readDanQuestState(),
+          applyValue: (v) => applyDanQuestState(v) },
+        // Roaches' political schism quest. See the ROACH_QUEST_* block above.
+        { id: 'roachQuest',    label: 'Roaches Quest',        kind: 'variable', varId: ROACH_QUEST_VAR,
+          options: ROACH_QUEST_OPTIONS,
+          displayAs: 'switch',
+          targetLabel: `var ${ROACH_QUEST_VAR} + switch ${ROACH_QUEST_SWITCH_SCHISM} + state ${ROACH_QUEST_STATE_SCHISM} on actor ${ROACH_QUEST_ACTOR}`,
+          readValue: () => readRoachQuestState(),
+          applyValue: (v) => applyRoachQuestState(v) },
     ];
 
     // The 'sacrifices' category label is rebuilt at menu-open time from the
@@ -828,6 +882,123 @@
             return true;
         } catch (error) {
             CabbyCodes.error(`${LOG_PREFIX} Apply failed for Hellen Garden: ${error?.message || error}`);
+            return false;
+        } finally {
+            token.release();
+        }
+    }
+
+    // ---- Dan NeoDuo Quest (single-variable progression) ----
+    //
+    // Read uses range matching so the transient phase values the natural
+    // game progresses through (3..99) all show as "Accepted" — toggling
+    // back to "Accepted" from any of those would no-op the user-visible
+    // state since the in-progress maps would still gate on their specific
+    // phase value, but the row label still reflects "the player accepted
+    // and is somewhere in the middle of doing it".
+
+    function readDanQuestState() {
+        const phase = readVar(DAN_VAR_QUEST);
+        if (phase >= 100) return 3;       // Complete
+        if (phase >= 2)   return 2;       // Accepted (covers 2..99)
+        if (phase === 1)  return 1;       // Declined
+        return 0;                          // Not Started
+    }
+
+    function danQuestStateLabel(value) {
+        const s = DAN_STATES.find(st => st.value === value);
+        return s ? s.label : String(value);
+    }
+
+    function applyDanQuestState(newValue) {
+        if (!isSessionReady()) {
+            return false;
+        }
+        const target = DAN_STATES.find(s => s.value === newValue);
+        if (!target) {
+            return false;
+        }
+        const oldValue = readDanQuestState();
+        const api = CabbyCodes.freezeTime;
+        const token = (api && typeof api.exemptFromRestore === 'function')
+            ? api.exemptFromRestore({ variables: [DAN_VAR_QUEST] })
+            : { release: () => {} };
+        try {
+            $gameVariables.setValue(DAN_VAR_QUEST, target.phase);
+            CabbyCodes.warn(`${LOG_PREFIX} Dan Quest: ${danQuestStateLabel(oldValue)} -> ${danQuestStateLabel(newValue)}. var ${DAN_VAR_QUEST}=${target.phase}.`);
+            return true;
+        } catch (error) {
+            CabbyCodes.error(`${LOG_PREFIX} Apply failed for Dan Quest: ${error?.message || error}`);
+            return false;
+        } finally {
+            token.release();
+        }
+    }
+
+    // ---- Roaches Quest (compound progression + 3 outcomes + debuff state) ----
+    //
+    // Read priority is exact phase match for the three terminal outcomes
+    // (100/101/102) so the row reflects which decision was made; otherwise
+    // range-collapse phases 1-4 onto "Bickering" since those transitions
+    // are advanced by Map003 events the player interacts with anyway.
+
+    function readRoachQuestState() {
+        const phase = readVar(ROACH_QUEST_VAR);
+        if (phase === 102) return 5;     // Prime Minister
+        if (phase === 101) return 4;     // King
+        if (phase === 100) return 3;     // Schism
+        if (phase >= 5)    return 2;     // Decision Pending
+        if (phase >= 1)    return 1;     // Bickering (covers 1..4)
+        return 0;                         // Not Started
+    }
+
+    function roachQuestStateLabel(value) {
+        const s = ROACH_QUEST_STATES.find(st => st.value === value);
+        return s ? s.label : String(value);
+    }
+
+    function applyRoachQuestState(newValue) {
+        if (!isSessionReady()) {
+            return false;
+        }
+        const target = ROACH_QUEST_STATES.find(s => s.value === newValue);
+        if (!target) {
+            return false;
+        }
+        const oldValue = readRoachQuestState();
+        const api = CabbyCodes.freezeTime;
+        const token = (api && typeof api.exemptFromRestore === 'function')
+            ? api.exemptFromRestore({
+                variables: [ROACH_QUEST_VAR],
+                switches: [ROACH_QUEST_SWITCH_SCHISM]
+            })
+            : { release: () => {} };
+        try {
+            $gameVariables.setValue(ROACH_QUEST_VAR, target.phase);
+            $gameSwitches.setValue(ROACH_QUEST_SWITCH_SCHISM, target.schism);
+            // State 227 (`RoachSchism`) on actor 10 is the in-battle debuff
+            // the natural game adds at phase 2->3 and removes at the King/PM
+            // branches. Mirror it here so picking an outcome via the cheat
+            // doesn't leave a stale debuff or a missing one. No-op if actor
+            // 10 isn't loaded (Roaches not recruited yet).
+            let stateNote = '';
+            if (typeof $gameActors !== 'undefined' && $gameActors) {
+                const roaches = $gameActors.actor(ROACH_QUEST_ACTOR);
+                if (roaches) {
+                    const isAffected = typeof roaches.isStateAffected === 'function' && roaches.isStateAffected(ROACH_QUEST_STATE_SCHISM);
+                    if (target.debuff && !isAffected && typeof roaches.addState === 'function') {
+                        roaches.addState(ROACH_QUEST_STATE_SCHISM);
+                        stateNote = ` Added state ${ROACH_QUEST_STATE_SCHISM} to actor ${ROACH_QUEST_ACTOR}.`;
+                    } else if (!target.debuff && isAffected && typeof roaches.removeState === 'function') {
+                        roaches.removeState(ROACH_QUEST_STATE_SCHISM);
+                        stateNote = ` Removed state ${ROACH_QUEST_STATE_SCHISM} from actor ${ROACH_QUEST_ACTOR}.`;
+                    }
+                }
+            }
+            CabbyCodes.warn(`${LOG_PREFIX} Roaches Quest: ${roachQuestStateLabel(oldValue)} -> ${roachQuestStateLabel(newValue)}. var ${ROACH_QUEST_VAR}=${target.phase}, sw ${ROACH_QUEST_SWITCH_SCHISM}=${target.schism}, state ${ROACH_QUEST_STATE_SCHISM}=${target.debuff}.${stateNote}`);
+            return true;
+        } catch (error) {
+            CabbyCodes.error(`${LOG_PREFIX} Apply failed for Roaches Quest: ${error?.message || error}`);
             return false;
         } finally {
             token.release();
