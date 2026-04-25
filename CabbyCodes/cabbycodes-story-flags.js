@@ -3,18 +3,20 @@
 //=============================================================================
 /*:
  * @target MZ
- * @plugindesc CabbyCodes Story Flags - Inspect and override story-decision variables, recruit toggles, and sacrifice counters.
+ * @plugindesc CabbyCodes Story Flags - Inspect and override story-decision variables, recruit toggles, and protagonist body state.
  * @author CabbyCodes
  * @help
  * Adds a press option that opens a three-submenu picker:
- *   Sacrifices  - arm state, sacrifice count, good sacrifices.
+ *   <Sam>       - protagonist body state (arm state, spore head). The
+ *                 label uses actor 1's live name, so it follows any
+ *                 player rename.
  *   Recruits    - per-companion on/off (also adds/removes the actor from
  *                 the party so the toggle "actually" recruits them).
  *   Quest States - per-questline progression variables.
  *
  * Variable presets are tightened where the gameplay value range is known
- * (e.g. War Bomb State 0-6, Sacrifice Count 0-4, Nestor 0/1/10/11). Where
- * the encoding is unknown the picker falls back to a 0..15 + landmarks list.
+ * (e.g. War Bomb State 0-6, Nestor 0/1/10/11). Where the encoding is
+ * unknown the picker falls back to a 0..15 + landmarks list.
  *
  * Cooperates with Freeze Time by acquiring an exempt-from-restore token
  * across writes. A WARN-level log line names the flag and reports old/new
@@ -94,8 +96,6 @@
 
     const SACRIFICE_FLAGS = [
         { id: 'arm',        label: 'Arm State',       kind: 'variable', varId: 187, options: ARM_OPTIONS, onApplyExtra: (v) => reconcileSamAfterArmChange(v) },
-        { id: 'sacrifices', label: 'Sacrifice Count', kind: 'variable', varId: 156, options: numericRange(0, 4) },
-        { id: 'goodSacs',   label: 'Good Sacrifices', kind: 'variable', varId: 157, options: numericRange(0, 4) },
         // Dizzyshroom (var 240): CE 75 swaps Chara_Player to index 1 (if
         // sporeControl switch 197 is on) or 2 (if off) whenever var 240 >= 1
         // AND switch 103 is off. Shown in the overworld AND save-slot preview.
@@ -181,8 +181,11 @@
         { id: 'danQuest',      label: 'Dan Quest State',      kind: 'variable', varId: 896, options: [0, 1, 2, 3, 4, 5, 6, 9, 10, 100].map(v => ({ value: v, label: String(v) })) },
     ];
 
+    // The 'sacrifices' category label is rebuilt at menu-open time from the
+    // protagonist's live actor-1 name (Sam by default, but renameable), so the
+    // label here is just a placeholder that openCategoriesMenu overwrites.
     const CATEGORIES = [
-        { id: 'sacrifices', label: 'Sacrifices...',   helpText: 'Body state & sacrifice counters.', flags: SACRIFICE_FLAGS },
+        { id: 'sacrifices', label: 'Sam...',          helpText: 'Body state of the protagonist.', flags: SACRIFICE_FLAGS },
         { id: 'recruits',   label: 'Recruits...',     helpText: 'Toggle companions.', flags: RECRUIT_FLAGS },
         { id: 'quests',     label: 'Quest States...', helpText: 'Per-questline progression variables.', flags: QUEST_FLAGS },
     ];
@@ -280,6 +283,22 @@
             : `var ${flag.varId}`;
     }
 
+    // Resolve the protagonist's current display name. The default is "Sam",
+    // but the player can rename actor 1 at the start of the game, so we read
+    // the live name and fall back to "Sam" only if the actor isn't available.
+    function resolvePlayerName() {
+        if (typeof $gameActors !== 'undefined' && $gameActors) {
+            const sam = $gameActors.actor(1);
+            if (sam && typeof sam.name === 'function') {
+                const name = sam.name();
+                if (name) {
+                    return name;
+                }
+            }
+        }
+        return 'Sam';
+    }
+
     function openCategoriesMenu() {
         if (!isSessionReady()) {
             CabbyCodes.warn(`${LOG_PREFIX} Picker blocked: no active session.`);
@@ -289,6 +308,10 @@
         if (typeof SceneManager === 'undefined' || typeof Scene_CabbyCodesStoryFlagsCategories === 'undefined') {
             CabbyCodes.warn(`${LOG_PREFIX} SceneManager or scene unavailable.`);
             return;
+        }
+        const playerCat = findCategory('sacrifices');
+        if (playerCat) {
+            playerCat.label = `${resolvePlayerName()}...`;
         }
         SceneManager.push(Scene_CabbyCodesStoryFlagsCategories);
     }
