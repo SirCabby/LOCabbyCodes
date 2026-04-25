@@ -163,6 +163,14 @@
         { id: 'goth',          label: 'Goth State',           kind: 'variable', varId: 298 },
         // Written to 1, 2, 3 (and up to 6 per earlier usage scan) in Map184.json.
         { id: 'warBomb',       label: 'War Bomb State',       kind: 'variable', varId: 357, options: numericRange(0, 6) },
+        // ratGrowth (var 386). CE 94 "ratchildDay" ticks this up by 1-3 each
+        // day while ratBabyIn (switch 365) is on, and consumes it in chunks
+        // of 1/2/3/4 as the rat child advances through growth phases tracked
+        // by ratShape (var 388). Pushing this to 10 from a fresh start force-
+        // marches the rat through every phase on the next ratchildDay tick.
+        // onApplyExtra reserves CE 94 so the cheat write takes effect on the
+        // next map tick instead of waiting for the player to sleep.
+        { id: 'ratGrowth',     label: 'Rat Child Growth',     kind: 'variable', varId: 386, options: numericRange(0, 10), onApplyExtra: () => reserveRatChildDay() },
         { id: 'ratHole',       label: 'Rat Hole State',       kind: 'variable', varId: 440 },
         { id: 'ratInteract',   label: 'Rat Interact State',   kind: 'variable', varId: 614 },
         { id: 'ernestTimes',   label: 'Ernest Recruit Times', kind: 'variable', varId: 642 },
@@ -541,6 +549,19 @@
     // tick re-runs the game's own sprite-selection logic against the new
     // var 240 value. No-op if $gameTemp is unavailable (pre-session).
     function reserveUpdatePlayerAssets() {
+        reserveCommonEventSafe(75);
+    }
+
+    // CE 94 "ratchildDay" is also trigger: 0; the only base-game caller is
+    // CE 7 "newDay". Reserving it makes a Rat Child Growth write take effect
+    // on the next map tick instead of waiting for the player to sleep. The
+    // CE's daily-increment block runs first when switch 365 (ratBabyIn) is
+    // on, so the effective starting value is N+1 in that case.
+    function reserveRatChildDay() {
+        reserveCommonEventSafe(94);
+    }
+
+    function reserveCommonEventSafe(eventId) {
         if (typeof $gameTemp === 'undefined' || !$gameTemp) {
             return;
         }
@@ -548,9 +569,9 @@
             return;
         }
         try {
-            $gameTemp.reserveCommonEvent(75);
+            $gameTemp.reserveCommonEvent(eventId);
         } catch (error) {
-            CabbyCodes.warn(`${LOG_PREFIX} reserveCommonEvent(75) failed: ${error?.message || error}`);
+            CabbyCodes.warn(`${LOG_PREFIX} reserveCommonEvent(${eventId}) failed: ${error?.message || error}`);
         }
     }
 
