@@ -236,6 +236,52 @@
         { id: 'ernestTemp', label: 'Ernest (Temp Recruit)', kind: 'switch', switchId: 792 },
     ];
 
+    // Hellen Garden Quest state. The natural progression lives in var 869
+    // (`HellenQuestPhase`):
+    //   0   Not Started
+    //   3   Accepted (CE 235 `HellenQuest`)
+    //   4-7 Early visit/dialog steps
+    //   8   Visit 1 watered (CE 253 `HellenQuestPlantInteract`)
+    //   9   Post-watering cutscene (Map293)
+    //   10  Day 1 wait (newDay ticks 9->10)
+    //   11/12/13, 14/15/16, 17 — same pattern through visits 2, 3, 4
+    //   18  Fruit harvested (Map433)
+    //   100 Complete (Map433)
+    //   -1  Aborted (CE 235 bad dialog choice)
+    //
+    // The failure path layers on top via four switches; CE 6 newDay
+    // (line 527-532) flips 1086 ON if a day passes while the player is in
+    // a waiting phase without having watered, CE 254 `hellenSpawn` flips
+    // 1087 ON to make Hellen appear stalking the player, and many `Maniac`
+    // map events flip 1088 ON when the player kills the stalking Hellen.
+    //
+    // We expose 13 named states so the user can step through the natural
+    // progression OR jump straight to any failure outcome. Switch 1085 is
+    // a per-day transient — always reset to OFF on apply so a stale "you
+    // watered today" doesn't suppress the next day-tick.
+    const HELLEN_VAR_PHASE = 869;
+    const HELLEN_SWITCH_WATERED = 1085;
+    const HELLEN_SWITCH_MISSED_WATER = 1086;
+    const HELLEN_SWITCH_SPAWNED = 1087;
+    const HELLEN_SWITCH_CHASED_KILLED = 1088;
+    const HELLEN_STATES = [
+        // value is the picker ordinal; phase is the var 869 value to write.
+        { value:  0, label: 'Not Started',     phase: 0,   missed: false, spawned: false, killed: false },
+        { value:  1, label: 'Accepted',        phase: 3,   missed: false, spawned: false, killed: false },
+        { value:  2, label: 'Pre-Watering',    phase: 7,   missed: false, spawned: false, killed: false },
+        { value:  3, label: 'Day 1 Wait',      phase: 10,  missed: false, spawned: false, killed: false },
+        { value:  4, label: 'Day 2 Wait',      phase: 13,  missed: false, spawned: false, killed: false },
+        { value:  5, label: 'Day 3 Wait',      phase: 16,  missed: false, spawned: false, killed: false },
+        { value:  6, label: 'Fruit Ripens',    phase: 17,  missed: false, spawned: false, killed: false },
+        { value:  7, label: 'Fruit Harvested', phase: 18,  missed: false, spawned: false, killed: false },
+        { value:  8, label: 'Complete',        phase: 100, missed: false, spawned: false, killed: false },
+        { value:  9, label: 'Aborted',         phase: -1,  missed: false, spawned: false, killed: false },
+        { value: 10, label: 'Missed Watering', phase: 13,  missed: true,  spawned: false, killed: false },
+        { value: 11, label: 'Hellen Hostile',  phase: 13,  missed: true,  spawned: true,  killed: false },
+        { value: 12, label: 'Hellen Killed',   phase: -1,  missed: true,  spawned: false, killed: true  }
+    ];
+    const HELLEN_OPTIONS = HELLEN_STATES.map(s => ({ value: s.value, label: s.label }));
+
     // Quest-state variables. Presets are tightened based on actual writes
     // grepped from CommonEvents.json, Map*.json, and Troops.json. Values
     // that appear nowhere in the data (e.g. 50, 100) are not in the pickers.
@@ -263,6 +309,23 @@
         { id: 'sybil',         label: 'Sybil State',          kind: 'variable', varId: 890, options: numericRange(0, 4) },
         // Written to 1, 2 and checked against 100 (end state). Non-sequential.
         { id: 'danQuest',      label: 'Dan Quest State',      kind: 'variable', varId: 896, options: [0, 1, 2, 3, 4, 5, 6, 9, 10, 100].map(v => ({ value: v, label: String(v) })) },
+        // Audrey's advice can stock (var 751 `vendingMachf1_Advice`). CE 216
+        // sets the initial stock to 8, decrements by 1 per interaction, and
+        // grants a one-shot +99 when the player completes the restock branch
+        // ("I can restock whenever I want now!"). Game-side dialog branches
+        // explicitly on 0/1/2/3/4+. There's no engine-enforced cap, so 999
+        // is a generous practical max well beyond anything the natural game
+        // produces.
+        { id: 'audreyCans',    label: 'Audrey Advice Cans',   kind: 'variable', varId: 751, options: [0, 1, 2, 3, 4, 8, 99, 999].map(v => ({ value: v, label: String(v) })) },
+        // Hellen's garden quest. Compound state covering the linear watering
+        // progression plus the failure path (missed watering -> hostile
+        // spawn -> killed). See the HELLEN_* constants block above.
+        { id: 'hellenGarden',  label: 'Hellen Garden Quest',  kind: 'variable', varId: HELLEN_VAR_PHASE,
+          options: HELLEN_OPTIONS,
+          displayAs: 'switch',
+          targetLabel: `var ${HELLEN_VAR_PHASE} + switches ${HELLEN_SWITCH_MISSED_WATER}+${HELLEN_SWITCH_SPAWNED}+${HELLEN_SWITCH_CHASED_KILLED}`,
+          readValue: () => readHellenGardenState(),
+          applyValue: (v) => applyHellenGardenState(v) },
     ];
 
     // The 'sacrifices' category label is rebuilt at menu-open time from the
@@ -687,6 +750,84 @@
             return true;
         } catch (error) {
             CabbyCodes.error(`${LOG_PREFIX} Apply failed for Rat Child: ${error?.message || error}`);
+            return false;
+        } finally {
+            token.release();
+        }
+    }
+
+    // ---- Hellen Garden Quest (compound progression + failure outcomes) ----
+    //
+    // Read priority: failure switches dominate over var 869 because the
+    // hostile/killed states layer on top of any waiting phase. Var 869's
+    // natural progression spends time at every integer 0..18 plus 100 and
+    // -1, but only a subset are stable "waypoints"; the rest are mid-step
+    // transients (e.g. 4-6 in Map092/Map294 visit dialog, 8 just-watered,
+    // 9 post-water cutscene). Range matching maps each transient to the
+    // labeled state that owns its phase block so the row reflects "where
+    // am I right now?" rather than snapping to a single magic value.
+
+    function readHellenGardenState() {
+        if (readSwitch(HELLEN_SWITCH_CHASED_KILLED)) {
+            return 12;
+        }
+        if (readSwitch(HELLEN_SWITCH_SPAWNED)) {
+            return 11;
+        }
+        if (readSwitch(HELLEN_SWITCH_MISSED_WATER)) {
+            return 10;
+        }
+        const phase = readVar(HELLEN_VAR_PHASE);
+        if (phase < 0) return 9;            // Aborted (-1)
+        if (phase >= 100) return 8;         // Complete
+        if (phase >= 18) return 7;          // Fruit Harvested (18..99)
+        if (phase >= 17) return 6;          // Fruit Ripens (17)
+        if (phase >= 14) return 5;          // Day 3 Wait covers 14, 15, 16
+        if (phase >= 11) return 4;          // Day 2 Wait covers 11, 12, 13
+        if (phase >= 8)  return 3;          // Day 1 Wait covers 8, 9, 10
+        if (phase >= 7)  return 2;          // Pre-Watering (7)
+        if (phase >= 3)  return 1;          // Accepted covers 3, 4, 5, 6
+        return 0;                            // Not Started covers 0, 1, 2
+    }
+
+    function hellenGardenStateLabel(value) {
+        const s = HELLEN_STATES.find(st => st.value === value);
+        return s ? s.label : String(value);
+    }
+
+    function applyHellenGardenState(newValue) {
+        if (!isSessionReady()) {
+            return false;
+        }
+        const target = HELLEN_STATES.find(s => s.value === newValue);
+        if (!target) {
+            return false;
+        }
+        const oldValue = readHellenGardenState();
+        const api = CabbyCodes.freezeTime;
+        const token = (api && typeof api.exemptFromRestore === 'function')
+            ? api.exemptFromRestore({
+                variables: [HELLEN_VAR_PHASE],
+                switches: [
+                    HELLEN_SWITCH_WATERED,
+                    HELLEN_SWITCH_MISSED_WATER,
+                    HELLEN_SWITCH_SPAWNED,
+                    HELLEN_SWITCH_CHASED_KILLED
+                ]
+            })
+            : { release: () => {} };
+        try {
+            $gameVariables.setValue(HELLEN_VAR_PHASE, target.phase);
+            // Always reset 1085 so a stale "watered today" doesn't suppress
+            // the next newDay tick the natural game uses to advance phase.
+            $gameSwitches.setValue(HELLEN_SWITCH_WATERED, false);
+            $gameSwitches.setValue(HELLEN_SWITCH_MISSED_WATER, target.missed);
+            $gameSwitches.setValue(HELLEN_SWITCH_SPAWNED, target.spawned);
+            $gameSwitches.setValue(HELLEN_SWITCH_CHASED_KILLED, target.killed);
+            CabbyCodes.warn(`${LOG_PREFIX} Hellen Garden: ${hellenGardenStateLabel(oldValue)} -> ${hellenGardenStateLabel(newValue)}. var ${HELLEN_VAR_PHASE}=${target.phase}, sw ${HELLEN_SWITCH_MISSED_WATER}=${target.missed}/${HELLEN_SWITCH_SPAWNED}=${target.spawned}/${HELLEN_SWITCH_CHASED_KILLED}=${target.killed}.`);
+            return true;
+        } catch (error) {
+            CabbyCodes.error(`${LOG_PREFIX} Apply failed for Hellen Garden: ${error?.message || error}`);
             return false;
         } finally {
             token.release();
