@@ -142,6 +142,60 @@
         { value: 2, label: 'Home' }
     ];
 
+    // Roaches has three switches that the natural recruit (Troop 279 "Roach
+    // Man" accept branch) flips together — and only flipping 369 leaves
+    // Roaches missing from Sam's bathroom because the post-recruit NPC page
+    // in Map004 (ApptBathroom) is gated on `roachRecruit` (249), not 369.
+    //   - 369 `recruitedRoaches`     : canonical "is recruited?" flag (most
+    //                                   reads in the data check this one)
+    //   - 370 `recruitedRoachesFull` : companion flag read by CE 33
+    //                                   (Screamatorium) and CE 205 (sqs) for
+    //                                   dialogue branching
+    //   - 249 `roachRecruit`         : gates the Chara_Recruit2 NPC page in
+    //                                   Map004 that calls CE 137 "Talk
+    //                                   Roaches" — without this, Roaches
+    //                                   never appears in Sam's bathroom and
+    //                                   the player can't use the in-dialog
+    //                                   "Manage Party" option
+    // The dev "Recruit ALL" menu in Map003 only flips 369 — that menu is a
+    // quick-test convenience and is intentionally not a full recruit. The
+    // cheat applies all three so toggling ON matches the post-recruit
+    // game state the player would reach naturally.
+    const ROACHES_SWITCH_RECRUITED = 369;
+    const ROACHES_SWITCH_FULL = 370;
+    const ROACHES_SWITCH_BATHROOM_NPC = 249;
+    const ROACHES_ACTOR_ID = 10;
+
+    // Rat Child recruit targets. See the flag descriptor in RECRUIT_FLAGS.
+    // The rat lives in Sam's apartment (Map003 "ratbaby" event); switch 365
+    // (`ratBabyIn`) is the gate for "rat is in the apartment at all". Adult
+    // form additionally requires switch 290 (`ratFollows`, gates the adult
+    // sprite page + joinable) and switch 366 (`ratBabyGrown`).
+    // RATCHILD_SHAPE_ADULT_AVERAGE = 7 mirrors CE 94's else-branch in both
+    // the intermediate-form selector (line 145) and the final-form selector
+    // (line 240) — the value the natural growth lands on when no
+    // disposition variable (387/389/390/392/393/394/396) dominates. Picking
+    // this default keeps the cheat outcome stable regardless of how the
+    // player interacted with the rat before toggling.
+    //
+    // We do NOT touch `peopleInAppt` (var 37) even though CE 94 block 6
+    // increments it on first baby->adult: the natural game has no inverse
+    // and toggling Adult->Off->Adult in the cheat would double-count. The
+    // tradeoff is that taking the cheat shortcut to Adult skips that +1.
+    const RATCHILD_VAR_GROWTH = 386;
+    const RATCHILD_VAR_SHAPE = 388;
+    const RATCHILD_SWITCH_IN_HOME = 365;
+    const RATCHILD_SWITCH_FOLLOWS = 290;
+    const RATCHILD_SWITCH_GROWN = 366;
+    const RATCHILD_ACTOR_ID = 8;
+    const RATCHILD_SHAPE_BABY = 0;
+    const RATCHILD_SHAPE_ADULT_AVERAGE = 7;
+    const RATCHILD_OPTIONS = [
+        { value: 0, label: 'Off' },
+        { value: 1, label: 'Baby' },
+        { value: 2, label: 'Adult' }
+    ];
+
     const RECRUIT_FLAGS = [
         { id: 'shadow',     label: 'Shadow',                kind: 'switch', switchId: 27 },
         { id: 'dan',        label: 'Dan',                   kind: 'switch', switchId: 32,  actorId: 6 },
@@ -155,7 +209,23 @@
           readValue: () => readSophieRecruitState(),
           applyValue: (v) => applySophieRecruitState(v) },
         { id: 'goths',      label: 'Goths',                 kind: 'switch', switchId: 363 },
-        { id: 'roaches',    label: 'Roaches',               kind: 'switch', switchId: 369, actorId: 10 },
+        { id: 'roaches',    label: 'Roaches',               kind: 'switch', switchId: ROACHES_SWITCH_RECRUITED, actorId: ROACHES_ACTOR_ID,
+          targetLabel: `switches ${ROACHES_SWITCH_BATHROOM_NPC}+${ROACHES_SWITCH_RECRUITED}+${ROACHES_SWITCH_FULL}`,
+          readValue: () => readRoachesRecruitState(),
+          applyValue: (v) => applyRoachesRecruitState(v) },
+        // Rat Child is a tri-state recruit: Off (not in the apartment),
+        // Baby (in apartment but not joinable), Adult (joinable, sprite
+        // swaps in Sam's apartment). Off lets the player remove the rat
+        // from the home if they're already there. Tracked as `kind: 'switch'`
+        // anchored on `ratBabyIn` (365) — the natural canonical "is the rat
+        // around?" flag — but the read/apply pair drives all five targets
+        // together (var 386, var 388, switches 290/365/366) so the row + picker
+        // never fall out of step with the in-game state.
+        { id: 'ratChild',   label: 'Rat Child',             kind: 'switch', switchId: RATCHILD_SWITCH_IN_HOME, actorId: RATCHILD_ACTOR_ID,
+          options: RATCHILD_OPTIONS,
+          targetLabel: `vars ${RATCHILD_VAR_GROWTH}+${RATCHILD_VAR_SHAPE} + switches ${RATCHILD_SWITCH_IN_HOME}+${RATCHILD_SWITCH_FOLLOWS}+${RATCHILD_SWITCH_GROWN}`,
+          readValue: () => readRatChildState(),
+          applyValue: (v) => applyRatChildState(v) },
         { id: 'morton',     label: 'Morton',                kind: 'switch', switchId: 371, actorId: 16 },
         { id: 'aster',      label: 'Aster',                 kind: 'switch', switchId: 374, actorId: 3 },
         { id: 'spider',     label: 'Spider',                kind: 'switch', switchId: 375, actorId: 19 },
@@ -185,14 +255,6 @@
         { id: 'goth',          label: 'Goth State',           kind: 'variable', varId: 298 },
         // Written to 1, 2, 3 (and up to 6 per earlier usage scan) in Map184.json.
         { id: 'warBomb',       label: 'War Bomb State',       kind: 'variable', varId: 357, options: numericRange(0, 6) },
-        // ratGrowth (var 386). CE 94 "ratchildDay" ticks this up by 1-3 each
-        // day while ratBabyIn (switch 365) is on, and consumes it in chunks
-        // of 1/2/3/4 as the rat child advances through growth phases tracked
-        // by ratShape (var 388). Pushing this to 10 from a fresh start force-
-        // marches the rat through every phase on the next ratchildDay tick.
-        // onApplyExtra reserves CE 94 so the cheat write takes effect on the
-        // next map tick instead of waiting for the player to sleep.
-        { id: 'ratGrowth',     label: 'Rat Child Growth',     kind: 'variable', varId: 386, options: numericRange(0, 10), onApplyExtra: () => reserveRatChildDay() },
         { id: 'ratHole',       label: 'Rat Hole State',       kind: 'variable', varId: 440 },
         { id: 'ratInteract',   label: 'Rat Interact State',   kind: 'variable', varId: 614 },
         { id: 'ernestTimes',   label: 'Ernest Recruit Times', kind: 'variable', varId: 642 },
@@ -510,6 +572,127 @@
         }
     }
 
+    // ---- Roaches recruit (drives 3 switches + party) ----
+    //
+    // ON  = Troop 279's accept branch outcome: 249/369/370 all ON, actor 10
+    //       in party (so Roaches stands as a talkable NPC in Sam's bathroom
+    //       and the Talk Roaches "Manage Party" choice is reachable).
+    // OFF = baseline: all three switches OFF, actor 10 not in party.
+    //
+    // Read state from the canonical `recruitedRoaches` (369). If a save has
+    // 249 or 370 ON without 369 (would only happen via a manual flag edit),
+    // the row reads OFF and toggling ON normalises all three.
+
+    function readRoachesRecruitState() {
+        return readSwitch(ROACHES_SWITCH_RECRUITED) ? 1 : 0;
+    }
+
+    function applyRoachesRecruitState(newValue) {
+        if (!isSessionReady()) {
+            return false;
+        }
+        const wantOn = Boolean(newValue);
+        const oldOn = Boolean(readRoachesRecruitState());
+        const switchIds = [
+            ROACHES_SWITCH_BATHROOM_NPC,
+            ROACHES_SWITCH_RECRUITED,
+            ROACHES_SWITCH_FULL
+        ];
+        const api = CabbyCodes.freezeTime;
+        const token = (api && typeof api.exemptFromRestore === 'function')
+            ? api.exemptFromRestore({ switches: switchIds })
+            : { release: () => {} };
+        try {
+            switchIds.forEach(id => $gameSwitches.setValue(id, wantOn));
+            const partyNote = syncActorParty({ actorId: ROACHES_ACTOR_ID, label: 'Roaches' }, wantOn);
+            const readBack = readRoachesRecruitState();
+            CabbyCodes.warn(`${LOG_PREFIX} Roaches (switches ${switchIds.join('+')}): ${oldOn} -> ${wantOn}. Read-back: ${Boolean(readBack)}.${partyNote}`);
+            return true;
+        } catch (error) {
+            CabbyCodes.error(`${LOG_PREFIX} Apply failed for Roaches: ${error?.message || error}`);
+            return false;
+        } finally {
+            token.release();
+        }
+    }
+
+    // ---- Rat Child recruit (Off / Baby / Adult) ----
+    //
+    // Off   = rat not in the apartment (switch 365 OFF). Removes the rat
+    //         NPC from Sam's apartment and clears all growth state. Lets
+    //         the player evict the rat without playing through CE 92's
+    //         "give the rat away" branch.
+    // Baby  = rat is in the apartment but not joinable. Switch 365 ON,
+    //         growth state cleared (var 388 = 0, var 386 = 0), Follows/
+    //         Grown switches OFF. Actor 8 not in party.
+    // Adult = post-growth state. Switch 365 ON, switches 290 + 366 ON,
+    //         var 388 = 7 (the average-rat default form). Actor 8 added
+    //         to the party so the player doesn't need to walk back to the
+    //         apartment and use CE 92's "Manage Party" choice to bring
+    //         them along.
+    //
+    // CE 94 "ratchildDay" can cascade through every growth phase in a
+    // single call when ratGrowth is high enough, but its growth messages
+    // are gated on CHEATMODE (switch 7), so the cascade is silent for
+    // normal players; the apartment sprite also only re-evaluates on map
+    // refresh. We write the end-state directly and request a refresh so
+    // the toggle has an immediate visible effect.
+
+    function readRatChildState() {
+        if (!readSwitch(RATCHILD_SWITCH_IN_HOME)) {
+            return 0;
+        }
+        if (readSwitch(RATCHILD_SWITCH_FOLLOWS)) {
+            return 2;
+        }
+        return 1;
+    }
+
+    function ratChildStateLabel(value) {
+        const opt = RATCHILD_OPTIONS.find(o => o.value === value);
+        return opt ? opt.label : String(value);
+    }
+
+    function applyRatChildState(newValue) {
+        if (!isSessionReady()) {
+            return false;
+        }
+        const wantOff = newValue === 0;
+        const wantAdult = newValue === 2;
+        const oldState = readRatChildState();
+        const api = CabbyCodes.freezeTime;
+        const token = (api && typeof api.exemptFromRestore === 'function')
+            ? api.exemptFromRestore({
+                variables: [RATCHILD_VAR_GROWTH, RATCHILD_VAR_SHAPE],
+                switches: [RATCHILD_SWITCH_IN_HOME, RATCHILD_SWITCH_FOLLOWS, RATCHILD_SWITCH_GROWN]
+            })
+            : { release: () => {} };
+        try {
+            $gameSwitches.setValue(RATCHILD_SWITCH_IN_HOME, !wantOff);
+            $gameSwitches.setValue(RATCHILD_SWITCH_FOLLOWS, wantAdult);
+            $gameSwitches.setValue(RATCHILD_SWITCH_GROWN, wantAdult);
+            $gameVariables.setValue(
+                RATCHILD_VAR_SHAPE,
+                wantAdult ? RATCHILD_SHAPE_ADULT_AVERAGE : RATCHILD_SHAPE_BABY
+            );
+            $gameVariables.setValue(RATCHILD_VAR_GROWTH, 0);
+            // Actor 8 is only in the party as Adult; Off and Baby both
+            // remove (Off = rat absent, Baby = present but not joinable).
+            const partyNote = syncActorParty({ actorId: RATCHILD_ACTOR_ID, label: 'Rat Child' }, wantAdult);
+            if (typeof $gameMap !== 'undefined' && $gameMap && typeof $gameMap.requestRefresh === 'function') {
+                $gameMap.requestRefresh();
+            }
+            const readBack = readRatChildState();
+            CabbyCodes.warn(`${LOG_PREFIX} Rat Child (vars ${RATCHILD_VAR_GROWTH}+${RATCHILD_VAR_SHAPE}, switches ${RATCHILD_SWITCH_IN_HOME}+${RATCHILD_SWITCH_FOLLOWS}+${RATCHILD_SWITCH_GROWN}): ${ratChildStateLabel(oldState)} -> ${ratChildStateLabel(newValue)}. Read-back: ${ratChildStateLabel(readBack)}.${partyNote}`);
+            return true;
+        } catch (error) {
+            CabbyCodes.error(`${LOG_PREFIX} Apply failed for Rat Child: ${error?.message || error}`);
+            return false;
+        } finally {
+            token.release();
+        }
+    }
+
     // Recruit switches gate availability, but the in-game recruit Common
     // Events also call code:129 Add Party Member after flipping the switch.
     // Toggling the switch alone is insufficient to actually put the actor
@@ -685,15 +868,6 @@
     // var 240 value. No-op if $gameTemp is unavailable (pre-session).
     function reserveUpdatePlayerAssets() {
         reserveCommonEventSafe(75);
-    }
-
-    // CE 94 "ratchildDay" is also trigger: 0; the only base-game caller is
-    // CE 7 "newDay". Reserving it makes a Rat Child Growth write take effect
-    // on the next map tick instead of waiting for the player to sleep. The
-    // CE's daily-increment block runs first when switch 365 (ratBabyIn) is
-    // on, so the effective starting value is N+1 in that case.
-    function reserveRatChildDay() {
-        reserveCommonEventSafe(94);
     }
 
     function reserveCommonEventSafe(eventId) {

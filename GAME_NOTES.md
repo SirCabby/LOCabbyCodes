@@ -138,8 +138,8 @@ at `Map003.json:23690+` which labels each branch by character name.
 | 362 | `recruitedSophie`     | 12            | Dev menu confirms `"Recruit Sophie"` → switch 362. Pairs with `SophieBackHome` (364); the Sophie cheat exposes both as a single Off/Recruited/Home tri-state. |
 | 363 | `recruitedGoths`      | (multi)       | Covers ≥2 goth actors (user-confirmed). Leave `actorId` unset in the cheat so only the switch flips. |
 | 364 | `SophieBackHome`      | 12 (NPC)      | Set ON by the Harriet-reunion troop event in `Troops.json` (which simultaneously flips 362 OFF and removes actor 12). When ON, Sophie spawns as an NPC in `Apt22_Harriet` (Map334) instead of following Sam. |
-| 369 | `recruitedRoaches`    | 10            | |
-| 370 | `recruitedRoachesFull`| —             | **Dead** (never written, barely read). Skip. |
+| 369 | `recruitedRoaches`    | 10            | Canonical "is recruited" flag (most reads). The Roaches recruit cheat drives this in lockstep with 249 and 370 to mirror Troop 279's accept branch — see notes below. |
+| 370 | `recruitedRoachesFull`| 10            | Companion flag. Read by CE 33 (`game:Screamatorium`) and CE 205 (`sqs`) to branch Roaches dialogue. Set ON alongside 369 by the natural recruit. |
 | 371 | `recruitedMorton`     | 16            | |
 | 372 | `recruitedKindface`   | —             | **Dead** (no matching actor). Skip. |
 | 373 | `recruitedMelted`     | 18 (Melt)     | **Dead** switch — Melt is recruited via a different path |
@@ -156,6 +156,54 @@ Read flags freely for feature gating. Writes are now mod-managed via the
 Story Flags cheat — when adding new features that mutate recruit state,
 go through the same flag definitions to keep the switch + actor party
 membership in sync.
+
+### Roaches recruit chain (switches 249 + 369 + 370)
+
+Troop 279 ("Roach Man") accept branch flips three switches in lockstep,
+not just `recruitedRoaches`:
+
+- `recruitedRoaches` (369) — canonical recruit flag, gates most downstream reads.
+- `recruitedRoachesFull` (370) — branches Roaches dialogue in CE 33 / CE 205.
+- `roachRecruit` (249) — gates the post-recruit Chara_Recruit2 NPC page in
+  `Map004` (Sam's bathroom) that calls CE 137 "Talk Roaches". Without 249,
+  Roaches never spawns in the bathroom and the in-dialog "Manage Party"
+  choice (CE 137) is unreachable, so the player can't actually take him
+  along even if 369 is on.
+
+The Roaches cheat must drive all three together; flipping 369 alone
+recreates the dev-menu shortcut state, not the post-recruit game state.
+
+### Rat Child recruit chain (actor 8, two vars + three switches)
+
+The rat child is **actor 8** (`RatChild` sprite, class 20). The natural
+flow uses CE 94 `ratchildDay` to cascade through growth phases, but its
+visible feedback is gated on `CHEATMODE` (switch 7) so a normal player
+sees no on-screen change when CE 94 advances state — and the apartment
+sprite (Map003 `ratbaby` event) only re-evaluates page conditions on
+map refresh. The Rat Child cheat sets the end-state directly:
+
+- `ratBabyIn` (switch 365) — "rat is in the apartment". All ratbaby
+  page conditions in Map003 require this. Off = rat absent.
+- `ratFollows` (switch 290) — gates the adult sprite page (RatChild#0)
+  AND the joinable flag set in CE 94 block 6.
+- `ratBabyGrown` (switch 366) — set ON in CE 94's intermediate→final
+  step (line 156); branches downstream dialogue.
+- `ratGrowth` (var 386) — daily input counter consumed by CE 94 in
+  chunks (1/2/3/4) per phase. Cleared by the cheat.
+- `ratShape` (var 388) — internal CE 94 state machine. End-state
+  values 7 / 12-15 / 17-20 are the adult forms. The cheat writes 7
+  ("Average Rat"), the CE 94 fallback when no disposition variable
+  (387/389/390/392/393/394/396) dominates.
+
+CE 92 `ratchild` is the in-apartment dialog that natively handles
+Add/Remove actor 8 from party (code 129) and the "give the rat away"
+branch that flips switch 365 OFF. The cheat skips it and writes
+directly so toggles take effect without the player walking back home.
+
+`peopleInAppt` (var 37) is incremented by +1 in CE 94 block 6 on first
+baby→adult transition. The cheat intentionally does NOT touch var 37:
+the natural game has no inverse and toggling Adult→Off→Adult would
+double-count.
 
 ---
 
