@@ -386,6 +386,84 @@
     ];
     const JUICEBOX_QUEST_OPTIONS = JUICEBOX_QUEST_STATES.map(s => ({ value: s.value, label: s.label }));
 
+    // Bedroom Plant quest. The plant lives at Map002 ev7 from the start;
+    // CE 65 "Plant" runs each interaction, offering Talk / Water / Add soil /
+    // Examine / Leave. Three flags drive the talk arc end-to-end:
+    //   var 120 `nbTimesTalkedPlant` — the talk-progression counter (0..12+).
+    //                                  Each value below has unique dialog and
+    //                                  the counter increments by 1 per Talk:
+    //     0  "Hey, plant! Any plans tonight?"   (only if switch 48 is OFF)
+    //     1  "Hey, plant! Still growing?"
+    //     2  "Pull it to the light?"            (offers a move choice that
+    //                                            flips switch 79 plantMoved)
+    //     3-5 routine greetings; branch on switch 79 (val 5 with sw 79 ON
+    //         grants the `Misc_PlantMonster` achievement)
+    //     5  (sw 79 OFF) "...uh, I wanted to tell you something..." chickens out
+    //     6  "We need to talk... I love you. Do you... love me?"
+    //     7  "...I understand. We're from different kingdoms."
+    //         -> setAchievement("Misc_PlantRejection") fires HERE
+    //     8  "I cried a little bit, but I'm okay." (friendship preserved)
+    //     9  "I need more time. Maybe a succulent. Or a cactus."
+    //     10 "Oh, you have someone else in mind?" (a lichen)
+    //     11 routine
+    //     12+ generic "What's up? Have a good day." (loops forever)
+    //   switch 48 `tutorialPlant` — gates the val-0 first-talk tutorial; on
+    //                                ON, the val-1+ branches run normally.
+    //   switch 60 `talkedPlant`    — per-day "already talked" lock. CE 6
+    //                                newDay clears it. We always reset to OFF
+    //                                on apply so the next interaction reads
+    //                                the new var-120 dialog without the
+    //                                player having to wait a day.
+    // CE 65 also gates the Talk choice itself behind switch 1004 via the
+    // `WD_ConditionalChoice` plugin syntax: the first choice text in the
+    // "What will you do?" menu is `(([s[1004]]))Talk.`, which the plugin
+    // reads as "hide this choice when switch 1004 is ON". CE 65 turns sw1004
+    // ON at the top of every interaction whenever var 37 (`peopleInAppt`)
+    // >= 2 — i.e. whenever you have any companion or visitor in the
+    // apartment. Saves with companions present therefore see only
+    // Water / Add soil / Examine / Leave on the plant menu and the talk arc
+    // is unreachable regardless of var 120 / sw 60. The cheat strips the
+    // `(([s[1004]]))` prefix from the Talk choice text in $dataCommonEvents
+    // on apply (idempotent — only if the prefix is still there) so Talk
+    // shows even with a full apartment.
+    //   switch 79 `plantMoved`     — whether the player pulled the plant to
+    //                                the light at val-2. CE 65 has TWO
+    //                                separate val-3+ dialog branches gated
+    //                                on this switch: when sw79 is ON, the
+    //                                tree only goes 3 -> 4 -> >=5
+    //                                (PlantMonster achievement) and the
+    //                                love/rejection content (vals 6..12+)
+    //                                is unreachable. Saves where the player
+    //                                pulled the plant to the light therefore
+    //                                can't see rejection at all without
+    //                                flipping sw79 OFF first. We force it
+    //                                OFF on apply so the picker actually
+    //                                lands on the rejection arc the labels
+    //                                describe.
+    //
+    // The cheat collapses the 13 unique values onto 7 picker states focused
+    // on the love/rejection arc since that's the meaningful storyline. The
+    // intermediate vals 2..5 (light position, chickening out) all map onto
+    // "Pre-Confession" because their dialog isn't load-bearing and the player
+    // who wants to dial up rejection doesn't care which side-branch they're on.
+    const PLANT_VAR_TALK = 120;
+    const PLANT_SWITCH_TUTORIAL = 48;
+    const PLANT_SWITCH_TALKED_TODAY = 60;
+    const PLANT_SWITCH_PLANT_MOVED = 79;
+    const PLANT_QUEST_STATES = [
+        // value: picker ordinal; phase: var 120 to write; tutorial: switch 48
+        // target state. Switch 60 is always cleared so the player can talk
+        // immediately after applying.
+        { value: 0, label: 'Not Started',     phase: 0,  tutorial: false },
+        { value: 1, label: 'Tutorial Done',   phase: 1,  tutorial: true  },
+        { value: 2, label: 'Pre-Confession',  phase: 5,  tutorial: true  },
+        { value: 3, label: 'Confessing',      phase: 6,  tutorial: true  },
+        { value: 4, label: 'Awaiting Reply',  phase: 7,  tutorial: true  },
+        { value: 5, label: 'Rejected',        phase: 8,  tutorial: true  },
+        { value: 6, label: 'Moving On',       phase: 12, tutorial: true  }
+    ];
+    const PLANT_QUEST_OPTIONS = PLANT_QUEST_STATES.map(s => ({ value: s.value, label: s.label }));
+
     // Lyle's "Mazes and Wizards" quest is a session-count quest: var 701
     // `sessionNb` is the number of completed sessions, incremented by CE 239
     // (MWCore) at the end of each tabletop session. Each value 1..6 maps to
@@ -422,6 +500,14 @@
           targetLabel: `var ${HELLEN_VAR_PHASE} + switches ${HELLEN_SWITCH_MISSED_WATER}+${HELLEN_SWITCH_SPAWNED}+${HELLEN_SWITCH_CHASED_KILLED}`,
           readValue: () => readHellenGardenState(),
           applyValue: (v) => applyHellenGardenState(v) },
+        // Bedroom Plant quest — talk arc culminating in the love-confession
+        // and rejection branch. See the PLANT_* constants block above.
+        { id: 'plantQuest',    label: 'Plant Quest',          kind: 'variable', varId: PLANT_VAR_TALK,
+          options: PLANT_QUEST_OPTIONS,
+          displayAs: 'switch',
+          targetLabel: `var ${PLANT_VAR_TALK} + switches ${PLANT_SWITCH_TUTORIAL}+${PLANT_SWITCH_TALKED_TODAY}+${PLANT_SWITCH_PLANT_MOVED}`,
+          readValue: () => readPlantQuestState(),
+          applyValue: (v) => applyPlantQuestState(v) },
         // Dan's NeoDuo retrieval quest. See the DAN_* constants block above.
         { id: 'danQuest',      label: 'Dan Quest',            kind: 'variable', varId: DAN_VAR_QUEST,
           options: DAN_OPTIONS,
@@ -1134,6 +1220,125 @@
             return true;
         } catch (error) {
             CabbyCodes.error(`${LOG_PREFIX} Apply failed for Juicebox Quest: ${error?.message || error}`);
+            return false;
+        } finally {
+            token.release();
+        }
+    }
+
+    // ---- Plant Quest (talk arc -> love confession -> rejection) ----
+    //
+    // var 120 increments by 1 per Talk and never decrements. Map ranges
+    // back to picker ordinals: vals 0,1 are uniquely named, 2..5 collapse
+    // onto "Pre-Confession" (chickens out / side branches), 6 is the
+    // confession, 7 is the rejection-fires-this-talk state, 8..11 are the
+    // friend-zone aftermath, 12+ is the generic loop.
+
+    function readPlantQuestState() {
+        const phase = readVar(PLANT_VAR_TALK);
+        if (phase >= 12)               return 6;   // Moving On
+        if (phase >= 8 && phase <= 11) return 5;   // Rejected (friend zone)
+        if (phase === 7)               return 4;   // Awaiting Reply
+        if (phase === 6)               return 3;   // Confessing
+        if (phase >= 2 && phase <= 5)  return 2;   // Pre-Confession
+        if (phase === 1)               return 1;   // Tutorial Done
+        return 0;                                   // Not Started
+    }
+
+    function plantQuestStateLabel(value) {
+        const s = PLANT_QUEST_STATES.find(st => st.value === value);
+        return s ? s.label : String(value);
+    }
+
+    // CE 65's "What will you do?" choice command is at $dataCommonEvents[65]
+    // .list[13] (code 102). Choice text 0 is the Talk option, prefixed with
+    // `(([s[1004]]))` so the WD_ConditionalChoice plugin hides it whenever
+    // sw1004 is ON. CE 65 itself flips sw1004 ON at the top of the interaction
+    // when peopleInAppt >= 2, so any save with a companion present sees the
+    // gate fire on every visit. Strip the prefix in-place; idempotent.
+    function ensurePlantTalkChoiceVisible() {
+        if (typeof $dataCommonEvents === 'undefined' || !$dataCommonEvents) {
+            return 'no-data';
+        }
+        const ce = $dataCommonEvents[65];
+        if (!ce || !Array.isArray(ce.list)) {
+            return 'no-ce65';
+        }
+        for (let i = 0; i < ce.list.length; i += 1) {
+            const cmd = ce.list[i];
+            if (!cmd || cmd.code !== 102) {
+                continue;
+            }
+            const params = cmd.parameters;
+            if (!Array.isArray(params) || !Array.isArray(params[0])) {
+                continue;
+            }
+            const choices = params[0];
+            for (let c = 0; c < choices.length; c += 1) {
+                if (typeof choices[c] === 'string' && /^Talk\.|\(\(\[s\[1004\]\]\)\)Talk\./.test(choices[c])) {
+                    if (choices[c].startsWith('(([s[1004]]))')) {
+                        choices[c] = choices[c].replace('(([s[1004]]))', '');
+                        return 'stripped';
+                    }
+                    return 'already-clean';
+                }
+            }
+        }
+        return 'no-talk-choice';
+    }
+
+    function applyPlantQuestState(newValue) {
+        if (!isSessionReady()) {
+            return false;
+        }
+        const target = PLANT_QUEST_STATES.find(s => s.value === newValue);
+        if (!target) {
+            return false;
+        }
+        const oldValue = readPlantQuestState();
+        const api = CabbyCodes.freezeTime;
+        const token = (api && typeof api.exemptFromRestore === 'function')
+            ? api.exemptFromRestore({
+                variables: [PLANT_VAR_TALK],
+                switches: [PLANT_SWITCH_TUTORIAL, PLANT_SWITCH_TALKED_TODAY, PLANT_SWITCH_PLANT_MOVED]
+            })
+            : { release: () => {} };
+        try {
+            $gameVariables.setValue(PLANT_VAR_TALK, target.phase);
+            $gameSwitches.setValue(PLANT_SWITCH_TUTORIAL, target.tutorial);
+            // Always clear the daily talked-today lock so the next plant
+            // interaction reads the new var-120 dialog without the player
+            // having to wait until newDay (CE 6) clears it.
+            $gameSwitches.setValue(PLANT_SWITCH_TALKED_TODAY, false);
+            // Force the plant back to its default position. CE 65 only
+            // renders the love/rejection branch (var 120 vals 6..12+) when
+            // sw79 is OFF; saves where the player pulled the plant to the
+            // light have it ON and would otherwise stay stuck on the
+            // PlantMonster branch regardless of var 120.
+            $gameSwitches.setValue(PLANT_SWITCH_PLANT_MOVED, false);
+            // Strip the `(([s[1004]]))` hide-gate from CE 65's Talk choice so
+            // the talk arc is reachable even with companions in the
+            // apartment (var 37 >= 2). See the comment on
+            // ensurePlantTalkChoiceVisible above for the full rationale.
+            const talkChoiceFix = ensurePlantTalkChoiceVisible();
+            // Read back through the public engine API so the log captures
+            // what the next CE-65 conditional will actually see — not just
+            // what we asked for. Diverging from `target.phase` here means
+            // some other interceptor blocked or rewrote the value.
+            const readbackVar = readVar(PLANT_VAR_TALK);
+            const readbackSwTutorial = readSwitch(PLANT_SWITCH_TUTORIAL);
+            const readbackSwTalked = readSwitch(PLANT_SWITCH_TALKED_TODAY);
+            const readbackSwMoved = readSwitch(PLANT_SWITCH_PLANT_MOVED);
+            // Also dump the gates that CE 65 checks before reaching the
+            // var-120 dialog tree, so we can tell at a glance whether the
+            // talk branch is even reachable from the player's current state.
+            const introFinished = readVar(103);
+            const peopleInAppt = readVar(37);
+            const mapId = (typeof $gameMap !== 'undefined' && $gameMap && typeof $gameMap.mapId === 'function') ? $gameMap.mapId() : '?';
+            CabbyCodes.warn(`${LOG_PREFIX} Plant Quest: ${plantQuestStateLabel(oldValue)} -> ${plantQuestStateLabel(newValue)}. wrote var ${PLANT_VAR_TALK}=${target.phase} sw ${PLANT_SWITCH_TUTORIAL}=${target.tutorial} sw ${PLANT_SWITCH_TALKED_TODAY}=false sw ${PLANT_SWITCH_PLANT_MOVED}=false. readback var ${PLANT_VAR_TALK}=${readbackVar} sw ${PLANT_SWITCH_TUTORIAL}=${!!readbackSwTutorial} sw ${PLANT_SWITCH_TALKED_TODAY}=${!!readbackSwTalked} sw ${PLANT_SWITCH_PLANT_MOVED}=${!!readbackSwMoved}. ce65-gates var 103 (introFinished)=${introFinished} var 37 (peopleInAppt)=${peopleInAppt} mapId=${mapId}. talk-choice=${talkChoiceFix}.`);
+            return true;
+        } catch (error) {
+            CabbyCodes.error(`${LOG_PREFIX} Apply failed for Plant Quest: ${error?.message || error}`);
             return false;
         } finally {
             token.release();
