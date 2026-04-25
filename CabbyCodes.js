@@ -63,6 +63,7 @@
             'cabbycodes-item-giver.js',
             'cabbycodes-set-time.js',
             'cabbycodes-set-danger.js',
+            'cabbycodes-set-difficulty.js',
             'cabbycodes-max-cooking.js',
             'cabbycodes-item-editor.js',
             'cabbycodes-money-editor.js',
