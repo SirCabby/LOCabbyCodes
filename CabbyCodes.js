@@ -67,6 +67,7 @@
             'cabbycodes-item-editor.js',
             'cabbycodes-money-editor.js',
             'cabbycodes-story-flags.js',
+            'cabbycodes-video-games.js',
             'cabbycodes-fast-credits.js'
         ];
         

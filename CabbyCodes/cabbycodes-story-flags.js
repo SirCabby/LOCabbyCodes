@@ -184,10 +184,24 @@
     // The 'sacrifices' category label is rebuilt at menu-open time from the
     // protagonist's live actor-1 name (Sam by default, but renameable), so the
     // label here is just a placeholder that openCategoriesMenu overwrites.
+    //
+    // 'videoGames' is an external category: instead of rendering a flag list,
+    // selecting it hands off to cabbycodes-video-games.js's own scene via
+    // CabbyCodes.openVideoGamesScene(). The onSelect callback returns true on
+    // a successful push and false if blocked (no session, module missing) so
+    // the categories window can re-activate itself instead of stranding input.
     const CATEGORIES = [
         { id: 'sacrifices', label: 'Sam...',          helpText: 'Body state of the protagonist.', flags: SACRIFICE_FLAGS },
         { id: 'recruits',   label: 'Recruits...',     helpText: 'Toggle companions.', flags: RECRUIT_FLAGS },
         { id: 'quests',     label: 'Quest States...', helpText: 'Per-questline progression variables.', flags: QUEST_FLAGS },
+        { id: 'videoGames', label: 'Video Games...',  helpText: 'Plays remaining and skill earned per cartridge.', onSelect: () => {
+            if (typeof CabbyCodes.openVideoGamesScene === 'function') {
+                return CabbyCodes.openVideoGamesScene();
+            }
+            CabbyCodes.warn(`${LOG_PREFIX} Video Games module unavailable.`);
+            SoundManager.playBuzzer();
+            return false;
+        } },
     ];
 
     // Module-level state so popped scenes can be re-created without losing
@@ -671,6 +685,13 @@
         const cat = this._listWindow.currentCategory();
         if (!cat) {
             this._listWindow.activate();
+            return;
+        }
+        if (typeof cat.onSelect === 'function') {
+            const pushed = cat.onSelect();
+            if (!pushed) {
+                this._listWindow.activate();
+            }
             return;
         }
         openFlagListFor(cat.id);
