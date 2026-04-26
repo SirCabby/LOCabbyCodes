@@ -19,18 +19,15 @@
  * the shared var to 1; setting both kids in the pair to Not Saved drops
  * it back to 0. `sewerKidsTotal` (var 724) is recomputed from the
  * counting troop groups (1..6 — Roxie's Service Dog group does not
- * increment in the natural game), and `sewerKidsReported` (var 723) is
- * kept equal to var 724 so David's "any news?" reward gate sees the
- * current saved count as already reported. The natural game's
- * `Misc_SewerKids` achievement is granted via a `setAchievement(...)`
- * script call inside David's all-back dialog, NOT via a switch flip,
- * so the cheat doesn't try to award it from here — visiting David
- * after using the cheat produces a no-op (var 723 catches up var 724
- * mid-cheat-write so the natural reward branch doesn't fire either).
- * Players who want the achievement should save at least one of the
- * six counting troop groups by playing through the natural rescue
- * dialog: that path bumps var 724 without touching var 723, reopening
- * the gap David's all-back conditional needs.
+ * increment in the natural game). `sewerKidsReported` (var 723) is
+ * David's "kids I already know about" counter; the cheat clamps it to
+ * be ≤ var 724 (so reset-all also rewinds it) but otherwise leaves it
+ * alone. That preserves the gap (var 723 < var 724) that Troop 532's
+ * page-1 conditional uses to fire David's "you found some" / "they're
+ * all back" branch on the next visit — letting the player collect his
+ * rewards and the `Misc_SewerKids` achievement (granted via a
+ * `setAchievement(...)` script call inside that branch) the same way
+ * the natural rescue path would.
  *
  * Cooperates with Freeze Time by acquiring an exempt-from-restore token
  * across writes (these vars/switches aren't in the freeze set today, but
@@ -89,9 +86,12 @@
     const TOTAL_COUNTING_GROUPS = COUNTING_TROOP_GROUPS.length;
 
     // sewerKidsReported: David's "kids I already know about" counter. The
-    // natural game catches it up to var 724 at the end of each David
-    // conversation, so keeping it equal to var 724 after every cheat write
-    // makes David's "any news?" reward branch a no-op (already reported).
+    // natural game catches it up to var 724 only at the end of each David
+    // conversation. The cheat clamps it to be ≤ var 724 (so a reset-all
+    // also rewinds David's memory) but never bumps it up — leaving the
+    // gap intact lets David's "you found some / all back" branch fire
+    // next visit and grant the natural reward + `Misc_SewerKids`
+    // achievement.
     const VAR_REPORTED = 723;
     // sewerKidsTotal: number of distinct troop groups (1..6) the player has
     // brought back. The cheat recomputes this from the per-kid switches so
@@ -108,13 +108,16 @@
     const ACTION_EXT_BULK = -1;
 
     // Bulk modes:
-    //   'saveAll'  - flip every kid to Saved + sync the global vars
-    //   'resetAll' - flip every kid to Not Saved + clear var 723/724
+    //   'saveAll'  - flip every kid to Saved + bump var 724 to 6 (var 723
+    //                is left alone so David fires the all-back branch on
+    //                the next visit)
+    //   'resetAll' - flip every kid to Not Saved + var 724 to 0 + clamp
+    //                var 723 down to 0
     const BULK_MODES = {
         saveAll: {
             id: 'saveAll',
             label: 'Save all kids',
-            confirmActionLine: 'all 10 kids set to Saved and the David counters synced to 6.',
+            confirmActionLine: 'all 10 kids set to Saved and var 724 bumped to 6 - visit David to claim his reward.',
             wantSaved: true,
         },
         resetAll: {
@@ -251,9 +254,13 @@
     //----------------------------------------------------------------------
 
     // Set one kid's saved flag, then re-derive the shared troop var, var 724
-    // (sewerKidsTotal), and var 723 (sewerKidsReported = total). All writes
-    // happen under a single freeze-exemption token so the restore debounce
-    // doesn't undo any of them mid-batch.
+    // (sewerKidsTotal), and clamp var 723 (sewerKidsReported) to be ≤ var
+    // 724. var 723 is only written when it would otherwise exceed var 724
+    // (reset path) — saving more kids leaves the prior reported count
+    // alone so the var 723 < var 724 gap David's recognition dialog
+    // needs is preserved. All writes happen under a single
+    // freeze-exemption token so the restore debounce doesn't undo any
+    // of them mid-batch.
     function applyKidSaved(kid, wantSaved) {
         if (!isSessionReady()) {
             return false;
@@ -270,11 +277,18 @@
                     const groupResult = recomputeGroupVar(kid.troopGroup);
                     const newTotal = computeSavedTroopCount();
                     $gameVariables.setValue(VAR_TOTAL, newTotal);
-                    $gameVariables.setValue(VAR_REPORTED, newTotal);
+                    const oldReported = readVar(VAR_REPORTED);
+                    let reportedNote = '';
+                    if (oldReported > newTotal) {
+                        $gameVariables.setValue(VAR_REPORTED, newTotal);
+                        reportedNote = ` var ${VAR_REPORTED}=${newTotal} (clamped from ${oldReported}).`;
+                    } else {
+                        reportedNote = ` var ${VAR_REPORTED}=${oldReported} (unchanged).`;
+                    }
                     const groupNote = groupResult
                         ? ` var ${groupResult.varId}=${groupResult.value}.`
                         : '';
-                    CabbyCodes.warn(`${LOG_PREFIX} ${kid.label} sw ${kid.switchId}: ${oldSaved} -> ${wantSaved}.${groupNote} var ${VAR_TOTAL}=${newTotal}, var ${VAR_REPORTED}=${newTotal}.`);
+                    CabbyCodes.warn(`${LOG_PREFIX} ${kid.label} sw ${kid.switchId}: ${oldSaved} -> ${wantSaved}.${groupNote} var ${VAR_TOTAL}=${newTotal}.${reportedNote}`);
                     return true;
                 } catch (error) {
                     CabbyCodes.error(`${LOG_PREFIX} Apply failed for ${kid.label}: ${error?.message || error}`);
@@ -317,8 +331,15 @@
                 groupIds.forEach(g => recomputeGroupVar(g));
                 const newTotal = computeSavedTroopCount();
                 $gameVariables.setValue(VAR_TOTAL, newTotal);
-                $gameVariables.setValue(VAR_REPORTED, newTotal);
-                CabbyCodes.warn(`${LOG_PREFIX} Bulk (${mode.id}): ${updated} switch flip(s). var ${VAR_TOTAL}=${newTotal}, var ${VAR_REPORTED}=${newTotal}.`);
+                const oldReported = readVar(VAR_REPORTED);
+                let reportedNote;
+                if (oldReported > newTotal) {
+                    $gameVariables.setValue(VAR_REPORTED, newTotal);
+                    reportedNote = `var ${VAR_REPORTED}=${newTotal} (clamped from ${oldReported}).`;
+                } else {
+                    reportedNote = `var ${VAR_REPORTED}=${oldReported} (unchanged).`;
+                }
+                CabbyCodes.warn(`${LOG_PREFIX} Bulk (${mode.id}): ${updated} switch flip(s). var ${VAR_TOTAL}=${newTotal}. ${reportedNote}`);
             }
         );
         return updated;
