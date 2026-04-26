@@ -70,6 +70,7 @@
             'cabbycodes-money-editor.js',
             'cabbycodes-story-flags.js',
             'cabbycodes-video-games.js',
+            'cabbycodes-sewer-kids.js',
             'cabbycodes-fast-credits.js'
         ];
         

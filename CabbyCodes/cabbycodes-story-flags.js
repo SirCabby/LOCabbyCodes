@@ -673,6 +673,66 @@
     const FREDERIC_QUEST_OPTIONS = FREDERIC_QUEST_STATES.map(s => ({ value: s.value, label: s.label }));
     const FREDERIC_PORTRAIT_INDICES = Object.keys(FREDERIC_PORTRAIT_VARS).map(n => Number(n));
 
+    // Charan questline (basement-pit big-friend arc). The player jumps in
+    // the basement pit, lands on Charan (an enormous fleshy librarian-
+    // creature) instead of dying, and works through a small social arc
+    // culminating in the rose gift. State spans one disposition variable
+    // and five switches:
+    //   var 630  `CharanDispo`         — first-encounter flag. Troop 590
+    //                                    page 0 flips this 0 -> 1 on the
+    //                                    initial meet; subsequent pit
+    //                                    visits skip the intro dialog.
+    //   sw  677  `CharanLeaveEarly`    — set ON by CE 6 newDay the day
+    //                                    after `gaveCharanRose` (680)
+    //                                    flips ON. While ON, CE 213's
+    //                                    pit-jump branches into the
+    //                                    `goCave` -100 HP fall instead of
+    //                                    the friendly `seeCharan` catch.
+    //   sw  678  `shookCharanhand`     — set ON by the "(Shake hands)"
+    //                                    choice on first encounter.
+    //   sw  679  `CharanMentionedLove` — set ON by Troop 590's "Need any
+    //                                    help?" branch (gated on day-of-
+    //                                    week var 15 >= 5). Required to
+    //                                    unlock the "About that gift..."
+    //                                    choice that takes the rose.
+    //   sw  680  `gaveCharanRose`      — set ON by handing over Rose
+    //                                    (item 360) inside the gift
+    //                                    sub-menu. Drives CE 6 newDay's
+    //                                    leave-early write the next day.
+    //   sw 1064  `charanGift`          — set ON by CE 213's seeCharan
+    //                                    branch when sw 680 is already
+    //                                    ON, representing the medieval-
+    //                                    sword thank-you. Encoded as a
+    //                                    switch only (no `code:126 Add
+    //                                    Item` write — the dialog
+    //                                    narrates the sword without
+    //                                    actually placing one in
+    //                                    inventory), so the cheat just
+    //                                    mirrors the flag.
+    //
+    // The picker exposes 6 stable waypoints. Var 816 (`CharanLift`, set to
+    // 100 on every seeCharan catch) and var 815 (`CharanJob`, 1..6 from
+    // the chat job-recommendation choice) are written by the natural game
+    // but nothing reads either, so they're cosmetic and the cheat leaves
+    // them alone. Var 629 (`SmoochCount`) is similarly skipped.
+    const CHARAN_VAR_DISPO = 630;
+    const CHARAN_SWITCH_LEAVE_EARLY = 677;
+    const CHARAN_SWITCH_SHOOK_HAND = 678;
+    const CHARAN_SWITCH_MENTIONED_LOVE = 679;
+    const CHARAN_SWITCH_GAVE_ROSE = 680;
+    const CHARAN_SWITCH_SWORD_GIFT = 1064;
+    const CHARAN_STATES = [
+        // value: picker ordinal; dispo: var 630; leaveEarly/shookHand/
+        // mentionedLove/gaveRose/swordGift: switches 677/678/679/680/1064.
+        { value: 0, label: 'Not Started',     dispo: 0, leaveEarly: false, shookHand: false, mentionedLove: false, gaveRose: false, swordGift: false },
+        { value: 1, label: 'Met Charan',      dispo: 1, leaveEarly: false, shookHand: true,  mentionedLove: false, gaveRose: false, swordGift: false },
+        { value: 2, label: 'Mentioned Love',  dispo: 1, leaveEarly: false, shookHand: true,  mentionedLove: true,  gaveRose: false, swordGift: false },
+        { value: 3, label: 'Rose Given',      dispo: 1, leaveEarly: false, shookHand: true,  mentionedLove: true,  gaveRose: true,  swordGift: false },
+        { value: 4, label: 'Sword Received',  dispo: 1, leaveEarly: false, shookHand: true,  mentionedLove: true,  gaveRose: true,  swordGift: true  },
+        { value: 5, label: 'Charan Left',     dispo: 1, leaveEarly: true,  shookHand: true,  mentionedLove: true,  gaveRose: true,  swordGift: true  }
+    ];
+    const CHARAN_OPTIONS = CHARAN_STATES.map(s => ({ value: s.value, label: s.label }));
+
     // Quest-state variables. Each entry needs a real understanding of what
     // the variable drives in-game; speculative entries on under-investigated
     // variables previously lived here (Joel/Papineau/Lyle/Nestor/Goth/
@@ -743,6 +803,14 @@
           targetLabel: `vars ${FREDERIC_PAINTER_VAR}+${FREDERIC_PORTRAITS_LEFT_VAR} + 9 portrait state vars`,
           readValue: () => readFredericQuestState(),
           applyValue: (v) => applyFredericQuestState(v) },
+        // Charan questline — basement-pit big-friend arc. See the CHARAN_*
+        // constants block above.
+        { id: 'charanQuest',   label: 'Charan Quest',         kind: 'variable', varId: CHARAN_VAR_DISPO,
+          options: CHARAN_OPTIONS,
+          displayAs: 'switch',
+          targetLabel: `var ${CHARAN_VAR_DISPO} + switches ${CHARAN_SWITCH_LEAVE_EARLY}+${CHARAN_SWITCH_SHOOK_HAND}+${CHARAN_SWITCH_MENTIONED_LOVE}+${CHARAN_SWITCH_GAVE_ROSE}+${CHARAN_SWITCH_SWORD_GIFT}`,
+          readValue: () => readCharanQuestState(),
+          applyValue: (v) => applyCharanQuestState(v) },
         // Lyle's Mazes and Wizards campaign — sessions completed (var 701).
         // Each session is a distinct adventure; 6 = wrap-up.
         { id: 'mazesWizardsQuest', label: 'Mazes and Wizards', kind: 'variable', varId: MW_VAR_SESSION,
@@ -755,6 +823,27 @@
               { value: 5, label: '5 / Death Barrens' },
               { value: 6, label: '6 / Complete' }
           ] },
+        // David's sewer-rescue quest. Compound state spans 10 individual
+        // savedKid* switches (770..779) plus 7 SewerKids_* "encountered"
+        // vars (725..731) plus the global counters (var 723/724), so the
+        // standard one-shot value picker can't represent it. Selecting the
+        // row pushes a dedicated per-kid management scene instead — see
+        // cabbycodes-sewer-kids.js for the scene + apply path. The row's
+        // value text shows a live "saved/total" summary so the player can
+        // see overall progress at a glance from the Quest States list.
+        { id: 'sewerKidsQuest', label: 'Sewer Kids Quest', kind: 'variable', varId: 724,
+          targetLabel: 'vars 723+724 + 7 SewerKids_* vars + 10 savedKid* switches',
+          formatValue: () => (typeof CabbyCodes.getSewerKidsSummary === 'function')
+              ? CabbyCodes.getSewerKidsSummary()
+              : '?',
+          onSelect: () => {
+              if (typeof CabbyCodes.openSewerKidsScene === 'function') {
+                  return CabbyCodes.openSewerKidsScene();
+              }
+              CabbyCodes.warn(`${LOG_PREFIX} Sewer Kids module unavailable.`);
+              SoundManager.playBuzzer();
+              return false;
+          } },
     ];
 
     // The 'sacrifices' category label is rebuilt at menu-open time from the
@@ -1784,6 +1873,71 @@
         }
     }
 
+    // ---- Charan Quest (basement-pit big-friend arc) ----
+    //
+    // Read priority: `CharanLeaveEarly` ON dominates because it's the gate
+    // that locks Charan out (subsequent pit jumps die at -100 HP instead of
+    // seeing him), so we report that as "Charan Left" regardless of which
+    // mid-state the supporting switches were last in. Otherwise descend the
+    // milestone chain newest-to-oldest. The handshake switch OR a non-zero
+    // disposition var both indicate "Met Charan" because dispo flips to 1
+    // on EITHER first-encounter choice (shake or refuse), so a save where
+    // the player refused the handshake still reads as "Met Charan"; the
+    // canonical apply path sets sw 678 ON to leave a clean state.
+
+    function readCharanQuestState() {
+        if (readSwitch(CHARAN_SWITCH_LEAVE_EARLY))    return 5; // Charan Left
+        if (readSwitch(CHARAN_SWITCH_SWORD_GIFT))     return 4; // Sword Received
+        if (readSwitch(CHARAN_SWITCH_GAVE_ROSE))      return 3; // Rose Given
+        if (readSwitch(CHARAN_SWITCH_MENTIONED_LOVE)) return 2; // Mentioned Love
+        if (readSwitch(CHARAN_SWITCH_SHOOK_HAND) || readVar(CHARAN_VAR_DISPO) >= 1) return 1; // Met Charan
+        return 0;                                                // Not Started
+    }
+
+    function charanQuestStateLabel(value) {
+        const s = CHARAN_STATES.find(st => st.value === value);
+        return s ? s.label : String(value);
+    }
+
+    function applyCharanQuestState(newValue) {
+        if (!isSessionReady()) {
+            return false;
+        }
+        const target = CHARAN_STATES.find(s => s.value === newValue);
+        if (!target) {
+            return false;
+        }
+        const oldValue = readCharanQuestState();
+        const api = CabbyCodes.freezeTime;
+        const token = (api && typeof api.exemptFromRestore === 'function')
+            ? api.exemptFromRestore({
+                variables: [CHARAN_VAR_DISPO],
+                switches: [
+                    CHARAN_SWITCH_LEAVE_EARLY,
+                    CHARAN_SWITCH_SHOOK_HAND,
+                    CHARAN_SWITCH_MENTIONED_LOVE,
+                    CHARAN_SWITCH_GAVE_ROSE,
+                    CHARAN_SWITCH_SWORD_GIFT
+                ]
+            })
+            : { release: () => {} };
+        try {
+            $gameVariables.setValue(CHARAN_VAR_DISPO, target.dispo);
+            $gameSwitches.setValue(CHARAN_SWITCH_LEAVE_EARLY, target.leaveEarly);
+            $gameSwitches.setValue(CHARAN_SWITCH_SHOOK_HAND, target.shookHand);
+            $gameSwitches.setValue(CHARAN_SWITCH_MENTIONED_LOVE, target.mentionedLove);
+            $gameSwitches.setValue(CHARAN_SWITCH_GAVE_ROSE, target.gaveRose);
+            $gameSwitches.setValue(CHARAN_SWITCH_SWORD_GIFT, target.swordGift);
+            CabbyCodes.warn(`${LOG_PREFIX} Charan Quest: ${charanQuestStateLabel(oldValue)} -> ${charanQuestStateLabel(newValue)}. var ${CHARAN_VAR_DISPO}=${target.dispo}, sw ${CHARAN_SWITCH_LEAVE_EARLY}=${target.leaveEarly}, sw ${CHARAN_SWITCH_SHOOK_HAND}=${target.shookHand}, sw ${CHARAN_SWITCH_MENTIONED_LOVE}=${target.mentionedLove}, sw ${CHARAN_SWITCH_GAVE_ROSE}=${target.gaveRose}, sw ${CHARAN_SWITCH_SWORD_GIFT}=${target.swordGift}.`);
+            return true;
+        } catch (error) {
+            CabbyCodes.error(`${LOG_PREFIX} Apply failed for Charan Quest: ${error?.message || error}`);
+            return false;
+        } finally {
+            token.release();
+        }
+    }
+
     // Recruit switches gate availability, but the in-game recruit Common
     // Events also call code:129 Add Party Member after flipping the switch.
     // Toggling the switch alone is insufficient to actually put the actor
@@ -2174,6 +2328,18 @@
             this._listWindow.activate();
             return;
         }
+        // Flag entries with an `onSelect` callback route to a dedicated
+        // sub-scene (e.g. the per-kid Sewer Kids picker) instead of the
+        // standard one-shot value picker. Returning false from onSelect
+        // signals "scene push refused" so we can keep the flag list active
+        // and the user isn't stranded with no input focus.
+        if (typeof flag.onSelect === 'function') {
+            const pushed = flag.onSelect();
+            if (!pushed) {
+                this._listWindow.activate();
+            }
+            return;
+        }
         openValuePickerFor(flag);
     };
 
@@ -2228,10 +2394,14 @@
         if (!flag) {
             return;
         }
-        const current = readFlagForDisplay(flag);
-        const valueText = rendersAsSwitch(flag)
-            ? switchValueLabel(flag, current)
-            : `= ${current}`;
+        // Flags that own a sub-scene (onSelect set) supply their own
+        // formatValue() since the row's "value" is a derived summary
+        // string ("5/10") rather than a single var/switch read.
+        const valueText = (typeof flag.formatValue === 'function')
+            ? flag.formatValue()
+            : (rendersAsSwitch(flag)
+                ? switchValueLabel(flag, readFlagForDisplay(flag))
+                : `= ${readFlagForDisplay(flag)}`);
         const valueWidth = this.textWidth('= 000000');
         const labelWidth = Math.max(0, rect.width - valueWidth - 8);
         this.resetTextColor();
