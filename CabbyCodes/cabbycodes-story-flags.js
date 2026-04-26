@@ -898,6 +898,65 @@
     ];
     const MARSHALL_OPTIONS = MARSHALL_STATES.map(s => ({ value: s.value, label: s.label }));
 
+    // Eugene is the head member of Nestor's worm-anatomy fleet. Pre-takeover
+    // he runs the apartment-24 shop (Map132 `f2_shopEugene`) and Map132 ev69
+    // `EugeneIntro` plays the "WelcomeToEugenes" cue + first-meet/returning-
+    // customer dialog gated on var 530 `EugeneDispo`. After the player
+    // triggers the worm-spawn beat at Map094 ev11 `Nestor` (var 281
+    // `nestorState` == 10 → flips switch 422 `FirstWormPartsSpawned` ON),
+    // Map132 ev4 `WormHead` materializes as Eugene's hostile worm-head form.
+    //
+    // Head-chase progression lives in var 434 (`nestorHeadChase`):
+    //   0   Pre-mutation — Eugene runs the shop normally; WormHead ev4 has
+    //         no matching page, no worm walks
+    //   4   Hostile — page 0 renders Eugene as WormHead patrolling the shop;
+    //         collision flips selfSwitch B to escalate the encounter
+    //   5   Battle just won — a parallel-process page on WormHead plays
+    //         "DeathTree2" once and auto-advances var 434 → 6
+    //   6   Idle dead state — empty WormHead page; the Exitdoor event then
+    //         flips switch 331 `tempCloseEugene` ON, plays Nestor's
+    //         "redecorating" dialog, and writes var 434 = 10 on next exit
+    //   10  Shop temporarily locked while Nestor "redecorates"
+    //   11  Nestor has fully taken over Eugene — EugeneIntro page 1 wins,
+    //         "NewManagement" cue plays, Nestor's twisted dialog runs the
+    //         shop with var 833 tracking visit count
+    //
+    // switch 449 `wormheadDead` is the canonical "Eugene's worm-head was
+    // killed" sentinel — set ON when Troop 554 (head-worm battle invoked
+    // from WormHead ev4 page 1) is won. After the natural game progresses
+    // var 434 past 5, this switch is ON for the rest of the run.
+    //
+    // We expose 3 picker states. The natural progression's transitional
+    // values (var 434 = 5/6/10) collapse into Hostile (since they're all
+    // post-kill auto-advance steps that the natural game runs through in
+    // ≤2 in-game days). Var 530 `EugeneDispo` (the player-attacked-Eugene
+    // disposition flag set inside Troop 117's shop interaction) is left
+    // alone — it represents a different mechanic (player griefing during
+    // the shop-as-battle UI) and writing it would conflate the two.
+    //
+    // Side-effect note: switch 422 (`FirstWormPartsSpawned`) is shared
+    // across Nestor's whole body-part fleet (head/hand/body/foot) — the
+    // same gate Marshall Quest writes. Setting Eugene to Hostile/Taken Over
+    // forces 422 ON, which also exposes Marshall and any other body-part
+    // NPC whose own chase var is primed; setting Eugene to Normal clears
+    // 422, which hides every body-part NPC. Eugene Quest and Marshall
+    // Quest therefore share the parts-spawned switch in lock-step — the
+    // last apply wins.
+    const EUGENE_VAR_HEAD_CHASE = 434;
+    const EUGENE_SWITCH_PARTS_SPAWNED = 422;
+    const EUGENE_SWITCH_HEAD_DEAD = 449;
+    const EUGENE_HEAD_CHASE_INITIAL = 0;
+    const EUGENE_HEAD_CHASE_HOSTILE = 4;
+    const EUGENE_HEAD_CHASE_TAKEN_OVER = 11;
+    const EUGENE_STATES = [
+        // value: picker ordinal; headChase: var 434; partsSpawned: switch 422;
+        // headDead: switch 449.
+        { value: 0, label: 'Normal',             headChase: EUGENE_HEAD_CHASE_INITIAL,    partsSpawned: false, headDead: false },
+        { value: 1, label: 'Hostile (Wormhead)', headChase: EUGENE_HEAD_CHASE_HOSTILE,    partsSpawned: true,  headDead: false },
+        { value: 2, label: 'Taken Over',         headChase: EUGENE_HEAD_CHASE_TAKEN_OVER, partsSpawned: true,  headDead: true  }
+    ];
+    const EUGENE_OPTIONS = EUGENE_STATES.map(s => ({ value: s.value, label: s.label }));
+
     // Fuzzy Quest — Joel's teddy bear (and the rat-child events that change
     // it). Seven weapon variants exist in $dataWeapons, all etypeId 1, all
     // exclusive to Joel (actor 4):
@@ -1058,6 +1117,15 @@
           targetLabel: `var ${MARSHALL_VAR_FOOT_CHASE} + switches ${MARSHALL_SWITCH_PARTS_SPAWNED}+${MARSHALL_SWITCH_FOOT_DEAD} + Map${MARSHALL_MAP_ID} ev${MARSHALL_STALL_EVENT_ID}/${MARSHALL_DARKNESS_EVENT_ID} self-sw`,
           readValue: () => readMarshallQuestState(),
           applyValue: (v) => applyMarshallQuestState(v) },
+        // Eugene questline — pre-takeover apartment-24 shop vs. hostile
+        // wormhead vs. Nestor-replaced shop. See the EUGENE_* constants
+        // block above.
+        { id: 'eugeneQuest',   label: 'Eugene Quest',         kind: 'variable', varId: EUGENE_VAR_HEAD_CHASE,
+          options: EUGENE_OPTIONS,
+          displayAs: 'switch',
+          targetLabel: `var ${EUGENE_VAR_HEAD_CHASE} + switches ${EUGENE_SWITCH_PARTS_SPAWNED}+${EUGENE_SWITCH_HEAD_DEAD}`,
+          readValue: () => readEugeneQuestState(),
+          applyValue: (v) => applyEugeneQuestState(v) },
         // Fuzzy quest — pick which Fuzzy variant Joel wields (the rat-child
         // shred + apology + repair paths grant 7 different weapons). See
         // the FUZZY_* constants block above.
@@ -2384,6 +2452,72 @@
             return true;
         } catch (error) {
             CabbyCodes.error(`${LOG_PREFIX} Apply failed for Marshall Quest: ${error?.message || error}`);
+            return false;
+        } finally {
+            token.release();
+        }
+    }
+
+    // ---- Eugene Quest (apt-24 shopkeeper takeover) ----
+    //
+    // Read priority walks Taken Over -> Hostile -> Normal so a save
+    // mid-progression always lands on the highest-step state currently
+    // satisfied. var 434 >= 11 pins Taken Over even if the head-dead switch
+    // somehow wasn't set, since EugeneIntro page 1's Nestor takeover only
+    // checks var 434 == 11. Hostile additionally requires switch 422 ON
+    // (parts spawned) — without it, WormHead ev4 has no matching page and
+    // Eugene's shop runs normally regardless of var 434, so we fall back
+    // to Normal.
+
+    function readEugeneQuestState() {
+        const chase = readVar(EUGENE_VAR_HEAD_CHASE);
+        if (chase >= EUGENE_HEAD_CHASE_TAKEN_OVER) {
+            return 2; // Taken Over
+        }
+        if (readSwitch(EUGENE_SWITCH_PARTS_SPAWNED) && chase >= EUGENE_HEAD_CHASE_HOSTILE && !readSwitch(EUGENE_SWITCH_HEAD_DEAD)) {
+            return 1; // Hostile (Wormhead)
+        }
+        return 0; // Normal
+    }
+
+    function eugeneQuestStateLabel(value) {
+        const s = EUGENE_STATES.find(st => st.value === value);
+        return s ? s.label : String(value);
+    }
+
+    function applyEugeneQuestState(newValue) {
+        if (!isSessionReady()) {
+            return false;
+        }
+        const target = EUGENE_STATES.find(s => s.value === newValue);
+        if (!target) {
+            return false;
+        }
+        const oldValue = readEugeneQuestState();
+        const api = CabbyCodes.freezeTime;
+        const token = (api && typeof api.exemptFromRestore === 'function')
+            ? api.exemptFromRestore({
+                variables: [EUGENE_VAR_HEAD_CHASE],
+                switches: [
+                    EUGENE_SWITCH_PARTS_SPAWNED,
+                    EUGENE_SWITCH_HEAD_DEAD
+                ]
+            })
+            : { release: () => {} };
+        try {
+            $gameVariables.setValue(EUGENE_VAR_HEAD_CHASE, target.headChase);
+            $gameSwitches.setValue(EUGENE_SWITCH_PARTS_SPAWNED, target.partsSpawned);
+            $gameSwitches.setValue(EUGENE_SWITCH_HEAD_DEAD, target.headDead);
+            // Refresh map so any sprite swap on Map132 takes effect
+            // immediately; events on other maps re-evaluate page conditions
+            // on next entry.
+            if (typeof $gameMap !== 'undefined' && $gameMap && typeof $gameMap.requestRefresh === 'function') {
+                $gameMap.requestRefresh();
+            }
+            CabbyCodes.warn(`${LOG_PREFIX} Eugene Quest: ${eugeneQuestStateLabel(oldValue)} -> ${eugeneQuestStateLabel(newValue)}. var ${EUGENE_VAR_HEAD_CHASE}=${target.headChase}, sw ${EUGENE_SWITCH_PARTS_SPAWNED}=${target.partsSpawned}, sw ${EUGENE_SWITCH_HEAD_DEAD}=${target.headDead}.`);
+            return true;
+        } catch (error) {
+            CabbyCodes.error(`${LOG_PREFIX} Apply failed for Eugene Quest: ${error?.message || error}`);
             return false;
         } finally {
             token.release();
