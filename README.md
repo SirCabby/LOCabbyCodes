@@ -1,99 +1,54 @@
-# CabbyCodes Mod Installation Guide
+# CabbyCodes
 
-Current Version: **1.0.0** (tracked in the root `VERSION` file)
+A cheats / quality-of-life mod for *Look Outside*, the RPG Maker MZ horror RPG. CabbyCodes adds a **Cheats** entry to the in-game menu with toggles and pickers for invincibility, infinite items, time control, story-flag editing, and dozens of other tweaks. It installs as a standard plugin — no game files are permanently modified, and uninstalling is just removing two files and one entry.
 
-This guide will walk you through installing the CabbyCodes mod for "Look Outside". The installation process involves copying files and adding one entry to the game's plugin configuration.
+**Current version:** `1.0.0`
 
-## Prerequisites
+---
 
-- A copy of "Look Outside" installed via Steam
-- Basic file navigation skills
-- A text editor (Notepad, Notepad++, VS Code, etc.)
+## Installation
 
-## Installation Location
+CabbyCodes ships as one loader file (`CabbyCodes.js`) plus a folder of feature modules (`CabbyCodes/`). You drop both into the game's `js/plugins/` folder and add a single entry to `plugins.js`.
 
-The game is typically installed at:
+### 1. Find your game install folder
+
+You need the folder that contains `Game.exe`. From here on this guide refers to it as `<game>`.
+
+- **Steam (default location):** `C:\Program Files (x86)\Steam\steamapps\common\Look Outside\`
+- **Steam (custom library / different drive):** open Steam → right-click *Look Outside* → *Manage* → *Browse local files*. The folder Steam opens is `<game>`.
+- **Other distributions or manual installs:** wherever you placed the game folder. It will contain `Game.exe`, a `js/` subfolder, a `www/` or `data/` subfolder, etc.
+
+### 2. Get the mod files
+
+- Download the latest `LOCabbyCodes.v<version>.zip` from the releases page and unzip it
+
+You should end up with a `CabbyCodes.js` file and a `CabbyCodes/` folder side by side.
+
+### 3. Copy the mod into the plugins folder
+
+Copy both `CabbyCodes.js` and the entire `CabbyCodes/` folder into `<game>/js/plugins/`. The result should look like:
+
 ```
-C:\Program Files (x86)\Steam\steamapps\common\Look Outside
-```
-
-**Note:** If you installed Steam in a different location, navigate to your Steam installation folder and find `steamapps\common\Look Outside`.
-
-## Developer Automation
-
-- `make deploy` – replace the installed CabbyCodes files inside the Look Outside installation (defaults to `C:\Program Files (x86)\Steam\steamapps\common\Look Outside`). Existing files are removed and re-verified before copying new ones.
-- `make package` – build `dist/LOCabbyCodes.v#.#.#.zip` containing only the files players need (no standalone `VERSION` file is included).
-- `make rev X.Y.Z` – bump the project version everywhere (`VERSION`, runtime constant, README). Always run this before packaging a release.
-- `make run` – run `make deploy`, stop any running game process, and launch the Steam build via `steam://rungameid/3373660`.
-
-## Step-by-Step Installation
-
-### Step 1: Locate the Game's Plugin Folder
-
-1. Navigate to your game installation folder (see Installation Location above)
-2. Open the `js` folder
-3. Open the `plugins` folder inside `js`
-
-You should now be at:
-```
-C:\Program Files (x86)\Steam\steamapps\common\Look Outside\js\plugins
-```
-
-### Step 2: Copy the CabbyCodes Loader Plugin
-
-1. Copy the file `CabbyCodes.js` from this repository
-2. Paste it into the `js\plugins` folder
-
-The file should now be at:
-```
-C:\Program Files (x86)\Steam\steamapps\common\Look Outside\js\plugins\CabbyCodes.js
+<game>/
+└── js/
+    └── plugins/
+        ├── CabbyCodes.js              ← loader (you added this)
+        ├── CabbyCodes/                ← feature modules (you added this)
+        │   ├── cabbycodes-core.js
+        │   ├── cabbycodes-patches.js
+        │   ├── cabbycodes-settings.js
+        │   └── ...                    (many more cabbycodes-*.js files)
+        ├── plugins.js                 ← you'll edit this next
+        └── (existing plugin files)
 ```
 
-### Step 3: Copy the CabbyCodes Mod Folder
+### 4. Register the plugin in `plugins.js`
 
-1. Copy the entire `CabbyCodes` folder from this repository (the folder containing `cabbycodes-core.js`, `cabbycodes-patches.js`, and `cabbycodes-settings.js`)
-2. Paste it into the `js\plugins` folder
+`<game>/js/plugins.js` tells the game which plugins to load. CabbyCodes needs one entry added to the list.
 
-The folder structure should now look like:
-```
-C:\Program Files (x86)\Steam\steamapps\common\Look Outside\js\plugins\
-├── CabbyCodes.js
-├── CabbyCodes\
-│   ├── cabbycodes-core.js
-│   ├── cabbycodes-patches.js
-│   └── cabbycodes-settings.js
-├── (other plugin files...)
-```
-
-### Step 4: Register the Plugin in plugins.js
-
-This is the most important step. You need to add the CabbyCodes plugin to the game's plugin list.
-
-1. Navigate to:
-   ```
-   C:\Program Files (x86)\Steam\steamapps\common\Look Outside\js\plugins.js
-   ```
-
-2. **IMPORTANT:** Make a backup copy of `plugins.js` before editing (right-click → Copy, then Paste in the same folder)
-
-3. Open `plugins.js` in a text editor (Notepad works, but Notepad++ or VS Code is recommended)
-
-4. Find the `$plugins` array. It should look like this at the top:
-   ```javascript
-   var $plugins =
-   [
-       {
-           "name": "MUSH_Audio_Engine",
-           "status": true,
-           ...
-       },
-       ...
-   ];
-   ```
-
-5. You need to add a new entry to this array. Find the closing bracket `];` at the very end of the array (it should be near the end of the file, after all the plugin entries).
-
-6. **BEFORE** the closing `];`, add a comma after the last plugin entry, then add this new entry:
+1. **Make a backup of `plugins.js` first** — right-click → *Copy*, then *Paste* in the same folder. If anything goes wrong you can restore it instantly.
+2. Open `plugins.js` in a text editor.
+3. Find the closing `];` at the end of the `var $plugins = [ ... ]` array. Add a comma after the last existing entry, then add this new entry just before the `];`:
 
    ```javascript
    {
@@ -104,178 +59,157 @@ This is the most important step. You need to add the CabbyCodes plugin to the ga
    }
    ```
 
-7. The end of your `$plugins` array should now look something like this:
-   ```javascript
-       {
-           "name": "TunicateScripts",
-           "status": true,
-           "description": "",
-           "parameters": {}
-       },
-       {
-           "name": "CabbyCodes",
-           "status": true,
-           "description": "CabbyCodes Mod Loader",
-           "parameters": {}
-       }
-   ];
-   ```
+4. Save the file.
 
-   **Important Notes:**
-   - Make sure there's a comma after the previous plugin entry
-   - Make sure the JSON syntax is correct (quotes around keys, proper brackets)
-   - The `"status": true` means the plugin is enabled
+The end of the array should now look something like:
 
-8. Save the file
+```javascript
+    {
+        "name": "TunicateScripts",
+        "status": true,
+        "description": "",
+        "parameters": {}
+    },
+    {
+        "name": "CabbyCodes",
+        "status": true,
+        "description": "CabbyCodes Mod Loader",
+        "parameters": {}
+    }
+];
+```
 
-### Step 5: Verify Installation
+JSON syntax matters here — make sure there's a comma between every entry except the last one, no trailing comma after the CabbyCodes entry, and that every `{` has a matching `}`.
 
-1. Launch "Look Outside"
-2. The mod should load automatically when the game starts
-3. You can verify it's working by:
-   - Opening the game's main menu and selecting the new **Cheats** entry (alongside Item, Skill, Options, etc.)
-   - Looking for CabbyCodes options such as "Invincibility" inside the Cheats menu
-   - Opening the `CabbyCodes.log` file (created beside the game's executable) and confirming new `[CabbyCodes]` entries are being written when you toggle options
+### 5. Verify it loaded
 
-### Log Output
+Launch the game. The mod loads automatically. To confirm it worked:
 
-- Every CabbyCodes message is appended to `CabbyCodes.log` in the game's installation directory (next to `Look Outside.exe` / `Game.exe`).
-- If you need to share diagnostics, include this file; it contains timestamps for each log entry.
+- Open loaded into a new or saved game, open the menu — there should be a new **Cheats** entry alongside Item, Skill, Options, etc.
+- Open `<game>/CabbyCodes.log` in a text editor — recent `[CabbyCodes]` lines confirm the loader ran and that toggle changes are being recorded.
+
+That's it. Open the Cheats menu in-game any time to enable, disable, or tweak features.
+
+---
+
+## Uninstalling
+
+1. Delete `CabbyCodes.js` from `<game>/js/plugins/`.
+2. Delete the `CabbyCodes/` folder from `<game>/js/plugins/`.
+3. Open `<game>/js/plugins.js` and remove the `CabbyCodes` entry from the `$plugins` array (or restore the backup you made during install).
+
+`<game>/CabbyCodes.log` is harmless if left behind, but you can delete it too.
+
+---
+
+## Troubleshooting
+
+### The Cheats menu doesn't appear
+
+- **Verify file locations.** `CabbyCodes.js` should be in `<game>/js/plugins/`, with the `CabbyCodes/` folder beside it. The folder must contain `cabbycodes-core.js` (plus the rest of the `cabbycodes-*.js` files).
+- **Verify `plugins.js`.** Open it and search for "CabbyCodes". The entry must have `"status": true` (not `false`), and the surrounding JSON must be valid — commas between entries, no trailing comma after the last entry, balanced brackets.
+- **Check the log.** Open `<game>/CabbyCodes.log`. Recent `[CabbyCodes]` lines confirm the loader ran. Warnings or errors there usually point straight at the problem.
+
+### The game won't start after installing
+
+This is almost always a `plugins.js` syntax error.
+
+- **Restore your backup.** If you have one, swap it back in.
+- **Use the platform's repair tool.** On Steam: right-click *Look Outside* → *Properties* → *Installed Files* → *Verify integrity of game files*. Other distributions usually offer a similar option.
+- **Validate the JSON.** Paste the contents of `var $plugins = [ ... ];` (just the array) into an online JSON validator. Common offenders: missing commas between entries, trailing commas, unbalanced brackets, missing quotes around keys.
+
+### Settings don't persist between launches
+
+Settings are saved in the game's `localStorage` under the key `CabbyCodes_Settings`. If your game install lives on a network drive or a folder with restrictive write permissions, NW.js may silently fail to write to it. Move the install to a normal local-disk location.
+
+### Sharing diagnostics
+
+When reporting an issue, include `<game>/CabbyCodes.log`. Each line is timestamped and most modules log a load message at startup, so the file usually shows what was active at the time of the problem.
+
+---
 
 ## Current Features
 
-- **Invincibility Toggle:** Adds an "Invincibility" option to the CabbyCodes Cheats menu. When enabled, any actor currently in the player's party is prevented from losing HP through combat damage, poison/regen ticks, scripted deaths, or other harmful effects. Toggle it on/off at any time while playing.
-- **One Hit Kill Enemies:** Adds a toggle that amplifies any HP damage dealt to an enemy battler into a lethal blow, so a single hit drops even bosses. Party actors are never affected — healing, regen, and friendly HP changes pass through unchanged.
-- **Never Miss Attacks:** Adds a toggle that forces every party attack to connect: the hit roll is treated as 100% and the target's evasion is treated as 0 while the option is on. Enemy accuracy and evasion are untouched, so foes can still miss or be dodged normally.
-- **Status Immunity:** Adds a toggle that blocks negative status effects from being applied to party actors, protecting them from action-restricting, parameter-reducing, or otherwise harmful states.
-- **Always Escape Battles:** Guarantees that the Escape party command succeeds instantly, bypassing the normal escape ratio so you can bail out of encounters without relying on luck.
-- **Stamina Control:** Prevents party actors from spending MP (stamina) when using skills, letting you cast freely without worrying about resource management.
-- **EXP Rate Slider:** Adds a CabbyCodes Cheats menu slider that scales all party EXP gains from 0x (no EXP) up through 10x, plus an "Instant Max" stop that gives enough EXP on the next event to hit the level cap immediately.
-- **Infinite Items:** Adds an option that keeps item counts from decreasing. Whether you use them, craft with them, or hand them to a visitor, the inventory count stays put. You can still pick up more; weapons, armor, key items, and a curated set of quest-triggered pseudo-key items (Rat Baby Thing, Dog Tags, Plumbing Tools, colored keys, etc.) are unaffected so scripted events can still progress. Planet / puzzle discs are an explicit exception — they stay in your inventory even after being inserted into a socket.
-- **Unbreakable Items:** Adds a toggle that stops weapons (and any other breakable gear) from losing durability when you attack or when enemies use weapon-breaking abilities. Keep your favorite equipment intact regardless of difficulty or special encounters.
-- **Unstick Equipment:** Adds a toggle that lets you unequip "stuck" gear directly from the standard Equip menu. While on, every equipment slot becomes selectable even when the slot would normally be class-locked or state-sealed; picking the blank "(no item)" entry sends the removed gear back to the party's inventory through the vanilla equip-change path. Only affects party actors, since the Equip menu only exposes party members.
+- **Invincibility Toggle:** When enabled, any actor currently in the player's party is prevented from losing HP through combat damage, poison/regen ticks, scripted damage, or other harmful effects.
+- **One Hit Kill Enemies:** Amplifies any HP damage dealt to an enemy into a lethal blow, so a single hit drops even bosses.
+- **Never Miss Attacks:** Forces every party attack to connect: the hit roll is treated as 100% and the target's evasion is treated as 0 while the option is on.
+- **Status Immunity:** Blocks negative status effects from being applied to the party.
+- **Always Escape Battles:** Guarantees that the Escape party command succeeds.
+- **Stamina Control:** Prevents party from spending MP (stamina) when using skills, letting you cast freely without worrying about resource management.
+- **EXP Rate Slider:** Scales all party EXP gains from 0x (no EXP) up through 10x, plus an "Instant Max" that gives enough EXP on the next event to hit the level cap immediately.
+- **Infinite Items:** Keeps item counts from decreasing. Whether you use them, craft with them, or hand them to a visitor, the inventory count stays put. You can still pick up more; weapons, armor, key items, and a curated set of quest-triggered pseudo-key items (Rat Baby Thing, Dog Tags, Plumbing Tools, colored keys, etc.) are unaffected so scripted events can still progress. Planet / puzzle discs are an explicit exception — they stay in your inventory even after being inserted into a socket.
+- **Unbreakable Items:** Stops weapons (and any other breakable gear) from losing durability when you attack or when enemies use weapon-breaking abilities.
+- **Unstick Equipment:** Lets you unequip "stuck" gear directly from the standard Equip menu. While on, every equipment slot becomes selectable even when the slot would normally be class-locked or state-sealed; picking the blank "(no item)" entry sends the removed gear back to the party's inventory through the vanilla equip-change path.
 - **Infinite Ammo:** Keeps every ranged weapon fully loaded and blocks all ammo item costs (magazines, marbles, gas cans, batteries, etc.) so you never have to reload or spend ammunition while the toggle is active.
-- **Enemy Health Bars:** Displays sleek HP plates above every enemy (including bosses) whenever the new "Enemy Health Bars" option is enabled. The plates animate with delayed damage trails, show precise HP totals, and remain readable even when the battle screen tone changes.
-- **Friendly Door Visitors:** Removes the pool of cursed/hostile door-knock visitors so answering the door never triggers those surprise fights. Disable the option again to restore the original encounter behavior.
-- **Send Next Door Visitor:** Adds a one-press option that immediately schedules the next queued (or freshly rolled) knock visitor so you can trigger door events on demand.
-- **Free Merchants:** Forces every shop menu entry to show a cost of zero, allowing you to buy gear, consumables, and upgrades without spending any gold while the toggle is enabled. Covers the standard shop UI (Nestor, Trickster, etc.), Eugene's custom event-driven shop, Mutt's special-inventory shop (where picking "Buy." / "Buy it." no longer deducts gold), and vending machines (which skip the coin slot mini-game and jump straight to the purchase menu with a price of zero).
-- **Floor 4 Always Available:** Keeps the apartment elevator's hidden Floor 4 choice permanently visible in the "Where to?" menu at Map074 (`DoorElevator`). The natural game gates that choice behind `(([v[817]<4]))Floor 4` — a `WD_ConditionalChoice` directive that hides it whenever var 817 (`elevatorGame`) is below 4 — and only advances var 817 to 4 when the player rides the elevator in a specific secret sequence (Ground Floor → Floor 3 → Floor 1 → Floor 2); picking any wrong floor along the way resets var 817 back to 0. While this toggle is enabled, every write to var 817 that would drop it below 4 is intercepted (via the freeze-time variable-write interceptor pipeline, so no extra hot-path patch is needed) and overridden to 4 instead, so the elevator's hide-gate never re-triggers. Toggling on also bumps var 817 to 4 immediately so Floor 4 unlocks without a "prime the pump" elevator ride first. Var 817 has no other read sites in the game data — every other 817 hit across CommonEvents, Map\*.json, and Troops.json is a skill or dataId in an unrelated context — so pinning it carries no other side effects, and toggling off simply stops intercepting writes (the natural sequence will then reset var 817 on the next wrong floor pick).
-- **Money Editor Button:** Adds a pencil icon button to the gold display on the main menu. Click it to open the same inline editor UI used for inventory items (without the delete option) and instantly set the party's bankroll to any value up to the normal gold cap.
-- **Infinite Money:** Adds a toggle that blocks any reduction to the party's gold total. You still earn money normally from events, loot, and shop sales, but spending never lowers the balance while enabled.
-- **Give Item:** Adds a "Give Item" press option that opens an inline item-giver scene so you can browse every item, weapon, and armor in the game and grant any quantity directly to the party.
-- **Give Missing Items:** Adds a press option that opens a category picker. The cursor starts on **All** so a single confirm still hands over every missing item, weapon, and armor in one shot, but you can also pick **All Items / All Weapons / All Armors** or drill into a specific sub-type (Medical, Snacks, Recipes, Crafting, Cooking, Coins, Disc Objects, Emails, Video Games, Valuables, Key Items, Regular; Simple / Bludgeon / Slashing / Piercing / Two-Handed / Ranged Weapons; Head / Body / Feet / Accessory / Jewelry) to fill in only that bucket. Anything you already own is skipped. Key items and quest-triggered pseudo-key items (Rat Baby Thing, Simple Key, colored keys, etc.) are skipped so event counters stay honest — you can still grant them individually from the Give Item menu. Planet / puzzle discs are included even though they are key items, so the full disc set is handed over when you pick All or All Items.
-- **Max Items in Inventory:** Adds a one-press option that tops every stack in your inventory up to the game's per-item limit (after a confirmation prompt). Same key / pseudo-key exclusions as Give Missing Items (planet / puzzle discs are included the same way).
-- **Save Anywhere:** Adds an "Enable Saving" toggle that bypasses difficulty-based save restrictions, letting you save from the main menu in situations where the game would normally forbid it.
+- **Enemy Health Bars:** Displays sleek HP plates above every enemy. The plates animate with delayed damage trails, show precise HP totals, and remain readable even when the battle screen tone changes.
+- **Friendly Door Visitors:** Removes the pool of cursed/hostile door-knock visitors so answering the door never triggers those surprise fights.
+- **Send Next Door Visitor:** Choose from the possible visitors pool and send them immediately knocking at the door.
+- **Free Merchants:** Forces every shop menu entry to show a cost of zero, including vending machines.
+- **Floor 4 Always Available:** Keeps the apartment elevator's hidden Floor 4 choice permanently available.
+- **Money Editor Button:** Adds a pencil icon button to the gold display on the main menu to edit current gold.
+- **Infinite Money:** Blocks any reduction to the party's gold total. You still earn money normally from events, loot, and shop sales, but spending never lowers the balance while enabled.
+- **Give Item:** You can browse every item, weapon, and armor in the game and grant any quantity directly to the party.
+- **Give Missing Items:** Gives all missing items except key items to the player's inventory.  Can also give by item type.
+- **Max Items in Inventory:** Tops every stack in your inventory up to the game's per-item limit.
+- **Save Anywhere:** Bypasses difficulty-based save restrictions, letting you save from the main menu in situations where the game would normally forbid it.
 - **Delete Save Buttons:** Adds an X button to every row of the Load and Save screens. Clicking it prompts for confirmation and then deletes the selected save file without needing to start a new game.
 - **Freeze Time of Day:** Locks the in-world clock at its current value. Time-burning actions (cooking, opening the door, playing a videogame, etc.) still execute fully and any queued events run to completion, but the actual game time — not just the displayed clock — stays put, so hour/day side effects like stamina drain, day-segment shifts, and daily resets do not happen while the toggle is on.
-- **Set Game Time:** Adds a press option that opens a picker for hour, minute (15-minute increments, matching the in-game clock), and absolute day, with a confirmation prompt before applying. Forward jumps run the game's TimePasses event, so HourPassed (stat decay, quest timers, door spawns) and newDay (daily resets, shop refreshes, plant health) fire the same way they do after a crossword or other time-burning activity; multi-day jumps add an extra newDay for each 4 AM crossing. This works even when Freeze Time is on — Set Time opens a scoped advance-mode token that lets the cascade through for this one call, then re-freezes at the new moment. Normal time-burning activities (crossword, cooking, etc.) stay suppressed under freeze. Backward jumps fall back to a direct write with no cascade.
-- **Set Danger Level:** Adds a press option that opens a picker for the time-based encounter danger bonus with five tiers (None 0, Low 60, Medium 160, High 300, Critical 500 — the value at which the in-game danger meter finishes filling its final pip). Only available when the player is outside the apartment, since returning home zeroes the value. Cooperates with Freeze Time — picking a new tier while frozen re-freezes at the chosen value.
-- **Set Difficulty:** Adds a press option that opens a picker for the active difficulty (Easy / Normal / Hard). Writes the chosen mode to the game's three mutually-exclusive difficulty switches (EASYMODE / NORMALMODE / HARDMODE), so existing logic that branches on them — escape ratios, weapon-break chance, save restrictions, etc. — picks up the new tier on the next read.
-- **Video Games Cost No Time:** Lets you enjoy every console game in your apartment without advancing the in-game clock. The option automatically rewinds the time-of-day variable after each gaming session so the rest of the world remains in sync.
+- **Set Game Time:** Opens a picker for hour, minute (15-minute increments, matching the in-game clock), and absolute day. Forward jumps run the game's TimePasses event, so HourPassed (stat decay, quest timers, door spawns) and newDay (daily resets, shop refreshes, plant health) fire the same way they do after a crossword or other time-burning activity; multi-day jumps add an extra newDay for each 4 AM crossing. This works even when Freeze Time is on — Set Time opens a scoped advance-mode token that lets the cascade through for this one call, then re-freezes at the new moment. Normal time-burning activities (crossword, cooking, etc.) stay suppressed under freeze. Backward jumps fall back to a direct write with no cascade.
+- **Set Danger Level:** Opens a picker for the time-based encounter danger bonus with five tiers (None 0, Low 60, Medium 160, High 300, Critical 500. Only available when the player is outside the apartment, since returning home zeroes the value.
+- **Set Difficulty:** Adds a press option that opens a picker for the active difficulty (Easy / Normal / Hard). Writes the chosen mode to the game's three mutually-exclusive difficulty switches (EASYMODE / NORMALMODE / HARDMODE), so existing logic that branches on them — escape ratios, weapon-break chance, save restrictions, etc.
 - **Freeze Hygiene / Needs:** Locks all of the hidden personal-need meters against worsening — hygiene, hunger, vigor, morale, social, and calm can't tick downward, and the bad-breath counter (where higher is worse, and the nightly Sleeping event adds +1) can't tick upward. Positive actions like eating, showering, or brushing teeth still move the meters in the good direction.
-- **Hidden Needs HUD:** Adds a "Hidden Needs HUD" press option in the CabbyCodes settings. Select it to pop open a dedicated window with every hidden meter (hunger, fatigue, hygiene, morale, calm, social, and the breath-odor tracker), then press OK/Cancel to jump right back into the game.
-- **Show Clock HUD:** Adds a toggle that draws a compact clock panel in the top-right corner while you are on the map, showing the live in-game time so you can keep tabs on the schedule without opening menus.
-- **Refill Status:** Adds a press-style option that immediately tops up every party member’s HP/MP and maxes out all hidden need meters (hunger, energy, hygiene, morale, calm, social, and breath odor) whenever you select it.
-- **Max Cooking Skill:** Adds a press-style option that, after an explicit warning, permanently sets your Cooking skill to the game’s top rank (currently Level 8, Amateur Chef) so you can skip the recipe grind.
-- **Oven Ingredient Checkboxes:** Overlays CabbyCodes-styled checkboxes onto the oven ingredient menus so you can instantly see which primary bases have every pairing finished and which secondary combinations you’ve already cooked (the "Nothing" option is always marked complete). Toggle it anytime from the CabbyCodes settings.
-- **Craft Ingredient Checkboxes:** Overlays CabbyCodes-styled checkboxes onto the crafting station’s ingredient menus so you can see at a glance which first ingredients still have undiscovered recipes and which (first + second) pairings you’ve already made. Ingredients or pairings that aren’t part of any recipe display a red dash instead of a checkbox, and the "Nothing" option shows no marker on either picker.
-- **Cook Book:** Adds a press-style option that opens a dedicated Cook Book scene listing every oven combination in the game, with completion state pulled straight from your save so you can see at a glance what you still need to cook.
-- **Recipe Book:** Adds a press-style option that opens a dedicated Recipe Book scene listing every recipe the game tracks, marked off as you discover them so you can plan what to make next without digging through in-game menus.
-- **Change Character Name:** Adds a press option that opens the standard name-input UI prefilled with actor 1's current name and writes the new name back via `Game_Actor.setName`. The hint window above the editor lists the three base-game names that branch behavior: `Ash` (also `Williams` / `evildead`) bypasses TunicateScripts' missing-arm Shotgun ban so actor 1 can equip the Shotgun even after losing an arm (live-checked, so a mid-game rename works), `Casanova` flips the persistent smooch/kiss flag that 94 troop encounters across the cast (Sybil, Shadow, Pierre, Vincent, Grinning Beast, etc.) gate their kiss dialog branches on, and `lumpy` makes Sybil's intro hand actor 1 a Straitjacket (armor 336) and equip it. The natural game only sets the smooch flags (switches 1194 `permaSmooch` and 1199 `SmoochMode`) inside Sybil's one-shot bus-crash intro on Map002, with TimePasses syncing 1199 from 1194 each tick — so to make a mid-game `Casanova` rename actually unlock the dialog branches (including under Freeze Time, which blocks the TimePasses HourPassed / newDay sync), the rename handler writes both switches ON directly when the new name contains "casanova". `lumpy` is left intro-only — the rename takes effect cosmetically but the Straitjacket only drops if the rename is in place on a new game before the Sybil intro fires.
-- **Fast Credits Scroll:** Drops a contextual `Fast Credits: ON/OFF` toggle into the top-right of the screen, just under the CabbyCodes clock, whenever the player is on the end-credits map. Click it to multiply the credits scroll speed by 20x so you can blow through and reach the post-credits portion quickly; click again to drop back to normal speed. The HUD is intentionally not in the Options menu — it only appears when relevant, and both the toggle and the multiplier auto-disable the moment the game transfers to the post-credits "End Results" scoring scroll so the scoring page always plays at normal speed.
-- **Story Flags:** Adds a press-style option that opens a four-submenu editor for story-decision flags. **\<Player name\>** (labelled with the protagonist's live actor name — "Sam" by default, or whatever the player renamed actor 1 to) holds Arm State (Both Arms / Lost Right Hand / Lost Left Hand) and a Spore Head On/Off toggle that adds or removes the Fungus Lair mushroom sprite on the protagonist (visible on the overworld and save-slot preview). **Recruits** lists every recruitable companion (Joel, Lyle, Dan, Sophie, Aster, Spider, Morton, Hellen, Leigh, Ernest, Audrey, Philippe, Papineau, Roaches, Rat Child, Goths/Montgomery) as Off/On toggles — flipping On also adds the actor to your party (and Off removes them) so the toggle "actually" recruits without needing to revisit the in-game NPC. Sophie has a third "Home" state that mirrors the post-Harriet-reunion layout (recruited switch off, "back home" switch on, actor removed from the party so she stands as an NPC in Apt22_Harriet) so a save where Sophie has already returned home reads correctly in the picker and you can re-enter that state without replaying the encounter. Rat Child is a tri-state Off / Baby / Adult: Off removes the rat from Sam's apartment entirely (clears `ratBabyIn`), Baby plants the baby rat in the apartment without joining the party, and Adult skips the CE 94 growth cascade by writing the average-rat end-state (`ratShape` 7, `ratFollows`, `ratBabyGrown`) and adding actor 8 to the party — necessary because CE 94's growth dialogs are gated on `CHEATMODE` so the natural cascade runs silently and the apartment sprite doesn't refresh. Switching states requests a map refresh so the rat sprite swaps without leaving the room. **Quest States** holds the verified questline pickers — currently Audrey Advice Cans (`vendingMachf1_Advice`, presets 0/1/2/3/4/8/99/999 covering the natural in-game thresholds plus a generous 999 cap), the Hellen Garden Quest 13-state compound picker covering the full happy-path progression (Not Started → Accepted → Pre-Watering → Day 1/2/3 Wait → Fruit Ripens → Fruit Harvested → Complete) plus the failure outcomes (Aborted, Missed Watering, Hellen Hostile, Hellen Killed), the Plant Quest 7-state picker for Sam's bedroom plant talk arc (Not Started, Tutorial Done, Pre-Confession, Confessing, Awaiting Reply, Rejected, Moving On) — drives `nbTimesTalkedPlant` (var 120), the `tutorialPlant` switch (48), and clears the per-day `talkedPlant` switch (60) on every apply so you can immediately walk up to the plant and trigger the next dialog beat without waiting for newDay; also forces `plantMoved` (switch 79) OFF because the love-confession and rejection branch (var 120 vals 6..12+) is gated inside CE 65's `sw79 OFF` arm and is unreachable on saves where the player pulled the plant into the light; and strips the `(([s[1004]]))` hide-gate off CE 65's Talk choice (a `WD_ConditionalChoice` directive that hides Talk whenever `peopleInAppt` >= 2) so the talk arc is reachable even when you have companions in the apartment; setting "Awaiting Reply" and then talking is the cheat path to the `Misc_PlantRejection` achievement, the Dan Quest 4-state picker covering the NeoDuo retrieval errand (Not Started, Declined, Accepted, Complete) — only the states the player can meaningfully drop into are exposed; the intermediate map-driven phases (apartment door, meeting Mom, retrieving the console, etc.) all read as "Accepted" since they're transient transitions the natural game advances through automatically — the Roaches Quest 6-state picker for the political schism (Not Started, Bickering, Decision Pending, Schism, King, Prime Minister) which drives `roachQuest` (var 899), `roachesSchism` (switch 1095), and the `RoachSchism` state 227 on actor 10 atomically; states with the schism debuff active (Decision Pending and Schism) re-add state 227 to Roaches if it's been cleared, and outcomes that resolve the schism (King / Prime Minister) remove it — the crown / sash armor rewards aren't replicated, grab those via the item editor cheat if you want the actual gear — and the Juicebox Quest 5-state picker for the card-trick errand (Not Started, Ready to Play, Card Trick Played, Card Retrieved, Complete) which drives both `juiceboxCardTrick` (var 741, the card-trick state) and `juiceboxTalk` (var 287, the relationship-talk dialog stage that gates whether Juicebox will offer the trick) — Ready to Play sets var 287 = 6 exactly so the next bedroom visit fires the trick scene; Not Started clamps var 287 down to ≤ 5 so the prerequisite isn't met; the post-trick states bump var 287 up to ≥ 7 so the natural relationship arc continues from where the trick scene leaves it. The vending-machine purchase that retrieves the card is bypassed when jumping directly to Card Retrieved or Complete — the Shadow Quest 8-state picker for the Masked Shadow questline (Not Started, After 1st/2nd/3rd Encounter, Gift At Apartment, Bedroom Pending, Befriended, Defeated) — drives `shadowState` (var 150) and `shadowDispo` (var 152) plus the three supporting switches `recruitedShadow` (27), `shadowGift` (28), and `shadowItemLeft` (161); the previous "Shadow" entry under Recruits has been removed because Shadow never actually joins the party (the natural game's "befriended" outcome is one branch of the bedroom encounter that flips switch 27 ON alongside `shadowState = 20`, so the cheat now exposes it as one ordinal of the questline picker rather than a recruit toggle), the Mazes and Wizards Quest session-count picker for Lyle's tabletop campaign (`sessionNb` / var 701) which exposes the six adventures Lyle runs (Tavern Village, Wilderness, Mysterious Temple, City of Daggerback, Death Barrens) plus 0 (Not Started) and 6 (Complete, the CE 247 CharaClosing wrap-up). Each value is the count of completed sessions; the picker writes var 701 directly and leaves the transient setup mechanics (var 700 `MazesWizardsTalk` and switch 1002 `primeMWgame`, which cycle around each session start) alone since they aren't quest-progression flags, and the Frederic Quest 13-state picker for the painter's apartment (Not Started, In Progress, Tumor / Ring / Rage / Godly / Hat / Closet / Healer / Shy / Faceless Frederic Last Alive, Painter Last Alive, All Killed) — labels reflect each portrait's distinctive trait sourced from its troop dialog (Tumor drops {Tumor Lumps}, Ring brags about a red-gem ring, Rage hands over the Rage Armor companion gear, Godly speaks like a god, Hat is the parasitic Faceless side-event hat, Closet hides in a closet, Healer heals party HP and gives {Medic-in-a-jar}, Shy refuses to be looked at, Faceless is the original Frederic whose face was stolen and who can paint gear duplicates after you return the {Torn-Off Face}) — the Painter has 9 self-portrait copies wandering specific maps as hostile NPCs and rewards the player with a tiered set of items as the count drops; each portrait has both a state variable (`Portrait1_state` / 304 on Map095, `Portrait2_state` / 308 on Map096, `Portrait3_state` / 309 on Map236, `Portrait4_state` / 311 on Map238, `Portrait5_state` / 313 on Map119+, `Portrait6_state` / 315 on Map237, `Portrait7_state` / 320 on Map218, `Portrait8` / 302 on Map097, `Portrait9` / 300 on Map239) using 99 as the canonical "dead" sentinel AND a self switch on its roaming-NPC event that controls which page renders (the dead-body sprite vs the alive sprite). The cheat mirrors both halves of the natural battle-event's death write so that picking a state actually swaps the in-world NPC visibility — survivor + Painter Last Alive + All Killed apply paths set the state var (99 dead, 0 alive) AND flip the matching dead self switch ON for portraits being killed / clear all four self switches A/B/C/D for the survivor; a `$gameMap.requestRefresh()` runs at the end so the sprite swap is visible immediately on the current map. Picking "Portrait N Last Alive" primes `PainterState` (var 305) to 4 + `PortraitsLeft` (var 306) to 1 so the next visit to the Painter NPC fires the final-reward dialog (paint palette) directly — intermediate rewards (turpentine, canvas carry bag, medical supplies) are skipped since they require multiple visits. "Painter Last Alive" is the natural good-ending state where the player has killed all 9 portrait copies and the original Frederic / Painter NPC is the surviving Frederic with `PainterState` set to 5 (paint palette already given) — distinct from "All Killed" which folds the Painter himself into the death sweep (`PainterState` = 99) for a "no Frederic survives" outcome; the read function distinguishes these by checking var 305 alongside the portrait count, so a save in the natural good-ending shows as "Painter Last Alive" rather than misleadingly reading as "All Killed". "Not Started" clears all 9 portraits to 0 with the Painter at his initial state, and "In Progress" leaves the kill configuration alone (so the cheat can re-engage Painter dialog mid-quest without disturbing the player's actual portrait progress). The Faceless / Portrait5 hat side-event (switch 535 `portrait5Friendly`, switches 523/524/525 part-kill flags, var 313's 1/10/12/40/45/46 phase values) is deliberately not managed here so the player can still play that beat naturally on top of any chosen survivor; Portrait5's wall painting and Painter dialog gate update from the var 313 write, but the multi-stage roaming-event self switches across Map119/Map042/Map217/Map236/Map237 are left alone — so reviving Portrait5 from the cheat reopens var 313 but any partially-played hat events keep their existing self-switch state, and the Charan Quest 6-state picker for the basement-pit big-friend arc (Not Started, Met Charan, Mentioned Love, Rose Given, Sword Received, Charan Left) — drives `CharanDispo` (var 630, the first-encounter flag flipped 0 -> 1 by Troop 590's intro page) plus five switches: `shookCharanhand` (678), `CharanMentionedLove` (679, gates the "About that gift..." choice that takes the rose), `gaveCharanRose` (680, set when the player hands over Rose / item 360 inside Troop 590's gift sub-menu), `charanGift` (1064, the medieval-sword thank-you flag CE 213's seeCharan branch flips ON when the player jumps back into the pit after handing over the rose — encoded as a switch only, with no `code:126 Add Item` write, so the cheat just mirrors the flag), and `CharanLeaveEarly` (677, set by CE 6 newDay the day after `gaveCharanRose` flips ON; while ON, CE 213's pit jump branches into the `goCave` -100 HP fall instead of the friendly `seeCharan` catch). Charan-flavor variables that nothing reads (`CharanLift` 816, `CharanJob` 815, `SmoochCount` 629) are deliberately not touched, and the Kevin Quest Off / On availability toggle (Not Available, Available) for the basement-worm Worm-Egg trader at Map094 ev43 — Kevin's appearance is gated in the natural game by the Nestor-questline state machine (`nestorBodyState` / var 437 must be >= 12, plus the event's self-switch C must be OFF), and reaching var 437 == 12 organically requires the player to whittle down Nestor's anatomy through ten-plus Worm body-part events scattered across many maps and then wait two in-game days for CE 6 newDay to tick the var past 10 -> 11 (foot-worm groups appear) -> 12 (Kevin's group becomes active). The toggle skips that wait: "Available" sets var 437 to max(current, 12) and clears the Map094 ev43 self-switch C so any prior post-encounter dead-state flips back to the friendly-encounter page, then requests a map refresh so the sprite swap is visible immediately; "Not Available" clamps var 437 back down to 11 if it's at or above 12 (preserving the foot-worm threshold while closing Kevin's gate), and leaves the self-switch alone so a player who organically engaged Kevin keeps that state. Trade-tier state (var 734 `WormKevin`) and the "already bought" hide-gates (sw 961 `wormBoughtRobe` / sw 962 `wormBoughtCrown`) are deliberately NOT tracked or written — once Kevin is reachable the player handles trades naturally through Troop 560's in-game menu, and reward items (Worm Juice, Worm-Baked Pie, Worm-O'-Nine-Tails, Wormskin Robe, Worm Crown) can be granted directly from the item-editor cheat if desired. The orthogonal `WormDeal` (var 735, 1/2/3 for the 80-/40-/70-year human-worm coexistence outcomes) is also not managed because the natural game grants the `Misc_WormyDeal` achievement via a `setAchievement(...)` script call inside the deal sub-menu — just writing var 735 from the cheat would not award the achievement, so the deal is left to natural play. The trade-off in flipping "Available" is that the var 437 bump unavoidably fast-forwards the rest of the Nestor questline by however many days are still missing (foot-worm groups in Map013 + Map092 will spawn alongside Kevin), since there is no Kevin-specific gate that doesn't also touch nestorBodyState — the cheat does the smallest possible bump (exactly to 12) to minimize the impact, the Marshall Quest 4-state picker for the bathroom-stall voice / foot-worm chase phases (In Stall, Mutated, Mutated (Stronger), Defeated) — Marshall is the leg/foot member of Nestor's worm-anatomy fleet, hiding as a disembodied wisdom-dispenser in the Map054 stall before mutating into the Worm/WormLeg foot-worm at Map054 ev41. The picker drives `nestorFootChase` (var 435), `FirstWormPartsSpawned` (switch 422), `wormfootDead` (switch 451), Map054 ev2 (`StallDoor2`) self-switch A (which controls the bathroom-stall door sprite — closed when OFF, open when ON), and Map054 ev7 (`DarknessStall2`) self-switches A+B (which control the `!LargeFurniture` black-box overlay drawn over Marshall's stall — drawn when both OFF, hidden when both ON) atomically: In Stall zeroes var 435 and clears both global switches plus all three self-switches so the worm doesn't appear, the door reads as closed, and the darkness overlay is drawn back over the stall; Mutated sets var 435 = 5 + sw 422 ON + stall self-switch ON + darkness self-switches A+B both ON so contact with Marshall ev41 fires Troop 558 (Marshall, base Worm/WormLeg), the door visibly opens to show Marshall has left, and the black box stops obscuring the stall interior; Mutated (Stronger) sets var 435 = 10 + sw 422 ON + stall self-switch ON + darkness self-switches A+B both ON for the Troop 559 (Marshall2, Worm/WormLeg_Attack3) fight that the natural game escalates to after the first kill (var 435 == 10 wins StallDoor2's page-2 open-sprite condition AND DarknessStall2's page-3 cleared condition on its own, but the cheat sets the self-switches too for consistency with the Mutated state); Defeated keeps var 435 = 10 + sw 422 ON + both stall + darkness self-switches ON and flips sw 451 ON so Marshall ev41's defeated page wins and the WormFoot battle event is bypassed. The natural game never sets StallDoor2's self-switch A — its page list has no `this.sOn("A")` script, unlike StallDoor1 — so the door open is a cheat-only path that hijacks the dead page-1 condition to open the door without waiting for var 435 to escalate to 10. DarknessStall2's reveal is similarly cheat-only at var 435 == 5: the natural game's reveal animation is gated on its own selfSwitch A which is set somewhere upstream of the encounter and ends by setting selfSwitch B ON to permanently clear the box; the cheat skips the animation by writing both A and B directly so page 2 (cleared) wins immediately, and writes A = OFF on In Stall to ensure a save where the player previously triggered the reveal animation can't re-fire it through page 1 if we cleared B alone, the Eugene Quest 3-state picker for the apartment-24 shopkeeper takeover (Normal, Hostile (Wormhead), Taken Over) — Eugene is the head member of Nestor's worm-anatomy fleet, running the Map132 (`f2_shopEugene`) shop normally until the worm-spawn beat flips him into a hostile WormHead patrolling the shop floor (Map132 ev4, Troop 554 base wormhead battle) and eventually a Nestor-replaced "NewManagement" shop (Map132 ev69 `EugeneIntro` page 1's twisted Nestor dialog at var 434 == 11). The picker drives `nestorHeadChase` (var 434), `FirstWormPartsSpawned` (switch 422), and `wormheadDead` (switch 449) atomically: Normal zeroes var 434 and clears both switches so EugeneIntro plays "WelcomeToEugenes" and the human Eugene runs the shop; Hostile sets var 434 = 4 + sw 422 ON + sw 449 OFF so WormHead ev4 page 0 wins (Eugene patrols hostilely; collision triggers Troop 554); Taken Over sets var 434 = 11 + sw 422 ON + sw 449 ON so EugeneIntro page 1 wins, "NewManagement" plays, and Nestor's twisted dialog (\\C[14]Oh! HelLo! A cUStOMeR! yES!! I lOVe CuStOMerS!) runs the shop with `var 833` tracking visit count. Transitional values (var 434 = 5/6/10 — the post-kill DeathTree2 sting, the Exitdoor "redecorating" lock-out, and the day-wait before Nestor reopens) collapse into Hostile in the read priority since they're auto-advance steps the natural game runs through in ≤2 in-game days; the cheat doesn't expose them as separate picker entries. `EugeneDispo` (var 530) — the player-attacked-Eugene disposition flag set inside Troop 117's shop interaction — is left alone since it represents a different mechanic (player griefing during the shop UI) and writing it would conflate the two. Trade-off: switch 422 is the same shared "all worm parts spawned" gate that Marshall Quest writes, so Eugene Quest and Marshall Quest share it in lock-step — the last apply wins, and toggling Normal here clears 422 (hiding Marshall's foot-worm form too if it was visible). The dialog-stage var 733 (`MarshallStall`) that drives the stall's wisdom-progression dialog is left alone — the natural game keeps the stall talkable forever regardless of mutation, and var 544 `bossesKilled` is also untouched on Defeated since it's shared across every boss. Trade-off: switch 422 is the shared "all worm parts spawned" gate, so flipping a Mutated state also lets any other Nestor body-part NPC whose own chase var is already primed (var 434 `nestorHeadChase`, var 436 `nestorHandChase`, var 437 `nestorBodyState`) materialize alongside Marshall, and the Fuzzy Quest 7-state picker for Joel's teddy bear (Pristine, Shredded, Remains, Repaired by Eugene, Mangled by Sam, Renegade (Xaria), Worm (Nestor)) — each label corresponds to one of the seven Fuzzy variant weapons (`$dataWeapons` ids 91 / 170 / 171 / 172 / 173 / 174 / 175) the natural game grants Joel as the rat-child shred + apology + repair paths play out. Applying a state adds 1 of the chosen variant to inventory, calls `actor 4 changeEquipById` to put it in Joel's weapon slot (which moves it from inventory to equipped via the engine's `tradeItemWithParty`), then sweeps every other Fuzzy variant out of inventory so the player ends up with exactly one Fuzzy on Joel and zero held copies. Var 614 (`ratInteractState`) is bumped to >= 3 (post-apology) for any non-Pristine state so the natural rat-shreds-Fuzzy event at val 2 can't re-fire and overwrite the cheat, and clamped down to 1 when picking Pristine so the natural shred can still play through organically. Joel does not need to be in the party — `$gameActors.actor(4)` works regardless and the equip persists when he later joins. The deeper var 190 (`EugeneRepairingFuzzy`) state machine — which spans Eugene Shop / Nestor Shop / CE 6 daily ticks — is intentionally not synthesized for each variant because that progression is fragile; if you applied "Repaired by Eugene" but Eugene's dialog is mid-conversation, just re-engage Eugene to nudge the conversation forward naturally. Read priority is Joel's currently equipped weapon first, falling back to the highest-tier Fuzzy variant in `$gameParty` inventory, falling back to "Pristine" when nothing matches (so saves before Joel joins still read sensibly). The Hellen entry drives `HellenQuestPhase` (var 869) and the four supporting switches (`HellenWateredPlant`, `MissedHellenWatering`, `HellenSpawned`, `ChasingHellenKilled`) atomically so toggling between any two states leaves the in-game flag combination consistent; the Dan entry writes the canonical `danQuestState` (var 896) value for each label. **Friendly NPCs** is a flat list of Alive/Dead toggles for ~25 named non-recruit NPCs (Sybil, Mutt, Eugene the engineer, Madison, Nestor, Security Guard, Grave Digger, the Writer's Apartment quartet Jean-Pierre/Claire/Sylvain/Phil, Ben, Clint, Maurice, Nurse, Poet, Harriet, Cosmo, Gamer Eyeball, Colonel Squeakum, Kaeley, Antoine, and the astronomers Aurelius/Jasper/Beryl) — flipping the switch immediately swaps the NPC sprite with the dead-page sprite on the current map without needing a reload, since RPG Maker MZ re-evaluates event-page conditions every frame; Madison's entry drives both her dual switches (`madisonDead` 109 + `killedMadison` 543) together so different events that read each one stay consistent; the Sybil entry restores or revokes the full Apartment-35 friendly state by writing four switches together (`SybilDead` 975 OFF, `SybilToken` 149 ON, `disableSybilSaves` 1116 OFF, `SybilAtk` 969 OFF for Alive — page 1 of Map002 ev12 wins and she gives saves and dialogue; `SybilDead` ON + `disableSybilSaves` ON + `SybilAtk` OFF for Dead — page 2 "she's gone" wins) since the apartment event reads `SybilToken`/`disableSybilSaves` to choose its page rather than reading `SybilDead` directly, so a single-switch toggle would leave her stuck in the wrong page after a Meat-World boss kill; the separate Meat-World boss entry under **Bosses & Notable Enemies** toggles only `SybilDead` so the player can re-fight her without forcibly restoring the apartment dialog. NPCs already managed by Recruits or Quest States (Hellen, Marshall, Eugene-wormhead, Frederic portraits, Joel, Ernest, Lyle, Aster, Papineau, etc.) are intentionally omitted so the flat toggle can't desync the multi-switch sync those richer pickers do. **Bosses & Notable Enemies** is a parallel list of Alive/Dead toggles for ~36 unique bosses (Grin, Rat King, Spore Mother, Stargazer, Garage Cop Car, Corner Store Caterpillar, Police Van, Surgeon, Rocket, Piranha Guy, Boiler Beast, Dragon, Psplit, Baby Teeth, Sewer Spider, Snowman, Spine Monster, Rat Hell Beast/Champion, Furnace, APC, Guitar, Jeanne, Drowning Encounter, Whip Scorpion, Sybil (Meat World boss), Apt 12 Obsession, Wilhelmina the Kaiserin, Hive Man, Tank, Dream Eater, Spine Tingler, Hundredmaws, Crimson Scourge, Mop Bucket, KOTD) — sourced by sweeping `System.json` for every `*Dead` / `killed*` / `*Defeated` / `beat*` switch and cross-referenced against the game's CGMZ `Boss_*` achievement registry to confirm coverage. Spine Monster is a tri-state Alive / Dead / Spared driving both `spineMonsterDead` (642) and `spineSpared` (643) so the picker reflects whichever outcome the player actually reached; multi-part boss components (worm parts, surgeon-hand parts, eye-creature parts), minor husk and group-rat enemies, and video-game-only card enemies are deliberately excluded — the alive/dead toggle is for canonical bosses you'd identify by name. **Video Games** lists every cartridge in Sam's apartment (Wake The Blood Knight, Wizard's Hell, Super Jumplad 1/3, Catafalque, Honko's Grand Journey, Madwheels 97, Wraithscourge, Massacre Princess, Kill To Shoot, Myrmidon I/XII, Screamatorium, Frogit About It, Blood Ghoul Orgy 3, Octocook, Space Truckerz, Reptile Football, Auntie Wilma's Crossword) with a per-cartridge "K Left" counter showing how many more plays remain before the skill is awarded (or "Earned" once it is), plus a top-of-list "Set all unfinished to..." action that lets you bulk-set every still-unlearned cartridge to either "1 Left" (next play awards the skill) or "Earned" (mark complete — pushes the counter past the trigger and grants the skill to actor 1 directly), with a Yes/No confirmation prompt before the writes go in. "Earned (skip)" on the per-cartridge picker uses the same direct skill-grant path so the equality-comparator games can be marked complete without leaving the variable in a state where the cabinet would never re-award the skill. **Locked Doors** is a curated list of doors with no in-game key path — one-way back doors locked from the unreachable side (Floor 1 Stairs, Basement Back, Garage, Mailroom / Office, Cafe Kitchen Back, Fungus Path Back, Taxidermy Storage, Boiler Room, Pit Door), numbered electronic / puzzle locks whose code is hidden in another room (Security Door, Inner Security Door, Office Door #29, Inner Office Door #15, Mailroom Saturn Door, Mars Room, Ground Floor Stairs, Storage Door #16, Storage Door #5, Planetarium Outer Door, Planetarium Inner Door), the story-locked Bedroom Door and Landlord's Apartment Door, the Flooded Apt shortcut valve, the Power Room door, the Elevator Door, Eugene's Shop, and the Meat World "squeeze through" shortcut holes (Flesh Stairway, Flesh Rat Lair, Flesh TV, Flesh Laundromat, Flesh Mutt Storage) which are normally gated behind a "Squeeze through? Yes/No" prompt on first encounter. Each row shows its current Locked / Unlocked state and pressing OK toggles it immediately so you can flip several doors in one trip without leaving the menu. Doors that have an in-game key prompt ("Use the Basement Key?", "Use the Padlock Key?") are intentionally omitted since those can already be unlocked through normal play. Polarity was verified per-entry against each door's event pages — most of these switches are named like `F1StairsLock` but actually mean "the lock has been picked" (ON = unlocked), so the cheat handles the inversion for you and only ever shows the player-facing Locked / Unlocked label. A few doors layer additional conditions in the natural game (Security Door, Elevator Door, and the numbered electronic puzzle doors also require building power); unlocking those while the power is out will still show the in-game "no power" message — that's honest behaviour, not a bug. The shop's transient "temporarily closed" override (`tempCloseEugene`) is intentionally not exposed since it is an event-driven state rather than a player-facing lock. The Sewer Kids Quest entry under Quest States is a compound that opens a dedicated per-kid screen (since the standard one-shot value picker can't capture all 10 individual kids plus the David counters at once) — the row in the Quest States list shows a live `X/10` saved-count so you can see overall progress at a glance, and selecting it pushes the management screen. That screen lists each of the 10 children David is searching for (Alice/Fly, Thomas/Eyestalk, Coralie/Cosmo, Florence/Eyeball, Victor/Game, Oliver/Spooky, Tristan/Tentacles, Charlie/Croco, Zachary/Centipede, Roxie/Service Dog) as a Saved / Not Saved toggle, with a "Set all kids to..." bulk action at the top (Save All / Reset All, behind a Yes/No confirmation). Each toggle flips the kid's individual `savedKid*` switch (770..779), recomputes the shared `SewerKids_*` "troop encountered" variable for paired groups (Thomas+Coralie share var 726, Florence+Victor share 727, Tristan+Charlie share 729) so the natural game's intro-skip gate stays honest, and re-derives `sewerKidsTotal` (var 724) from the six counting troop groups (Roxie's Service Dog group does not increment in the natural game) plus mirrors that count into `sewerKidsReported` (var 723) so David's "any news?" reward branch reads as already-reported instead of replaying. The screen header shows live `Saved X/10  -  Reported X/6` so you can see the global state at a glance. The `Misc_SewerKids` achievement is granted via a `setAchievement(...)` script call inside David's all-back dialog (not via a switch flip), so the cheat doesn't try to award it from here — visiting David after the cheat is a no-op since var 723 already equals var 724; players who want the achievement should save at least the last troop group (Centipede or any other counting group) by playing through the natural rescue dialog, since that path increments var 724 without touching var 723 and reopens the gap David's reward branch needs. The natural-game prerequisite that Zachary won't agree to leave the sewer until Roxie has been calmed with a chew toy is intentionally not enforced — the cheat applies switches directly so any combination of saved kids is reachable. Cooperates with Freeze Time and logs every change at WARN level so you can correlate in-game dialogue with the specific switch/variable.
-## Troubleshooting
+- **Hidden Needs HUD:** Select it to pop open a dedicated window with every hidden meter (hunger, fatigue, hygiene, morale, calm, social, and the breath-odor tracker).
+- **Show Clock HUD:** Draws a compact clock panel in the top-right corner while you are on the map, showing the live in-game time so you can keep tabs on the schedule without opening menus.
+- **Refill Status:** Tops up every party member’s HP/MP and maxes out all hidden need meters (hunger, energy, hygiene, morale, calm, social, and breath odor) whenever you select it.
+- **Max Cooking Skill:** Permanently sets your Cooking skill to the game’s top rank (currently Level 8, Amateur Chef).
+- **Oven Ingredient Checkboxes:** Overlays checkboxes onto the oven ingredient menus so you can instantly see which primary bases have every pairing finished and which secondary combinations you’ve already cooked.
+- **Craft Ingredient Checkboxes:** Overlays checkboxes onto the crafting station’s ingredient menus so you can see at a glance which first ingredients still have undiscovered recipes and which (first + second) pairings you’ve already made. Ingredients or pairings that aren’t part of any recipe display a red dash instead of a checkbox.
+- **Cook Book:** Opens a dedicated Cook Book scene listing every oven combination in the game, with completion state pulled straight from your save so you can see at a glance what you still need to cook.
+- **Recipe Book:** Opens a dedicated Recipe Book scene listing every recipe the game tracks, marked off as you discover them so you can plan what to make next without digging through in-game menus.
+- **Change Character Name:** Allows changing of the main character's name (default Sam). The hint window above the editor lists the three base-game names that branch behavior: `Ash` (also `Williams` / `evildead`) allows player to equip the Shotgun even after losing an arm, `Casanova` enables the April Fools Day smooch/kiss flag that 94 npc encounters across the cast (Sybil, Shadow, Pierre, Vincent, Grinning Beast, etc.) gate their kiss dialog branches on, and `lumpy` makes Sybil's intro hand the player a Straitjacket. `lumpy` is intro-only — the rename takes effect cosmetically but the Straitjacket only drops if the rename is in place on a new game before the Sybil intro fires.
+- **Fast Credits Scroll:** Drops a contextual `Fast Credits: ON/OFF` toggle into the top-right of the screen, just under the CabbyCodes clock, whenever the player is on the end-credits scene. Click it to multiply the credits scroll speed by 20x so you can blow through and reach the post-credits portion quickly; click again to drop back to normal speed.
+- **Story Flags:** Opens an editor for story-decision flags. Sections include Player flags, Recruits to toggle party member availability, Quest States, Friendly NPCs and Bosses allow changing alive states, Video Games allows for owning and completing video games without playing them, and Locked Doors
 
-### The mod doesn't appear to be working
+---
 
-1. **Check file locations:**
-   - Verify `CabbyCodes.js` is in `js\plugins\`
-   - Verify the `CabbyCodes` folder is in `js\plugins\CabbyCodes\`
-   - Verify all three files are inside the `CabbyCodes` folder
+## Development
 
-2. **Check plugins.js:**
-   - Open `plugins.js` and search for "CabbyCodes"
-   - Verify the entry is correctly formatted (proper JSON syntax)
-   - Verify `"status": true` (not `false`)
-   - Make sure there are no syntax errors (missing commas, brackets, etc.)
+This section is for people working on the mod itself
 
-3. **Check the log:**
-   - Open `CabbyCodes.log` in the game's installation folder
-   - Look for recent lines that start with `[CabbyCodes]` to confirm the loader ran and to review any warnings/errors
+### Repo layout
 
-### Game won't start after installation
+- `CabbyCodes.js` — loader plugin. The `scripts` array at the top is the **authoritative load order** for the feature modules; new feature files must be added there.
+- `CabbyCodes/` — feature module IIFEs (`cabbycodes-*.js`). One file per cheat or supporting subsystem.
+- `Makefile` — Windows-only automation (deploy / package / version bump / launch). Defaults assume a Steam install at `C:\Program Files (x86)\Steam\steamapps\common\Look Outside\`. Override `INSTALL_DIR` if your install lives elsewhere.
+- `scripts/` — one-off Node and Python helpers (game-file refresh, version bump, common-events diff). Each script hard-codes the install path at the top — update it there, not inline.
+- `game_files/` — gitignored vanilla mirror of the game's data files; refreshed by the `/refresh-game-files` skill or `node scripts/refresh-game-files.js`. Do not edit or commit contents placed inside this folder.
 
-1. **Restore from backup:**
-   - If you made a backup of `plugins.js`, restore it
-   - If not, you may need to verify game files through Steam (right-click game → Properties → Local Files → Verify integrity of game files)
+There is no build step for runtime JS, no `package.json`, no test suite, and no linter. Files ship as-is.
 
-2. **Check JSON syntax:**
-   - The `plugins.js` file uses JSON format
-   - Common errors:
-     - Missing commas between entries
-     - Missing quotes around keys
-     - Extra commas at the end of arrays/objects
-     - Mismatched brackets
+### Make targets (Windows)
 
-3. **Use a JSON validator:**
-   - Copy the contents of `plugins.js` (just the `$plugins` array part)
-   - Paste it into an online JSON validator to check for syntax errors
+All targets assume `INSTALL_DIR` points at the game's install folder. Override per-invocation if needed (e.g. `make INSTALL_DIR="D:\Games\Look Outside" deploy`).
 
-### Settings don't appear in the Cheats menu
+| Target | What it does |
+| --- | --- |
+| `make deploy` | Hash-verified copy of `CabbyCodes.js` + `CabbyCodes/` into `<install>/js/plugins/`. Existing files are removed and re-verified before the new ones land. |
+| `make package` | Build `dist/LOCabbyCodes.v<version>.zip` containing only the loader, the `CabbyCodes/` folder, the README, and the LICENSE. |
+| `make rev X.Y.Z` | Bump the version everywhere: `VERSION`, `CabbyCodes.version` in `cabbycodes-core.js`, and the `Current version` line in this README. Run before packaging a release. |
+| `make run` | Deploy, kill any running `Game.exe`, delete `CabbyCodes.log`, then launch via `steam://rungameid/3373660`. **Force-kills the game — save first.** |
+| `make clean-log` | Delete `CabbyCodes.log` from the install dir. |
 
-- The Cheats menu will only show options if settings have been registered by mod features
-- If no features are active yet, the menu may appear empty
-- This is normal - the mod framework is still loaded and ready for features to be added
+### Documentation for contributors
 
-## Uninstallation
+- `CLAUDE.md` — project guidance for Claude Code agents, including the rule that the **Current Features** list above stays in sync with registered settings.
+- `ARCHITECTURE.md` — runtime model: boot sequence, patch chain, settings registry, session-state, logger, debug instrumentation.
+- `AGENTS.md` — authoritative coding conventions (file layout, patching rules, settings/logging rules, perf guardrails, known traps).
+- `IMPROVEMENTS.md` — known bugs and opportunities; cross-check before "fixing" something that looks broken.
+- `GAME_NOTES.md` — discovered variable / switch IDs and game-side behavior. Treat as potentially stale after a game patch.
 
-To remove the mod:
+### Technical notes
 
-1. Delete `CabbyCodes.js` from `js\plugins\`
-2. Delete the `CabbyCodes` folder from `js\plugins\`
-3. Open `plugins.js` and remove the CabbyCodes entry from the `$plugins` array
-4. Save the file
-
-## File Structure Reference
-
-After installation, your file structure should match this:
-
-```
-C:\Program Files (x86)\Steam\steamapps\common\Look Outside\
-├── js\
-│   ├── plugins\
-│   │   ├── CabbyCodes.js          ← Loader plugin (you added this)
-│   │   ├── CabbyCodes\            ← Mod folder (you added this)
-│   │   │   ├── cabbycodes-core.js
-│   │   │   ├── cabbycodes-logger.js
-│   │   │   ├── cabbycodes-patches.js
-│   │   │   ├── cabbycodes-settings.js
-│   │   │   ├── cabbycodes-invincibility.js
-│   │   │   ├── cabbycodes-stamina.js
-│   │   │   └── cabbycodes-infinite-consumables.js
-│   │   ├── plugins.js              ← You modified this file
-│   │   └── (other existing plugins...)
-│   └── (other game files...)
-├── CabbyCodes.log                  ← Automatically generated runtime log
-└── (other game folders...)
-```
-
-## Support
-
-If you encounter issues not covered in this guide:
-
-1. Double-check all file locations match the guide exactly
-2. Verify the JSON syntax in `plugins.js` is correct
-3. Make sure all files were copied completely (not corrupted)
-4. Try removing and reinstalling following the steps again
-
-## Technical Details
-
-For developers or advanced users:
-
-- The mod uses the standard RPG Maker MZ plugin system
-- Settings are stored in browser localStorage under the key `CabbyCodes_Settings`
-- The loader plugin dynamically loads scripts from the `CabbyCodes` folder
-- All mod functionality is contained within the `CabbyCodes` folder - no game files are permanently modified
-- Diagnostic logs are written to `CabbyCodes.log` in the game's installation directory
-
+- The mod uses the standard RPG Maker MZ plugin system on the NW.js host.
+- Settings persist to `localStorage` under the key `CabbyCodes_Settings`.
+- The loader plugin dynamically injects each `cabbycodes-*.js` script in the order listed in `CabbyCodes.js`'s `scripts` array.
+- All mod functionality is contained within `CabbyCodes.js` and the `CabbyCodes/` folder — no game files are permanently modified.
+- Diagnostic output is appended to `CabbyCodes.log` in the game's installation directory via NW.js `fs.appendFileSync`. INFO-level messages only persist when `CabbyCodes.debugLoggingEnabled = true`; WARN/ERROR always persist.
