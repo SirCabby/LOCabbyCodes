@@ -40,7 +40,7 @@
 
     CabbyCodes.registerSetting(SETTING_KEY, 'Show Clock', {
         defaultValue: false,
-        order: 65,
+        order: 170,
         onChange: () => {
             refreshActiveSceneClock();
         }

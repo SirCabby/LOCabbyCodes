@@ -445,7 +445,7 @@
     // ----- Setting registration -----
     CabbyCodes.registerSetting(settingKey, 'Freeze Time', {
         defaultValue: false,
-        order: 55,
+        order: 140,
         onChange: newValue => {
             if (newValue) {
                 requestCaptureSnapshot();

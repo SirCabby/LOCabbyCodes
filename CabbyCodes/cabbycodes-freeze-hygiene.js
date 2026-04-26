@@ -44,7 +44,7 @@
         'Freeze Needs / Hygiene',
         {
             defaultValue: false,
-            order: 50
+            order: 145
         },
         newValue => {
             CabbyCodes.log(

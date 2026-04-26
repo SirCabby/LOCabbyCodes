@@ -26,7 +26,7 @@
         'Infinite Money',
         {
             defaultValue: false,
-            order: 80
+            order: 105
         },
         newValue => {
             CabbyCodes.log(`[CabbyCodes] Infinite money ${newValue ? 'enabled' : 'disabled'}`);

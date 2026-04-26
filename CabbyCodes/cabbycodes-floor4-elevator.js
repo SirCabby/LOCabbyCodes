@@ -49,7 +49,7 @@
         'Floor 4 Always Available',
         {
             defaultValue: false,
-            order: 88
+            order: 150
         },
         newValue => {
             CabbyCodes.log(`${LOG_PREFIX} Floor 4 ${newValue ? 'unlocked' : 'released'}.`);

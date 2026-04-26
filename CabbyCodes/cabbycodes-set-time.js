@@ -59,7 +59,7 @@
 
     CabbyCodes.registerSetting(SETTING_KEY, 'Set Game Time', {
         defaultValue: 0,
-        order: 56,
+        order: 20,
         formatValue: () => 'Press',
         onActivate: () => {
             openPickerScene();

@@ -26,7 +26,7 @@
         'One Hit Kill Enemies',
         {
             defaultValue: false,
-            order: 36
+            order: 80
         },
         newValue => {
             CabbyCodes.log(

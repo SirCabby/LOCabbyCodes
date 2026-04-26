@@ -29,7 +29,7 @@
         'Infinite Items',
         {
             defaultValue: false,
-            order: 70
+            order: 110
         },
         newValue => {
             CabbyCodes.log(

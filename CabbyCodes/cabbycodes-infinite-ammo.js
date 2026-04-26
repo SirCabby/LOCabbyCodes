@@ -27,7 +27,7 @@
         'Infinite Ammo',
         {
             defaultValue: false,
-            order: 76
+            order: 115
         },
         newValue => {
             CabbyCodes.log(

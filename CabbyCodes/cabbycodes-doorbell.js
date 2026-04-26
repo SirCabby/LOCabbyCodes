@@ -698,7 +698,7 @@
         'Send Next Door Visitor',
         {
             defaultValue: false,
-            order: 15,
+            order: 10,
             formatValue: () => 'Press',
             onChange: newValue => {
                 if (!newValue) {

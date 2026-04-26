@@ -50,7 +50,7 @@
 
     CabbyCodes.registerSetting(SETTING_KEY, 'Set Danger Level', {
         defaultValue: 0,
-        order: 57,
+        order: 25,
         formatValue: () => 'Press',
         onActivate: () => {
             openPickerScene();

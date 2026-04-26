@@ -47,7 +47,7 @@
 
     CabbyCodes.registerSetting(SETTING_KEY, 'Max Cooking Skill', {
         defaultValue: false,
-        order: 115,
+        order: 55,
         formatValue: () => 'Press'
     });
 

@@ -35,7 +35,7 @@
         min: 0,
         max: INSTANT_MAX_VALUE,
         step: 1,
-        order: 48,
+        order: 135,
         formatValue: formatExpRateSettingValue,
         inputTitle: 'EXP Rate',
         inputDescription: 'Use left/right to pick 0x-10x EXP or Instant Max.',

@@ -56,7 +56,6 @@
             'cabbycodes-unstick-equipment.js',
             'cabbycodes-infinite-ammo.js',
             'cabbycodes-friendly-door-visitors.js',
-            'cabbycodes-free-vending.js',
             'cabbycodes-free-merchants.js',
             'cabbycodes-floor4-elevator.js',
             'cabbycodes-doorbell.js',

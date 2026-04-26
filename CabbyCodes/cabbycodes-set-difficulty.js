@@ -46,7 +46,7 @@
 
     CabbyCodes.registerSetting(SETTING_KEY, 'Set Difficulty', {
         defaultValue: 0,
-        order: 58,
+        order: 30,
         formatValue: () => 'Press',
         onActivate: () => {
             openPickerScene();

@@ -25,7 +25,7 @@
         'Enable Saving',
         {
             defaultValue: false,
-            order: 60
+            order: 160
         },
         newValue => {
             CabbyCodes.log(`[CabbyCodes] Save anywhere ${newValue ? 'enabled' : 'disabled'}`);

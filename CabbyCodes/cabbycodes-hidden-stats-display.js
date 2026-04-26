@@ -174,7 +174,7 @@
 
     CabbyCodes.registerSetting(settingKey, 'Hidden Stats HUD', {
         defaultValue: false,
-        order: 10,
+        order: 60,
         formatValue: () => 'Press',
         onChange: newValue => {
             if (!newValue) {

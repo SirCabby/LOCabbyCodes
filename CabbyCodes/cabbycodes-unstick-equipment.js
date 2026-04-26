@@ -30,7 +30,7 @@
         'Unstick Equipment',
         {
             defaultValue: false,
-            order: 78
+            order: 125
         },
         newValue => {
             CabbyCodes.log(

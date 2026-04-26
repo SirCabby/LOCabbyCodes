@@ -27,7 +27,7 @@
         'Never Miss Attacks',
         {
             defaultValue: false,
-            order: 37
+            order: 85
         },
         newValue => {
             CabbyCodes.log(

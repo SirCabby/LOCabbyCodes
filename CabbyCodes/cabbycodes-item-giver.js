@@ -3586,7 +3586,7 @@
 
     CabbyCodes.registerSetting(GIVE_ALL_ITEMS_SETTING_KEY, 'Give Missing Items', {
         defaultValue: false,
-        order: 105,
+        order: 45,
         formatValue: () => 'Press',
         onChange: newValue => {
             if (!newValue) {
@@ -3598,7 +3598,7 @@
 
     CabbyCodes.registerSetting(MAX_ALL_ITEMS_SETTING_KEY, MAX_ALL_ITEMS_LABEL, {
         defaultValue: false,
-        order: 110,
+        order: 50,
         formatValue: () => 'Press',
         onChange: newValue => {
             if (!newValue) {
@@ -3623,7 +3623,7 @@
     // Register setting with formatValue to show "Press" instead of on/off
     CabbyCodes.registerSetting('itemGiver', 'Give Item', {
         defaultValue: false,
-        order: 20,
+        order: 15,
         formatValue: () => 'Press'
     });
 

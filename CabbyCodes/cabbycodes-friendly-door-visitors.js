@@ -413,7 +413,7 @@
         'Friendly Door Visitors',
         {
             defaultValue: false,
-            order: 100
+            order: 155
         },
         newValue => {
             applyFriendlyMode(newValue);

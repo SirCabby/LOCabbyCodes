@@ -25,7 +25,7 @@
         'Invincibility',
         {
             defaultValue: false,
-            order: 35
+            order: 75
         },
         newValue => {
             CabbyCodes.log(

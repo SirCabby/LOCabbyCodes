@@ -28,7 +28,6 @@ repo-root/
 ├── scripts/                      # Node / Python helpers for data digs
 ├── Makefile                      # Windows-centric build / deploy (cmd + PowerShell)
 ├── README.md                     # Player-facing install guide
-├── .cursorrules                  # Developer guidelines (also read by Cursor)
 └── log.txt                       # Stray dev-time log
 ```
 
@@ -215,5 +214,4 @@ When you need a whole new UI scene, follow the `Scene_CabbyCodesNumberInput` / `
 
 - `AGENTS.md` — conventions AI assistants and contributors should follow when editing this repo.
 - `IMPROVEMENTS.md` — catalogue of known bugs, performance concerns, and architectural opportunities with suggested fixes.
-- `.cursorrules` — the original developer-rules file; still valid but predates the patch-chain and debug systems documented here.
 - `README.md` — player-facing install guide.

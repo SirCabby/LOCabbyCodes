@@ -264,15 +264,11 @@ Long sessions with debug logging on can produce multi-MB logs. Add rotation: whe
 
 ## H. Documentation
 
-### H1. `.cursorrules` predates current patch-chain semantics — **low**
-
-`.cursorrules` still describes patches using `target._cabbycodesOriginals?.functionName` directly (section "Store original functions"). That pattern is now the reason for bugs A1–A3. Update `.cursorrules` to point at `CabbyCodes.callOriginal` as the canonical path.
-
-### H2. No inline docs for "press-style" settings — **low**
+### H1. No inline docs for "press-style" settings — **low**
 
 The `onActivate` hook is used by cookbook, recipe-book, refill-status, max-cooking, etc., but isn't documented in `cabbycodes-settings.js` beyond the JSDoc on `registerSetting`. Add an example section.
 
-### H3. Common Events reference is out of date — **medium**
+### H2. Common Events reference is out of date — **medium**
 
 The freeze-time module references dozens of common event IDs with inline comments. There's no single table of "Event N = X" for future contributors. Generate one from `game_files/CommonEvents.json` via a new `scripts/dump-common-events-index.js` and check in a terse Markdown table.
 
@@ -284,6 +280,6 @@ The freeze-time module references dozens of common event IDs with inline comment
 2. Sweep A3 (replace hand-rolled `callOriginal` calls) now that the chain is trustworthy.
 3. Performance pass: B1 (async logging) + B2 (optional debug wrap) — measurable frame-time gains.
 4. Repo hygiene: F1 (pull the large JSON out of git) + F6 (eslint).
-5. Nice-to-have: F3 (cross-platform deploy), H3 (common-events index).
+5. Nice-to-have: F3 (cross-platform deploy), H2 (common-events index).
 
 Each is isolated enough to ship on its own, and together they materially reduce the risk of adding new cheats without breaking existing ones.

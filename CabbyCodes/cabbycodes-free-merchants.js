@@ -3,14 +3,16 @@
 //=============================================================================
 /*:
  * @target MZ
- * @plugindesc CabbyCodes Free Merchants - Sets shop item prices to zero.
+ * @plugindesc CabbyCodes Free Merchants - Sets shop item and vending prices to zero.
  * @author CabbyCodes
  * @help
  * Adds an Options menu toggle that drops the price of every merchant item to
  * zero. When enabled, standard shop interfaces display a cost of 0, the
  * custom event-driven "BuyItemTable" purchase flow (Eugene's shop) no longer
- * deducts gold on the Buy choice, and Mutt's special-inventory shop on
- * Map056 (which prices via common event 291 / var 7) is also free.
+ * deducts gold on the Buy choice, Mutt's special-inventory shop on
+ * Map056 (which prices via common event 291 / var 7) is also free, and
+ * vending machines (var 229) skip the coin slot mini-game and jump straight
+ * to the purchase menu with a price of zero.
  */
 
 (() => {
@@ -22,6 +24,7 @@
     }
 
     const settingKey = 'freeMerchants';
+    const VENDING_COST_VARIABLE_ID = 229;
     const isFeatureEnabled = () => CabbyCodes.getSetting(settingKey, false);
 
     const callOriginal = typeof CabbyCodes.callOriginal === 'function'
@@ -39,14 +42,104 @@
         'Free Merchants',
         {
             defaultValue: false,
-            order: 90
+            order: 130
         },
         newValue => {
             CabbyCodes.log(
                 `[CabbyCodes] Free merchants ${newValue ? 'enabled' : 'disabled'}`
             );
+            if (newValue) {
+                enforceZeroVendingCost('setting toggled on');
+            }
         }
     );
+
+    function getRawVariableValue(varId) {
+        if (
+            typeof $gameVariables === 'undefined' ||
+            !$gameVariables ||
+            !Array.isArray($gameVariables._data)
+        ) {
+            return undefined;
+        }
+        return $gameVariables._data[varId];
+    }
+
+    function enforceZeroVendingCost(reason) {
+        if (!isFeatureEnabled()) {
+            return;
+        }
+        if (typeof $gameVariables === 'undefined' || !$gameVariables) {
+            return;
+        }
+        const rawValue = getRawVariableValue(VENDING_COST_VARIABLE_ID);
+        if (rawValue === 0 || typeof rawValue === 'undefined') {
+            return;
+        }
+        try {
+            $gameVariables.setValue(VENDING_COST_VARIABLE_ID, 0);
+            CabbyCodes.debug?.(
+                `[CabbyCodes] Free vending: clamped cost to zero${reason ? ` (${reason})` : ''}`
+            );
+        } catch (error) {
+            CabbyCodes.warn(
+                `[CabbyCodes] Free vending failed to clamp cost variable: ${error?.message || error}`
+            );
+        }
+    }
+
+    CabbyCodes.override(
+        Game_Variables.prototype,
+        'setValue',
+        function(variableId, value) {
+            const numericId = Number(variableId);
+            let nextValue = value;
+
+            if (numericId === VENDING_COST_VARIABLE_ID && isFeatureEnabled()) {
+                nextValue = 0;
+            }
+
+            return callOriginal(Game_Variables.prototype, 'setValue', this, [
+                variableId,
+                nextValue
+            ]);
+        }
+    );
+
+    CabbyCodes.override(
+        Game_Variables.prototype,
+        'value',
+        function(variableId) {
+            const numericId = Number(variableId);
+            if (numericId === VENDING_COST_VARIABLE_ID && isFeatureEnabled()) {
+                return 0;
+            }
+
+            return callOriginal(Game_Variables.prototype, 'value', this, [
+                variableId
+            ]);
+        }
+    );
+
+    CabbyCodes.after(
+        Game_Interpreter.prototype,
+        'operateVariable',
+        function(variableId) {
+            if (!isFeatureEnabled()) {
+                return;
+            }
+            const numericId = Number(variableId);
+            if (numericId === VENDING_COST_VARIABLE_ID) {
+                enforceZeroVendingCost('operateVariable');
+            }
+        }
+    );
+
+    if (typeof Scene_Boot !== 'undefined') {
+        CabbyCodes.after(Scene_Boot.prototype, 'start', function() {
+            enforceZeroVendingCost('Scene_Boot.start');
+        });
+    }
 
     CabbyCodes.override(
         Window_ShopBuy.prototype,

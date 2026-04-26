@@ -1502,7 +1502,7 @@
 
     CabbyCodes.registerSetting(SETTING_KEY, 'Story Flags', {
         defaultValue: 0,
-        order: 104,
+        order: 35,
         formatValue: () => 'Press',
         onActivate: () => {
             openCategoriesMenu();

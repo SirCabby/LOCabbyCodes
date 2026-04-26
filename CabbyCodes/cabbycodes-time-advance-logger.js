@@ -6,10 +6,12 @@
  * @plugindesc CabbyCodes Time Advance Logger - Debug minutes/hour drift
  * @author CabbyCodes
  * @help
- * Adds an Options toggle that records whenever critical time-of-day variables
+ * Always-on diagnostic that records whenever critical time-of-day variables
  * change. The log captures which event/common event adjusted the value, the
  * current map, and the interpreter command that initiated the change so we can
- * trace unexpected hour jumps when returning home.
+ * trace unexpected hour jumps when returning home. Lines go through
+ * CabbyCodes.log (INFO level), so they only persist to disk when
+ * CabbyCodes.debugLoggingEnabled is true.
  */
 
 (() => {
@@ -21,7 +23,6 @@
     }
 
     const MODULE_TAG = '[CabbyCodes][TimeLogger]';
-    const SETTING_KEY = 'logTimeAdvances';
     const trackedVariables = new Map([
         [16, { label: 'HourOfDay' }],
         [17, { label: 'MinuteOfHour' }],
@@ -37,21 +38,6 @@
         [112, { label: 'DoorDangerBonus' }],
         [122, { label: 'TimeBucket' }]
     ]);
-
-    let loggingEnabled = CabbyCodes.getSetting(SETTING_KEY, false);
-
-    CabbyCodes.registerSetting(SETTING_KEY, 'Log Time Advance Events', {
-        defaultValue: false,
-        order: 120,
-        onChange: value => {
-            loggingEnabled = Boolean(value);
-            CabbyCodes.log(
-                `${MODULE_TAG} ${loggingEnabled ? 'Enabled' : 'Disabled'}`
-            );
-        }
-    });
-
-    loggingEnabled = CabbyCodes.getSetting(SETTING_KEY, false);
 
     const freezeTimeApi = CabbyCodes.freezeTime;
     if (
@@ -353,7 +339,7 @@
     }
 
     function logVariableChange(varId, previousValue, pendingValue, interceptorContext) {
-        if (!loggingEnabled || !trackedVariables.has(varId)) {
+        if (!trackedVariables.has(varId)) {
             return;
         }
         const prevNumeric = normalizeNumeric(previousValue);
@@ -426,9 +412,6 @@
 
     freezeTimeApi.registerVariableWriteInterceptor(
         (varId, previousValue, pendingValue, context) => {
-            if (!loggingEnabled) {
-                return;
-            }
             logVariableChange(Number(varId), previousValue, pendingValue, context);
         }
     );

@@ -96,7 +96,6 @@ Guidelines for AI coding assistants (and human contributors) working in this rep
 
 ## 12. Editing etiquette for AI agents
 
-- Treat `.cursorrules` as a companion to this file. It predates the patch-chain and debug systems but its style rules are still authoritative (IIFE, JSDoc, namespace guard, etc.).
 - Do not introduce new runtime dependencies. The repo intentionally has no `package.json`, `npm install`, `eslint`, or build chain.
 - Do not modify `game_files/` — it is a pristine reference mirror.
 - Do not touch `CommonEvents.json` at the repo root unless you are updating the annotated reference (document any change in the commit message).

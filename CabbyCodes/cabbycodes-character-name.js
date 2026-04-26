@@ -77,7 +77,7 @@
 
     CabbyCodes.registerSetting(SETTING_KEY, 'Change Character Name', {
         defaultValue: 0,
-        order: 105,
+        order: 40,
         formatValue: () => 'Press',
         onActivate: () => {
             openNameScene();
