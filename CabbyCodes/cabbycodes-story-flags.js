@@ -1452,11 +1452,12 @@
     // protagonist's live actor-1 name (Sam by default, but renameable), so the
     // label here is just a placeholder that openCategoriesMenu overwrites.
     //
-    // 'videoGames' is an external category: instead of rendering a flag list,
-    // selecting it hands off to cabbycodes-video-games.js's own scene via
-    // CabbyCodes.openVideoGamesScene(). The onSelect callback returns true on
-    // a successful push and false if blocked (no session, module missing) so
-    // the categories window can re-activate itself instead of stranding input.
+    // 'videoGames' and 'lockedDoors' are external categories: instead of
+    // rendering a flag list, selecting either hands off to its own module's
+    // scene via CabbyCodes.openVideoGamesScene() / CabbyCodes.openLockedDoorsScene().
+    // The onSelect callback returns true on a successful push and false if
+    // blocked (no session, module missing) so the categories window can
+    // re-activate itself instead of stranding input.
     const CATEGORIES = [
         { id: 'sacrifices',   label: 'Sam...',                        helpText: 'Body state of the protagonist.', flags: SACRIFICE_FLAGS },
         { id: 'recruits',     label: 'Recruits...',                   helpText: 'Toggle companions.', flags: RECRUIT_FLAGS },
@@ -1468,6 +1469,14 @@
                 return CabbyCodes.openVideoGamesScene();
             }
             CabbyCodes.warn(`${LOG_PREFIX} Video Games module unavailable.`);
+            SoundManager.playBuzzer();
+            return false;
+        } },
+        { id: 'lockedDoors',  label: 'Locked Doors...',               helpText: 'Lock/unlock curated story doors.', onSelect: () => {
+            if (typeof CabbyCodes.openLockedDoorsScene === 'function') {
+                return CabbyCodes.openLockedDoorsScene();
+            }
+            CabbyCodes.warn(`${LOG_PREFIX} Locked Doors module unavailable.`);
             SoundManager.playBuzzer();
             return false;
         } },
