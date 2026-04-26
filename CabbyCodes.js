@@ -57,6 +57,7 @@
             'cabbycodes-friendly-door-visitors.js',
             'cabbycodes-free-vending.js',
             'cabbycodes-free-merchants.js',
+            'cabbycodes-floor4-elevator.js',
             'cabbycodes-doorbell.js',
             'cabbycodes-freeze-time.js',
             'cabbycodes-time-advance-logger.js',
