@@ -798,6 +798,71 @@
     ];
     const KEVIN_OPTIONS = KEVIN_STATES.map(s => ({ value: s.value, label: s.label }));
 
+    // Fuzzy Quest — Joel's teddy bear (and the rat-child events that change
+    // it). Seven weapon variants exist in $dataWeapons, all etypeId 1, all
+    // exclusive to Joel (actor 4):
+    //   91  Fuzzy           — Joel's starting weapon (Actors.json line 134).
+    //   170 Fluff Ball      — set by CommonEvents.json CE 92 (`childTalk`)
+    //                          var 614 (`ratInteractState`) == 2 branch:
+    //                          rat shreds Fuzzy, Joel loses 91 / gains 170.
+    //   171 Fuzzy's Remains — same CE, var 614 == 3 branch (gated on
+    //                          switch 396 `ratCanTalk` ON): rat apologizes,
+    //                          Joel loses 170 / gains 171.
+    //   172 Repaired Fuzzy  — Eugene Shop (Troops.json troop 117) "check-up"
+    //                          path; var 190 (`EugeneRepairingFuzzy`) walks
+    //                          0→1→2→3→4 across CE 6 newDay ticks plus
+    //                          repeated shop visits before this is granted.
+    //   173 Mangled Fuzzy   — Sam sews Fuzzy himself at the Map333 (Eugene's
+    //                          apt) sewing-machine event; gated on Joel
+    //                          equipping 171, no var-190 progression.
+    //   174 Renegade Fuzzy  — Xaria/Monty patch it (CommonEvents.json,
+    //                          ~line 203959). Joel hands them 171 and gets
+    //                          169 "Empty Handed" interim, then 174 later.
+    //   175 Worm Fuzzy      — Nestor (Troops.json troop 118) "fixes" it,
+    //                          sets var 190 = 6.
+    //
+    // The picker lets the player pick which variant Joel wields. We do NOT
+    // try to replicate the var-190 state machine — its 0..6 progression
+    // spans CE 6 daily ticks and three different troops, and writing
+    // arbitrary intermediate values would mis-gate Eugene/Nestor dialog
+    // unnecessarily. Instead we own only the part the player cares about:
+    //   1. Inventory + equip slot. Add 1 of the target weapon, equip Joel
+    //      slot 1 with it (which moves it from inventory to equipped via
+    //      Game_Actor.tradeItemWithParty), then sweep all other Fuzzy
+    //      variants out of inventory so the player ends up with exactly
+    //      one Fuzzy on Joel and zero held copies.
+    //   2. Var 614 (ratInteractState). For any state past Pristine, bump
+    //      var 614 ≥ 3 so the natural shred event at var 614 == 2 cannot
+    //      re-fire and overwrite the cheat. For Pristine, clamp var 614
+    //      down to ≤ 1 so the natural shred can still play organically if
+    //      the player wants to walk through the rat-Joel arc.
+    //
+    // Joel does not need to be in the party — `$gameActors.actor(4)` works
+    // regardless, and the equip writes through to actor state that
+    // persists when he later joins. Var 190 (`EugeneRepairingFuzzy`) is
+    // intentionally untouched — applying "Repaired by Eugene" leaves
+    // Eugene's dialog stuck on its current branch, but the player can
+    // re-engage Eugene to nudge the conversation if they want it
+    // resynced; bumping var 190 ourselves risks mis-gating Nestor's
+    // var-190 == 6 path (Worm Fuzzy) and the CE 6 daily-tick rules.
+    const FUZZY_ACTOR_ID = 4;
+    const FUZZY_WEAPON_ETYPE = 1; // changeEquipById uses etypeId, not slotId
+    const FUZZY_VAR_INTERACT = 614;
+    const FUZZY_INTERACT_SHRED_PHASE = 2;
+    const FUZZY_INTERACT_POST_APOLOGY = 3;
+    const FUZZY_INTERACT_PRE_SHRED = 1;
+    const FUZZY_STATES = [
+        { value: 0, label: 'Pristine',           weaponId: 91  },
+        { value: 1, label: 'Shredded',           weaponId: 170 },
+        { value: 2, label: 'Remains',            weaponId: 171 },
+        { value: 3, label: 'Repaired by Eugene', weaponId: 172 },
+        { value: 4, label: 'Mangled by Sam',     weaponId: 173 },
+        { value: 5, label: 'Renegade (Xaria)',   weaponId: 174 },
+        { value: 6, label: 'Worm (Nestor)',      weaponId: 175 }
+    ];
+    const FUZZY_WEAPON_IDS = FUZZY_STATES.map(s => s.weaponId);
+    const FUZZY_OPTIONS = FUZZY_STATES.map(s => ({ value: s.value, label: s.label }));
+
     // Quest-state variables. Each entry needs a real understanding of what
     // the variable drives in-game; speculative entries on under-investigated
     // variables previously lived here (Joel/Papineau/Lyle/Nestor/Goth/
@@ -884,6 +949,15 @@
           targetLabel: `var ${KEVIN_NESTOR_VAR} + Map${KEVIN_MAP_ID} ev${KEVIN_EVENT_ID} self-sw ${KEVIN_POST_SELFSW}`,
           readValue: () => readKevinQuestState(),
           applyValue: (v) => applyKevinQuestState(v) },
+        // Fuzzy quest — pick which Fuzzy variant Joel wields (the rat-child
+        // shred + apology + repair paths grant 7 different weapons). See
+        // the FUZZY_* constants block above.
+        { id: 'fuzzyQuest',    label: 'Fuzzy Quest',          kind: 'variable', varId: FUZZY_VAR_INTERACT,
+          options: FUZZY_OPTIONS,
+          displayAs: 'switch',
+          targetLabel: `actor ${FUZZY_ACTOR_ID} weapon slot + var ${FUZZY_VAR_INTERACT}`,
+          readValue: () => readFuzzyQuestState(),
+          applyValue: (v) => applyFuzzyQuestState(v) },
         // Lyle's Mazes and Wizards campaign — sessions completed (var 701).
         // Each session is a distinct adventure; 6 = wrap-up.
         { id: 'mazesWizardsQuest', label: 'Mazes and Wizards', kind: 'variable', varId: MW_VAR_SESSION,
@@ -2110,6 +2184,137 @@
             return true;
         } catch (error) {
             CabbyCodes.error(`${LOG_PREFIX} Apply failed for Kevin Quest: ${error?.message || error}`);
+            return false;
+        } finally {
+            token.release();
+        }
+    }
+
+    // ---- Fuzzy Quest (Joel's teddy bear weapon swap) ----
+    //
+    // Read priority:
+    //   1. Joel's currently equipped weapon (`actor 4 slot 0`). If it's
+    //      one of the seven Fuzzy variants, return that state. This is the
+    //      authoritative answer because the natural game and our cheat
+    //      both write to this slot via code 319 / changeEquipById.
+    //   2. Inventory fallback. If Joel has no Fuzzy variant equipped (e.g.
+    //      he's holding 169 "Empty Handed" during the Xaria interim, or
+    //      a manual unequip), surface the highest-tier Fuzzy variant we
+    //      find in `$gameParty`. This matches the "Joel's Fuzzy is in
+    //      Joel's possession even if not currently held" intent of the
+    //      questline.
+    //   3. Default to Pristine when nothing matches (pre-Joel saves where
+    //      actor 4 hasn't been initialized yet).
+
+    function readFuzzyQuestState() {
+        if (typeof $gameActors !== 'undefined' && $gameActors) {
+            const joel = $gameActors.actor(FUZZY_ACTOR_ID);
+            if (joel && typeof joel.equips === 'function') {
+                const equipped = joel.equips()[FUZZY_WEAPON_ETYPE - 1];
+                if (equipped && typeof equipped.id === 'number') {
+                    const matched = FUZZY_STATES.find(s => s.weaponId === equipped.id);
+                    if (matched) {
+                        return matched.value;
+                    }
+                }
+            }
+        }
+        if (typeof $gameParty !== 'undefined' && $gameParty
+                && typeof $gameParty.numItems === 'function'
+                && typeof $dataWeapons !== 'undefined' && $dataWeapons) {
+            // Walk states in reverse so the highest-tier variant wins
+            // when multiple are somehow held simultaneously (shouldn't
+            // happen post-cheat, but a save with mid-progression dupes
+            // should still read sensibly).
+            for (let i = FUZZY_STATES.length - 1; i >= 0; i -= 1) {
+                const state = FUZZY_STATES[i];
+                const w = $dataWeapons[state.weaponId];
+                if (w && $gameParty.numItems(w) > 0) {
+                    return state.value;
+                }
+            }
+        }
+        return 0;
+    }
+
+    function fuzzyQuestStateLabel(value) {
+        const s = FUZZY_STATES.find(st => st.value === value);
+        return s ? s.label : String(value);
+    }
+
+    function applyFuzzyQuestState(newValue) {
+        if (!isSessionReady()) {
+            return false;
+        }
+        const target = FUZZY_STATES.find(s => s.value === newValue);
+        if (!target) {
+            return false;
+        }
+        if (typeof $dataWeapons === 'undefined' || !$dataWeapons) {
+            CabbyCodes.warn(`${LOG_PREFIX} Fuzzy Quest: $dataWeapons unavailable.`);
+            return false;
+        }
+        if (typeof $gameActors === 'undefined' || !$gameActors) {
+            CabbyCodes.warn(`${LOG_PREFIX} Fuzzy Quest: $gameActors unavailable.`);
+            return false;
+        }
+        if (typeof $gameParty === 'undefined' || !$gameParty
+                || typeof $gameParty.gainItem !== 'function'
+                || typeof $gameParty.loseItem !== 'function') {
+            CabbyCodes.warn(`${LOG_PREFIX} Fuzzy Quest: $gameParty inventory API unavailable.`);
+            return false;
+        }
+        const joel = $gameActors.actor(FUZZY_ACTOR_ID);
+        if (!joel || typeof joel.changeEquipById !== 'function') {
+            CabbyCodes.warn(`${LOG_PREFIX} Fuzzy Quest: actor ${FUZZY_ACTOR_ID} (Joel) not ready.`);
+            return false;
+        }
+        const targetWeapon = $dataWeapons[target.weaponId];
+        if (!targetWeapon) {
+            CabbyCodes.warn(`${LOG_PREFIX} Fuzzy Quest: weapon ${target.weaponId} not in $dataWeapons.`);
+            return false;
+        }
+        const oldValue = readFuzzyQuestState();
+        const api = CabbyCodes.freezeTime;
+        const token = (api && typeof api.exemptFromRestore === 'function')
+            ? api.exemptFromRestore({ variables: [FUZZY_VAR_INTERACT] })
+            : { release: () => {} };
+        try {
+            // Game_Actor.tradeItemWithParty (called from changeEquip) needs
+            // the target weapon to be in the party inventory before equip;
+            // it then loses 1 from inventory and adds 1 of the previously-
+            // equipped item back. So: gain → equip → sweep dupes.
+            $gameParty.gainItem(targetWeapon, 1, false);
+            joel.changeEquipById(FUZZY_WEAPON_ETYPE, target.weaponId);
+            FUZZY_WEAPON_IDS.forEach(wid => {
+                const w = $dataWeapons[wid];
+                if (!w) return;
+                const have = $gameParty.numItems(w);
+                if (have > 0) {
+                    $gameParty.loseItem(w, have, false);
+                }
+            });
+            // Var 614 (ratInteractState). Gates the rat-child interaction
+            // scene chain — val 2 triggers the shred event that overwrites
+            // the equipped weapon. Bump past it for any non-Pristine state;
+            // clamp down for Pristine so the player can still play through
+            // the natural shred organically.
+            const curInteract = readVar(FUZZY_VAR_INTERACT);
+            let interactNote = `var ${FUZZY_VAR_INTERACT}=${curInteract} (unchanged)`;
+            if (target.value === 0) {
+                if (curInteract >= FUZZY_INTERACT_SHRED_PHASE) {
+                    $gameVariables.setValue(FUZZY_VAR_INTERACT, FUZZY_INTERACT_PRE_SHRED);
+                    interactNote = `var ${FUZZY_VAR_INTERACT}=${FUZZY_INTERACT_PRE_SHRED} (was ${curInteract})`;
+                }
+            } else if (curInteract < FUZZY_INTERACT_POST_APOLOGY) {
+                $gameVariables.setValue(FUZZY_VAR_INTERACT, FUZZY_INTERACT_POST_APOLOGY);
+                interactNote = `var ${FUZZY_VAR_INTERACT}=${FUZZY_INTERACT_POST_APOLOGY} (was ${curInteract})`;
+            }
+            const readBack = readFuzzyQuestState();
+            CabbyCodes.warn(`${LOG_PREFIX} Fuzzy Quest: ${fuzzyQuestStateLabel(oldValue)} -> ${fuzzyQuestStateLabel(newValue)}. weapon ${target.weaponId} equipped on actor ${FUZZY_ACTOR_ID}, ${interactNote}. Read-back: ${fuzzyQuestStateLabel(readBack)}.`);
+            return true;
+        } catch (error) {
+            CabbyCodes.error(`${LOG_PREFIX} Apply failed for Fuzzy Quest: ${error?.message || error}`);
             return false;
         } finally {
             token.release();
