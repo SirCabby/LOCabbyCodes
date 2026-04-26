@@ -1170,6 +1170,284 @@
           } },
     ];
 
+    // ----------------------------------------------------------------------
+    // NPC alive/dead status — flat per-NPC kill switches
+    // ----------------------------------------------------------------------
+    //
+    // Two categories of named NPCs and unique bosses whose alive/dead state
+    // is tracked by a single global "*Dead" / "killed*" switch. Flipping the
+    // switch flips the active page on the NPC's map event — RPG Maker MZ
+    // re-evaluates page conditions every frame, so the corpse sprite (or the
+    // alive sprite) swaps in immediately on the current map without any
+    // reload.
+    //
+    // NPCs already covered by Quest States or Recruits — Hellen, Marshall,
+    // Eugene-wormhead, Frederic portraits, Joel, Ernest, Lyle, Aster,
+    // Papineau, etc. — are intentionally omitted here so the flat toggle
+    // can't desync the multi-switch sync those richer pickers do.
+    //
+    // Switch IDs verified against game_files/data/System.json line numbers
+    // (offset 362: ID = line - 362).
+    const ALIVE_DEAD_OPTIONS = [
+        { value: 0, label: 'Alive' },
+        { value: 1, label: 'Dead' }
+    ];
+
+    // Madison has both an "absent" gate (109 `madisonDead`) and an explicit
+    // on-screen kill flag (543 `killedMadison`). Different events read each
+    // one; treating either-on as "Dead" and writing both together keeps the
+    // event pages in apartment maps consistent regardless of which path the
+    // player would have taken in the natural game.
+    const MADISON_SWITCH_DEAD = 109;
+    const MADISON_SWITCH_KILLED = 543;
+
+    // Spine has a tri-state outcome: alive (untouched), killed, or spared.
+    // 642 `spineMonsterDead` and 643 `spineSpared` are mutually exclusive
+    // in the natural game; expose both via a single picker so the row
+    // always reflects whichever happened.
+    const SPINE_SWITCH_DEAD = 642;
+    const SPINE_SWITCH_SPARED = 643;
+    const SPINE_OPTIONS = [
+        { value: 0, label: 'Alive' },
+        { value: 1, label: 'Dead' },
+        { value: 2, label: 'Spared' }
+    ];
+
+    // Sybil straddles two distinct contexts — Apartment 35 friendly NPC
+    // (page 1 of Map002 ev12 wins when SybilToken 149 is ON, gives saves
+    // and dialogue), and the Meat World final boss (the Unity-ending fight
+    // that flips SybilDead 975 ON when defeated). The natural game also
+    // sets `disableSybilSaves` (1116) ON when the apartment Sybil is
+    // "gone" (page 2 wins) and `SybilAtk` (969) ON during the active boss
+    // fight; the troop's victory event flips both 969 and 1116 OFF at the
+    // end of the fight.
+    //
+    // The Friendly NPC entry restores or revokes the Apartment-35 friendly
+    // state (multi-switch sync of 975+149+1116+969 — clears the kill flag,
+    // forces SybilToken ON, clears disable-saves, clears active-attack).
+    // The separate Boss entry toggles only switch 975 so the player can
+    // re-fight the boss without forcibly restoring her apartment dialog;
+    // both entries write 975, with the Friendly entry layering additional
+    // switches on top so its "Alive" outcome is the full pre-attack state
+    // and "Dead" puts the apartment into the canonical "she's gone" page.
+    const SYBIL_SWITCH_DEAD = 975;
+    const SYBIL_SWITCH_TOKEN = 149;
+    const SYBIL_SWITCH_DISABLE_SAVES = 1116;
+    const SYBIL_SWITCH_ATK = 969;
+
+    const FRIENDLY_NPC_FLAGS = [
+        { id: 'sybil',         label: 'Sybil (Apt 35)',     kind: 'switch', switchId: SYBIL_SWITCH_DEAD,
+          options: ALIVE_DEAD_OPTIONS,
+          targetLabel: `switches ${SYBIL_SWITCH_DEAD}+${SYBIL_SWITCH_TOKEN}+${SYBIL_SWITCH_DISABLE_SAVES}+${SYBIL_SWITCH_ATK}`,
+          readValue: () => readSybilFriendlyState(),
+          applyValue: (v) => applySybilFriendlyState(v) },
+        { id: 'mutt',          label: 'Mutt',               kind: 'switch', switchId: 317,  options: ALIVE_DEAD_OPTIONS },
+        { id: 'eugene',        label: 'Eugene (Engineer)',  kind: 'switch', switchId: 168,  options: ALIVE_DEAD_OPTIONS },
+        { id: 'madison',       label: 'Madison',            kind: 'switch', switchId: MADISON_SWITCH_DEAD,
+          options: ALIVE_DEAD_OPTIONS,
+          targetLabel: `switches ${MADISON_SWITCH_DEAD}+${MADISON_SWITCH_KILLED}`,
+          readValue: () => readMadisonState(),
+          applyValue: (v) => applyMadisonState(v) },
+        { id: 'nestor',        label: 'Nestor',             kind: 'switch', switchId: 247,  options: ALIVE_DEAD_OPTIONS },
+        { id: 'securityGuard', label: 'Security Guard',     kind: 'switch', switchId: 135,  options: ALIVE_DEAD_OPTIONS },
+        { id: 'graveDigger',   label: 'Grave Digger',       kind: 'switch', switchId: 388,  options: ALIVE_DEAD_OPTIONS },
+        { id: 'jeanPierre',    label: 'Jean-Pierre',        kind: 'switch', switchId: 487,  options: ALIVE_DEAD_OPTIONS },
+        { id: 'claire',        label: 'Claire',             kind: 'switch', switchId: 488,  options: ALIVE_DEAD_OPTIONS },
+        { id: 'sylvain',       label: 'Sylvain',            kind: 'switch', switchId: 489,  options: ALIVE_DEAD_OPTIONS },
+        { id: 'phil',          label: 'Phil',               kind: 'switch', switchId: 490,  options: ALIVE_DEAD_OPTIONS },
+        { id: 'ben',           label: 'Ben',                kind: 'switch', switchId: 542,  options: ALIVE_DEAD_OPTIONS },
+        { id: 'clint',         label: 'Clint',              kind: 'switch', switchId: 545,  options: ALIVE_DEAD_OPTIONS },
+        { id: 'maurice',       label: 'Maurice',            kind: 'switch', switchId: 560,  options: ALIVE_DEAD_OPTIONS },
+        { id: 'nurse',         label: 'Nurse',              kind: 'switch', switchId: 728,  options: ALIVE_DEAD_OPTIONS },
+        { id: 'poet',          label: 'Poet',               kind: 'switch', switchId: 731,  options: ALIVE_DEAD_OPTIONS },
+        { id: 'harriet',       label: 'Harriet',            kind: 'switch', switchId: 733,  options: ALIVE_DEAD_OPTIONS },
+        { id: 'cosmo',         label: 'Cosmo',              kind: 'switch', switchId: 767,  options: ALIVE_DEAD_OPTIONS },
+        { id: 'gamerEyeball',  label: 'Gamer Eyeball',      kind: 'switch', switchId: 768,  options: ALIVE_DEAD_OPTIONS },
+        { id: 'colSqueakum',   label: 'Colonel Squeakum',   kind: 'switch', switchId: 790,  options: ALIVE_DEAD_OPTIONS },
+        { id: 'kaeley',        label: 'Kaeley',             kind: 'switch', switchId: 939,  options: ALIVE_DEAD_OPTIONS },
+        { id: 'antoine',       label: 'Antoine',            kind: 'switch', switchId: 1046, options: ALIVE_DEAD_OPTIONS },
+        { id: 'aurelius',      label: 'Aurelius',           kind: 'switch', switchId: 170,  options: ALIVE_DEAD_OPTIONS },
+        { id: 'jasper',        label: 'Jasper',             kind: 'switch', switchId: 172,  options: ALIVE_DEAD_OPTIONS },
+        { id: 'beryl',         label: 'Beryl',              kind: 'switch', switchId: 173,  options: ALIVE_DEAD_OPTIONS },
+    ];
+
+    const BOSS_NPC_FLAGS = [
+        { id: 'grin',              label: 'Grin',                     kind: 'switch', switchId: 119,  options: ALIVE_DEAD_OPTIONS },
+        { id: 'ratKing',           label: 'Rat King',                 kind: 'switch', switchId: 133,  options: ALIVE_DEAD_OPTIONS },
+        { id: 'sporeMother',       label: 'Spore Mother',             kind: 'switch', switchId: 199,  options: ALIVE_DEAD_OPTIONS },
+        { id: 'stargazer',         label: 'Stargazer',                kind: 'switch', switchId: 241,  options: ALIVE_DEAD_OPTIONS },
+        { id: 'copCar',            label: 'Garage Cop Car',           kind: 'switch', switchId: 381,  options: ALIVE_DEAD_OPTIONS },
+        { id: 'cornerStoreCaterp', label: 'Corner Store Caterpillar', kind: 'switch', switchId: 390,  options: ALIVE_DEAD_OPTIONS },
+        { id: 'policeVan',         label: 'Police Van',               kind: 'switch', switchId: 418,  options: ALIVE_DEAD_OPTIONS },
+        { id: 'surgeon',           label: 'Surgeon (Hand)',           kind: 'switch', switchId: 423,  options: ALIVE_DEAD_OPTIONS },
+        { id: 'rocket',            label: 'Rocket',                   kind: 'switch', switchId: 442,  options: ALIVE_DEAD_OPTIONS },
+        { id: 'piranhaGuy',        label: 'Piranha Guy',              kind: 'switch', switchId: 470,  options: ALIVE_DEAD_OPTIONS },
+        { id: 'boilerBeast',       label: 'Boiler Beast',             kind: 'switch', switchId: 508,  options: ALIVE_DEAD_OPTIONS },
+        { id: 'dragon',            label: 'Dragon',                   kind: 'switch', switchId: 520,  options: ALIVE_DEAD_OPTIONS },
+        { id: 'psplit',            label: 'Psplit',                   kind: 'switch', switchId: 522,  options: ALIVE_DEAD_OPTIONS },
+        { id: 'babyteeth',         label: 'Baby Teeth',               kind: 'switch', switchId: 544,  options: ALIVE_DEAD_OPTIONS },
+        { id: 'sewerSpider',       label: 'Sewer Spider',             kind: 'switch', switchId: 553,  options: ALIVE_DEAD_OPTIONS },
+        { id: 'snowman',           label: 'Snowman',                  kind: 'switch', switchId: 559,  options: ALIVE_DEAD_OPTIONS },
+        { id: 'spineMonster',      label: 'Spine Monster',            kind: 'switch', switchId: SPINE_SWITCH_DEAD,
+          options: SPINE_OPTIONS,
+          targetLabel: `switches ${SPINE_SWITCH_DEAD}+${SPINE_SWITCH_SPARED}`,
+          readValue: () => readSpineState(),
+          applyValue: (v) => applySpineState(v) },
+        { id: 'rathellBeast',      label: 'Rat Hell Beast',           kind: 'switch', switchId: 657,  options: ALIVE_DEAD_OPTIONS },
+        { id: 'rathellChamp',      label: 'Rat Hell Champion',        kind: 'switch', switchId: 658,  options: ALIVE_DEAD_OPTIONS },
+        { id: 'furnace',           label: 'Furnace',                  kind: 'switch', switchId: 669,  options: ALIVE_DEAD_OPTIONS },
+        { id: 'apc',               label: 'APC',                      kind: 'switch', switchId: 707,  options: ALIVE_DEAD_OPTIONS },
+        { id: 'guitar',            label: 'Guitar (creature)',        kind: 'switch', switchId: 729,  options: ALIVE_DEAD_OPTIONS },
+        { id: 'jeanne',            label: 'Jeanne',                   kind: 'switch', switchId: 746,  options: ALIVE_DEAD_OPTIONS },
+        { id: 'drowning',          label: 'Drowning Encounter',       kind: 'switch', switchId: 826,  options: ALIVE_DEAD_OPTIONS },
+        { id: 'whipScorpion',      label: 'Whip Scorpion',            kind: 'switch', switchId: 831,  options: ALIVE_DEAD_OPTIONS },
+        { id: 'sybilBoss',         label: 'Sybil (Meat World boss)',  kind: 'switch', switchId: SYBIL_SWITCH_DEAD, options: ALIVE_DEAD_OPTIONS },
+        { id: 'apt12Obsession',    label: 'Apt 12 Obsession',         kind: 'switch', switchId: 1103, options: ALIVE_DEAD_OPTIONS },
+        { id: 'wilhelmina',        label: 'Wilhelmina (Kaiserin)',    kind: 'switch', switchId: 1135, options: ALIVE_DEAD_OPTIONS },
+        { id: 'hiveMan',           label: 'Hive Man',                 kind: 'switch', switchId: 1138, options: ALIVE_DEAD_OPTIONS },
+        { id: 'tank',              label: 'Tank',                     kind: 'switch', switchId: 1140, options: ALIVE_DEAD_OPTIONS },
+        { id: 'dreamEater',        label: 'Dream Eater',              kind: 'switch', switchId: 1143, options: ALIVE_DEAD_OPTIONS },
+        { id: 'spineTingler',      label: 'Spine Tingler',            kind: 'switch', switchId: 1144, options: ALIVE_DEAD_OPTIONS },
+        { id: 'hundredmaws',       label: 'Hundredmaws',              kind: 'switch', switchId: 1145, options: ALIVE_DEAD_OPTIONS },
+        { id: 'crimsonScourge',    label: 'Crimson Scourge',          kind: 'switch', switchId: 1146, options: ALIVE_DEAD_OPTIONS },
+        { id: 'mopBucket',         label: 'Mop Bucket',               kind: 'switch', switchId: 1203, options: ALIVE_DEAD_OPTIONS },
+        { id: 'kotd',              label: 'KOTD',                     kind: 'switch', switchId: 1205, options: ALIVE_DEAD_OPTIONS },
+    ];
+
+    function readMadisonState() {
+        return (readSwitch(MADISON_SWITCH_DEAD) || readSwitch(MADISON_SWITCH_KILLED)) ? 1 : 0;
+    }
+
+    function applyMadisonState(newValue) {
+        if (!isSessionReady()) {
+            return false;
+        }
+        const wantDead = Boolean(newValue);
+        const oldDead = Boolean(readMadisonState());
+        const switchIds = [MADISON_SWITCH_DEAD, MADISON_SWITCH_KILLED];
+        const api = CabbyCodes.freezeTime;
+        const token = (api && typeof api.exemptFromRestore === 'function')
+            ? api.exemptFromRestore({ switches: switchIds })
+            : { release: () => {} };
+        try {
+            switchIds.forEach(id => $gameSwitches.setValue(id, wantDead));
+            const readBack = Boolean(readMadisonState());
+            CabbyCodes.warn(`${LOG_PREFIX} Madison (switches ${switchIds.join('+')}): ${oldDead ? 'Dead' : 'Alive'} -> ${wantDead ? 'Dead' : 'Alive'}. Read-back: ${readBack ? 'Dead' : 'Alive'}.`);
+            return true;
+        } catch (error) {
+            CabbyCodes.error(`${LOG_PREFIX} Apply failed for Madison: ${error?.message || error}`);
+            return false;
+        } finally {
+            token.release();
+        }
+    }
+
+    function readSpineState() {
+        if (readSwitch(SPINE_SWITCH_SPARED)) {
+            return 2;
+        }
+        if (readSwitch(SPINE_SWITCH_DEAD)) {
+            return 1;
+        }
+        return 0;
+    }
+
+    function spineStateLabel(value) {
+        const opt = SPINE_OPTIONS.find(o => o.value === value);
+        return opt ? opt.label : String(value);
+    }
+
+    function applySpineState(newValue) {
+        if (!isSessionReady()) {
+            return false;
+        }
+        const wantDead = newValue === 1;
+        const wantSpared = newValue === 2;
+        const oldState = readSpineState();
+        const switchIds = [SPINE_SWITCH_DEAD, SPINE_SWITCH_SPARED];
+        const api = CabbyCodes.freezeTime;
+        const token = (api && typeof api.exemptFromRestore === 'function')
+            ? api.exemptFromRestore({ switches: switchIds })
+            : { release: () => {} };
+        try {
+            $gameSwitches.setValue(SPINE_SWITCH_DEAD, wantDead);
+            $gameSwitches.setValue(SPINE_SWITCH_SPARED, wantSpared);
+            const readBack = readSpineState();
+            CabbyCodes.warn(`${LOG_PREFIX} Spine Monster (switches ${switchIds.join('+')}): ${spineStateLabel(oldState)} -> ${spineStateLabel(newValue)}. Read-back: ${spineStateLabel(readBack)}.`);
+            return true;
+        } catch (error) {
+            CabbyCodes.error(`${LOG_PREFIX} Apply failed for Spine Monster: ${error?.message || error}`);
+            return false;
+        } finally {
+            token.release();
+        }
+    }
+
+    // ---- Sybil friendly Apartment-35 state ----
+    //
+    // The friendly entry wraps the canonical Map002 ev12 page conditions:
+    // page 1 (interactive Sybil) wins when SybilToken (149) is ON, page 2
+    // ("she's gone") wins when disableSybilSaves (1116) is ON, page 0
+    // (default fallback) wins otherwise. SybilDead (975) is the boss kill
+    // flag — set ON by the Meat World victory script — but the apartment
+    // event doesn't read it directly, so we treat it as part of the
+    // composite "is she alive in the apartment?" question alongside
+    // disableSybilSaves and SybilToken.
+    //
+    // Alive  = full pre-attack restore: 975 OFF + 149 ON + 1116 OFF + 969 OFF
+    //          (page 1 wins, saves enabled, no active fight)
+    // Dead   = canonical "she's gone": 975 ON + 1116 ON + 969 OFF
+    //          (page 2 wins; SybilToken left as-is so a save where she was
+    //           friendly before the kill still flips back cleanly)
+
+    function readSybilFriendlyState() {
+        // Apartment friendly only when none of the dead/disabled flags are
+        // set AND SybilToken is on (so page 1 actually wins).
+        const friendly = !readSwitch(SYBIL_SWITCH_DEAD)
+            && !readSwitch(SYBIL_SWITCH_DISABLE_SAVES)
+            && readSwitch(SYBIL_SWITCH_TOKEN);
+        return friendly ? 0 : 1;
+    }
+
+    function applySybilFriendlyState(newValue) {
+        if (!isSessionReady()) {
+            return false;
+        }
+        const wantDead = Boolean(newValue);
+        const oldDead = Boolean(readSybilFriendlyState());
+        const switchIds = [
+            SYBIL_SWITCH_DEAD,
+            SYBIL_SWITCH_TOKEN,
+            SYBIL_SWITCH_DISABLE_SAVES,
+            SYBIL_SWITCH_ATK
+        ];
+        const api = CabbyCodes.freezeTime;
+        const token = (api && typeof api.exemptFromRestore === 'function')
+            ? api.exemptFromRestore({ switches: switchIds })
+            : { release: () => {} };
+        try {
+            if (wantDead) {
+                $gameSwitches.setValue(SYBIL_SWITCH_DEAD, true);
+                $gameSwitches.setValue(SYBIL_SWITCH_DISABLE_SAVES, true);
+                $gameSwitches.setValue(SYBIL_SWITCH_ATK, false);
+                // SybilToken left as-is so re-Aliving cleanly restores prior friendly state.
+            } else {
+                $gameSwitches.setValue(SYBIL_SWITCH_DEAD, false);
+                $gameSwitches.setValue(SYBIL_SWITCH_TOKEN, true);
+                $gameSwitches.setValue(SYBIL_SWITCH_DISABLE_SAVES, false);
+                $gameSwitches.setValue(SYBIL_SWITCH_ATK, false);
+            }
+            const readBack = Boolean(readSybilFriendlyState());
+            CabbyCodes.warn(`${LOG_PREFIX} Sybil (Apt 35) (switches ${switchIds.join('+')}): ${oldDead ? 'Dead' : 'Alive'} -> ${wantDead ? 'Dead' : 'Alive'}. Read-back: ${readBack ? 'Dead' : 'Alive'}.`);
+            return true;
+        } catch (error) {
+            CabbyCodes.error(`${LOG_PREFIX} Apply failed for Sybil (Apt 35): ${error?.message || error}`);
+            return false;
+        } finally {
+            token.release();
+        }
+    }
+
     // The 'sacrifices' category label is rebuilt at menu-open time from the
     // protagonist's live actor-1 name (Sam by default, but renameable), so the
     // label here is just a placeholder that openCategoriesMenu overwrites.
@@ -1180,10 +1458,12 @@
     // a successful push and false if blocked (no session, module missing) so
     // the categories window can re-activate itself instead of stranding input.
     const CATEGORIES = [
-        { id: 'sacrifices', label: 'Sam...',          helpText: 'Body state of the protagonist.', flags: SACRIFICE_FLAGS },
-        { id: 'recruits',   label: 'Recruits...',     helpText: 'Toggle companions.', flags: RECRUIT_FLAGS },
-        { id: 'quests',     label: 'Quest States...', helpText: 'Per-questline progression variables.', flags: QUEST_FLAGS },
-        { id: 'videoGames', label: 'Video Games...',  helpText: 'Plays left and skill per cartridge.', onSelect: () => {
+        { id: 'sacrifices',   label: 'Sam...',                        helpText: 'Body state of the protagonist.', flags: SACRIFICE_FLAGS },
+        { id: 'recruits',     label: 'Recruits...',                   helpText: 'Toggle companions.', flags: RECRUIT_FLAGS },
+        { id: 'quests',       label: 'Quest States...',               helpText: 'Per-questline progression variables.', flags: QUEST_FLAGS },
+        { id: 'friendlyNpcs', label: 'Friendly NPCs...',              helpText: 'Alive/dead status of named non-recruit NPCs.', flags: FRIENDLY_NPC_FLAGS },
+        { id: 'bossNpcs',     label: 'Bosses & Notable Enemies...',   helpText: 'Alive/dead status of unique bosses.', flags: BOSS_NPC_FLAGS },
+        { id: 'videoGames',   label: 'Video Games...',                helpText: 'Plays left and skill per cartridge.', onSelect: () => {
             if (typeof CabbyCodes.openVideoGamesScene === 'function') {
                 return CabbyCodes.openVideoGamesScene();
             }
