@@ -3182,7 +3182,15 @@
             return null;
         }
 
-        const dataSource = getDatabaseCollectionForType(entry.type);
+        // Ranged "weapons" actually live in $dataArmors (etypeId === 2) but present as
+        // type === 'weapon' in the UI. Look up the full variant against sourceType so we
+        // hit the right database — using `type` returned $dataWeapons, whose entries at
+        // these indices are unrelated melee items (or empty), causing the dedup pass to
+        // fall back to entry.item, which is the first iterated non-empty variant
+        // ("loaded, but almost empty"). That is why the bulk shortcuts kept granting
+        // partially-loaded guns.
+        const sourceType = typeof entry.sourceType === 'string' ? entry.sourceType : entry.type;
+        const dataSource = getDatabaseCollectionForType(sourceType);
         if (!dataSource || !Array.isArray(dataSource)) {
             return null;
         }
@@ -3192,7 +3200,7 @@
         const fullOffset = hasBigBurst ? 4 : hasBurst ? 3 : 2;
         const fullId = baseId + fullOffset;
         const fullItem = dataSource[fullId];
-        const grantItem = isGrantableDatabaseItem(fullItem, entry.type) ? fullItem : entry.item;
+        const grantItem = isGrantableDatabaseItem(fullItem, sourceType) ? fullItem : entry.item;
 
         const wpnIndex = parseDatabaseIndex(meta.wpnIndex, { allowZero: true });
         const groupKey = Number.isInteger(wpnIndex)
