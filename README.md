@@ -1,6 +1,6 @@
 # CabbyCodes Mod Installation Guide
 
-Current Version: **0.0.1** (tracked in the root `VERSION` file)
+Current Version: **1.0.0** (tracked in the root `VERSION` file)
 
 This guide will walk you through installing the CabbyCodes mod for "Look Outside". The installation process involves copying files and adding one entry to the game's plugin configuration.
 
