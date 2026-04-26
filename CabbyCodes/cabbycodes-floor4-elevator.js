@@ -120,5 +120,24 @@
         }, 0);
     }
 
+    // Apply on game load so the cheat takes effect without requiring a manual
+    // toggle off/on after entering a save or starting a new game. The setting
+    // is persisted in localStorage; the var lives in the save file, so a save
+    // made before the cheat existed (or before it was enabled) still has
+    // var 817 below the gate.
+    function applyOnSessionStart() {
+        if (!isCheatEnabled()) {
+            return;
+        }
+        bumpElevatorVarIfBelowGate();
+    }
+
+    if (typeof Scene_Load !== 'undefined' && Scene_Load.prototype) {
+        CabbyCodes.after(Scene_Load.prototype, 'onLoadSuccess', applyOnSessionStart);
+    }
+    if (typeof Scene_Title !== 'undefined' && Scene_Title.prototype) {
+        CabbyCodes.after(Scene_Title.prototype, 'commandNewGame', applyOnSessionStart);
+    }
+
     CabbyCodes.log('[CabbyCodes] Floor 4 elevator module loaded');
 })();
