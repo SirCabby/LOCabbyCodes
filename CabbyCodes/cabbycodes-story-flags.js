@@ -798,6 +798,61 @@
     ];
     const KEVIN_OPTIONS = KEVIN_STATES.map(s => ({ value: s.value, label: s.label }));
 
+    // Marshall is the leg/foot member of Nestor's worm-anatomy chase. Pre-
+    // mutation he's a disembodied voice in the Map054 (bathroom) StallDoor2
+    // event (event 2; var 733 `MarshallStall` cycles his wisdom dialog 0..10).
+    // After the player triggers the worm-spawn beat at Map094 ev11 `Nestor`
+    // (var 281 `nestorState` == 10 → flips switch 422 `FirstWormPartsSpawned`
+    // ON), Marshall ev41 on Map054 materializes as the foot-worm.
+    //
+    // Foot-chase progression lives in var 435 (`nestorFootChase`):
+    //   0   Pre-mutation — Marshall ev41 has no matching page; no worm walks
+    //   4   Chase armed — page 0 renders Chara_Worms idx 5 patrolling; collision
+    //         flips selfSwitch B to escalate the encounter
+    //   5   Battle armed — page 2 fires Troop 558 (Marshall, enemy 576 base
+    //         Worm/WormLeg) on contact; on win sets switch 451 `wormfootDead` ON
+    //   10  Stronger phase — a separate Map054 event fires Troop 559
+    //         (Marshall2, enemy 577 Worm/WormLeg_Attack3) — same post-battle
+    //         bookkeeping flips switch 451 ON, plus var 544 `bossesKilled` += 1
+    //
+    // switch 451 `wormfootDead` is the canonical "Marshall the worm has been
+    // killed" sentinel; once it's ON, Marshall ev41's defeated page wins
+    // (Chara_Worms idx 5 frozen) and the WormFoot battle ev30 is bypassed.
+    //
+    // We expose 4 picker states. The dialog-stage var 733 `MarshallStall` is
+    // left alone — the natural game leaves the bathroom stall talkable forever
+    // regardless of whether Marshall has mutated, and rewinding it would
+    // discard any wisdom-progression the player has banked. Var 544
+    // `bossesKilled` is also untouched — picking "Defeated" doesn't synthesize
+    // a kill credit since that var is shared across every boss in the game.
+    //
+    // Side-effect note: switch 422 (`FirstWormPartsSpawned`) is shared across
+    // Nestor's whole body-part fleet (head/hand/body/foot). Forcing it ON to
+    // expose Marshall also exposes any other body-part NPC whose own chase
+    // var (434/436/437) is already primed; conversely, clearing it for
+    // In Stall hides every body-part NPC (page conditions on head/hand/body
+    // worms also require sw 422 ON), effectively rewinding the post-Nestor
+    // worm-spawn beat. The alternative (ID-walking the fleet to leave 422
+    // alone) would either let other worms appear when picking In Stall or
+    // silently mis-gate them when picking Mutated, so the cheat keeps
+    // switch 422 in lock-step with Marshall's chosen state and documents
+    // the trade-off here.
+    const MARSHALL_VAR_FOOT_CHASE = 435;
+    const MARSHALL_SWITCH_PARTS_SPAWNED = 422;
+    const MARSHALL_SWITCH_FOOT_DEAD = 451;
+    const MARSHALL_FOOT_CHASE_INITIAL = 0;
+    const MARSHALL_FOOT_CHASE_BATTLE = 5;
+    const MARSHALL_FOOT_CHASE_STRONGER = 10;
+    const MARSHALL_STATES = [
+        // value: picker ordinal; footChase: var 435; partsSpawned: switch 422;
+        // footDead: switch 451.
+        { value: 0, label: 'In Stall',           footChase: MARSHALL_FOOT_CHASE_INITIAL,  partsSpawned: false, footDead: false },
+        { value: 1, label: 'Mutated',            footChase: MARSHALL_FOOT_CHASE_BATTLE,   partsSpawned: true,  footDead: false },
+        { value: 2, label: 'Mutated (Stronger)', footChase: MARSHALL_FOOT_CHASE_STRONGER, partsSpawned: true,  footDead: false },
+        { value: 3, label: 'Defeated',           footChase: MARSHALL_FOOT_CHASE_STRONGER, partsSpawned: true,  footDead: true  }
+    ];
+    const MARSHALL_OPTIONS = MARSHALL_STATES.map(s => ({ value: s.value, label: s.label }));
+
     // Fuzzy Quest — Joel's teddy bear (and the rat-child events that change
     // it). Seven weapon variants exist in $dataWeapons, all etypeId 1, all
     // exclusive to Joel (actor 4):
@@ -949,6 +1004,15 @@
           targetLabel: `var ${KEVIN_NESTOR_VAR} + Map${KEVIN_MAP_ID} ev${KEVIN_EVENT_ID} self-sw ${KEVIN_POST_SELFSW}`,
           readValue: () => readKevinQuestState(),
           applyValue: (v) => applyKevinQuestState(v) },
+        // Marshall questline — pre-mutation voice in the bathroom stall vs.
+        // foot-worm chase phases vs. defeated. See the MARSHALL_* constants
+        // block above.
+        { id: 'marshallQuest', label: 'Marshall Quest',       kind: 'variable', varId: MARSHALL_VAR_FOOT_CHASE,
+          options: MARSHALL_OPTIONS,
+          displayAs: 'switch',
+          targetLabel: `var ${MARSHALL_VAR_FOOT_CHASE} + switches ${MARSHALL_SWITCH_PARTS_SPAWNED}+${MARSHALL_SWITCH_FOOT_DEAD}`,
+          readValue: () => readMarshallQuestState(),
+          applyValue: (v) => applyMarshallQuestState(v) },
         // Fuzzy quest — pick which Fuzzy variant Joel wields (the rat-child
         // shred + apology + repair paths grant 7 different weapons). See
         // the FUZZY_* constants block above.
@@ -2184,6 +2248,78 @@
             return true;
         } catch (error) {
             CabbyCodes.error(`${LOG_PREFIX} Apply failed for Kevin Quest: ${error?.message || error}`);
+            return false;
+        } finally {
+            token.release();
+        }
+    }
+
+    // ---- Marshall Quest (bathroom-stall voice vs foot-worm chase phases) ----
+    //
+    // Read priority walks Defeated -> Stronger -> Mutated -> In Stall so a
+    // save mid-progression always lands on the highest-step state currently
+    // satisfied. switch 451 ON pins Defeated even if var 435 has been
+    // re-zeroed, since the natural game treats `wormfootDead` as terminal —
+    // Marshall ev41's defeated page wins regardless of var 435 once 451 is ON.
+    // Mutated states require switch 422 (parts spawned) AND var 435 at the
+    // chase-phase threshold; without 422 ON, Marshall ev41 has no matching
+    // page and the worm doesn't appear, so a non-zero var 435 with sw 422
+    // OFF reads as In Stall.
+
+    function readMarshallQuestState() {
+        if (readSwitch(MARSHALL_SWITCH_FOOT_DEAD)) {
+            return 3; // Defeated
+        }
+        if (readSwitch(MARSHALL_SWITCH_PARTS_SPAWNED)) {
+            const chase = readVar(MARSHALL_VAR_FOOT_CHASE);
+            if (chase >= MARSHALL_FOOT_CHASE_STRONGER) {
+                return 2; // Mutated (Stronger)
+            }
+            if (chase >= 4) {
+                return 1; // Mutated
+            }
+        }
+        return 0; // In Stall
+    }
+
+    function marshallQuestStateLabel(value) {
+        const s = MARSHALL_STATES.find(st => st.value === value);
+        return s ? s.label : String(value);
+    }
+
+    function applyMarshallQuestState(newValue) {
+        if (!isSessionReady()) {
+            return false;
+        }
+        const target = MARSHALL_STATES.find(s => s.value === newValue);
+        if (!target) {
+            return false;
+        }
+        const oldValue = readMarshallQuestState();
+        const api = CabbyCodes.freezeTime;
+        const token = (api && typeof api.exemptFromRestore === 'function')
+            ? api.exemptFromRestore({
+                variables: [MARSHALL_VAR_FOOT_CHASE],
+                switches: [
+                    MARSHALL_SWITCH_PARTS_SPAWNED,
+                    MARSHALL_SWITCH_FOOT_DEAD
+                ]
+            })
+            : { release: () => {} };
+        try {
+            $gameVariables.setValue(MARSHALL_VAR_FOOT_CHASE, target.footChase);
+            $gameSwitches.setValue(MARSHALL_SWITCH_PARTS_SPAWNED, target.partsSpawned);
+            $gameSwitches.setValue(MARSHALL_SWITCH_FOOT_DEAD, target.footDead);
+            // Refresh map so any sprite swap on Map054 takes effect
+            // immediately; events on other maps re-evaluate page conditions
+            // on next entry.
+            if (typeof $gameMap !== 'undefined' && $gameMap && typeof $gameMap.requestRefresh === 'function') {
+                $gameMap.requestRefresh();
+            }
+            CabbyCodes.warn(`${LOG_PREFIX} Marshall Quest: ${marshallQuestStateLabel(oldValue)} -> ${marshallQuestStateLabel(newValue)}. var ${MARSHALL_VAR_FOOT_CHASE}=${target.footChase}, sw ${MARSHALL_SWITCH_PARTS_SPAWNED}=${target.partsSpawned}, sw ${MARSHALL_SWITCH_FOOT_DEAD}=${target.footDead}.`);
+            return true;
+        } catch (error) {
+            CabbyCodes.error(`${LOG_PREFIX} Apply failed for Marshall Quest: ${error?.message || error}`);
             return false;
         } finally {
             token.release();
