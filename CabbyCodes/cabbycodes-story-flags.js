@@ -197,7 +197,6 @@
     ];
 
     const RECRUIT_FLAGS = [
-        { id: 'shadow',     label: 'Shadow',                kind: 'switch', switchId: 27 },
         { id: 'dan',        label: 'Dan',                   kind: 'switch', switchId: 32,  actorId: 6 },
         { id: 'joel',       label: 'Joel',                  kind: 'switch', switchId: 33,  actorId: 4 },
         { id: 'leigh',      label: 'Leigh',                 kind: 'switch', switchId: 34,  actorId: 5 },
@@ -475,10 +474,69 @@
     // progression — so the picker leaves them alone.
     const MW_VAR_SESSION = 701;
 
+    // The Masked Shadow questline. The "befriended" outcome was previously
+    // exposed as a Recruits toggle on switch 27 (`recruitedShadow`), but
+    // Shadow is not a normal recruit — it never joins the party, and the
+    // natural game only flips switch 27 ON inside Troop 18's bedroom-
+    // encounter "Can you behave?" branch, alongside switch 28 (`shadowGift`)
+    // and var 150 = 20. The canonical progression variable is var 150
+    // (`shadowState`); the supporting state lives in:
+    //   var 150 `shadowState`     — questline phase (0..8, then 10/20/999)
+    //   var 152 `shadowDispo`     — disposition counter (0..10+); newDay
+    //                               advances phase 7 -> 8 once dispo >= 10
+    //   switch 27  `recruitedShadow`
+    //   switch 28  `shadowGift`
+    //   switch 161 `shadowItemLeft` — gift parked outside Sam's apartment
+    //                                 (Map006 EV040 page 1) waiting to be
+    //                                 picked up
+    //
+    // Phase progression (verified against Troops.json troop 18 and
+    // CommonEvents.json CE 6 newDay + CE 54 MaskedShadowSpawn):
+    //   0   Not encountered yet
+    //   1   First encounter triggered (intro dialog), advances to 2 next day
+    //   2   Second encounter armed
+    //   3   Second encounter triggered, advances to 4 next day
+    //   4   Third encounter armed (Tongue gift dialog)
+    //   5   Third encounter triggered, advances to 6 next day
+    //   6   Fourth encounter armed (Shadow comes to the apartment door)
+    //   7   Apartment-visit phase: switch 161 ON, gift parked at door,
+    //       newDay bumps dispo +2 per day until dispo >= 10
+    //   8   Bedroom encounter armed (Troop 18's "fifth encounter" branch)
+    //   10  Bedroom encounter survived without befriending (the
+    //       "Get out of here." / "Leave me alone." outcomes)
+    //   20  Befriended — set by the "Can you behave?" sub-branch alongside
+    //       sw 27 ON, sw 28 ON, achievement Recruit_Shadow
+    //   999 Defeated — set by the overworld Shadow Man events (Map001 ev3
+    //       et al) on battle win against troop 18
+    //
+    // The picker exposes 8 stable waypoints. Phase 10 reads as "Bedroom
+    // Pending" since the natural game treats it as an end-state where
+    // Shadow stops appearing (no further Troop 18 / Shadow_Gifts branch
+    // matches), and the cheat user re-applying any state from there gets
+    // a clean restart.
+    const SHADOW_VAR_STATE = 150;
+    const SHADOW_VAR_DISPO = 152;
+    const SHADOW_SWITCH_RECRUITED = 27;
+    const SHADOW_SWITCH_GIFT = 28;
+    const SHADOW_SWITCH_ITEM_LEFT = 161;
+    const SHADOW_STATES = [
+        // value: picker ordinal; phase: var 150; dispo: var 152;
+        // recruited/gift/itemLeft: switches 27/28/161.
+        { value: 0, label: 'Not Started',         phase: 0,   dispo: 0,  recruited: false, gift: false, itemLeft: false },
+        { value: 1, label: 'After 1st Encounter', phase: 2,   dispo: 0,  recruited: false, gift: false, itemLeft: false },
+        { value: 2, label: 'After 2nd Encounter', phase: 4,   dispo: 0,  recruited: false, gift: false, itemLeft: false },
+        { value: 3, label: 'After 3rd Encounter', phase: 6,   dispo: 1,  recruited: false, gift: false, itemLeft: false },
+        { value: 4, label: 'Gift At Apartment',   phase: 7,   dispo: 5,  recruited: false, gift: false, itemLeft: true  },
+        { value: 5, label: 'Bedroom Pending',     phase: 8,   dispo: 10, recruited: false, gift: false, itemLeft: false },
+        { value: 6, label: 'Befriended',          phase: 20,  dispo: 10, recruited: true,  gift: true,  itemLeft: false },
+        { value: 7, label: 'Defeated',            phase: 999, dispo: 0,  recruited: false, gift: false, itemLeft: false }
+    ];
+    const SHADOW_OPTIONS = SHADOW_STATES.map(s => ({ value: s.value, label: s.label }));
+
     // Quest-state variables. Each entry needs a real understanding of what
     // the variable drives in-game; speculative entries on under-investigated
-    // variables previously lived here (Joel/Shadow/Papineau/Lyle/Nestor/
-    // Goth/WarBomb/RatHole/RatInteract/ErnestTimes/SpiderHusk/Sybil/Dan)
+    // variables previously lived here (Joel/Papineau/Lyle/Nestor/Goth/
+    // WarBomb/RatHole/RatInteract/ErnestTimes/SpiderHusk/Sybil/Dan)
     // and were removed because their semantics weren't load-bearing for
     // any actual cheat workflow. Add new entries here only when there's a
     // verified mapping from option values to in-game state.
@@ -529,6 +587,13 @@
           targetLabel: `vars ${JUICEBOX_VAR_CARDTRICK}+${JUICEBOX_VAR_TALK}`,
           readValue: () => readJuiceboxQuestState(),
           applyValue: (v) => applyJuiceboxQuestState(v) },
+        // The Masked Shadow questline. See the SHADOW_* constants block above.
+        { id: 'shadowQuest',   label: 'Shadow Quest',         kind: 'variable', varId: SHADOW_VAR_STATE,
+          options: SHADOW_OPTIONS,
+          displayAs: 'switch',
+          targetLabel: `vars ${SHADOW_VAR_STATE}+${SHADOW_VAR_DISPO} + switches ${SHADOW_SWITCH_RECRUITED}+${SHADOW_SWITCH_GIFT}+${SHADOW_SWITCH_ITEM_LEFT}`,
+          readValue: () => readShadowQuestState(),
+          applyValue: (v) => applyShadowQuestState(v) },
         // Lyle's Mazes and Wizards campaign — sessions completed (var 701).
         // Each session is a distinct adventure; 6 = wrap-up.
         { id: 'mazesWizardsQuest', label: 'Mazes and Wizards', kind: 'variable', varId: MW_VAR_SESSION,
@@ -1339,6 +1404,66 @@
             return true;
         } catch (error) {
             CabbyCodes.error(`${LOG_PREFIX} Apply failed for Plant Quest: ${error?.message || error}`);
+            return false;
+        } finally {
+            token.release();
+        }
+    }
+
+    // ---- Shadow Quest (canonical phase var + 3 supporting switches) ----
+    //
+    // Read priority is exact phase match for the two terminal outcomes
+    // (999 Defeated, 20 / sw27 ON Befriended) so a save that has been
+    // resolved one way reads correctly. Otherwise the natural progression
+    // collapses each transient odd value onto its preceding even waypoint
+    // (e.g. phase 1 reads as "After 1st Encounter" because newDay will
+    // tick it to 2 anyway). Phase 10 (escaped from the bedroom) folds
+    // into Bedroom Pending — the cheat user can re-pick Befriended or
+    // Defeated to resolve it cleanly.
+
+    function readShadowQuestState() {
+        const phase = readVar(SHADOW_VAR_STATE);
+        if (phase === 999) return 7;                                          // Defeated
+        if (readSwitch(SHADOW_SWITCH_RECRUITED) || phase === 20) return 6;    // Befriended
+        if (phase >= 8) return 5;                                             // Bedroom Pending (covers 8, 10..19)
+        if (phase >= 7 || readSwitch(SHADOW_SWITCH_ITEM_LEFT)) return 4;      // Gift At Apartment
+        if (phase >= 5) return 3;                                             // After 3rd Encounter (covers 5, 6)
+        if (phase >= 3) return 2;                                             // After 2nd Encounter (covers 3, 4)
+        if (phase >= 1) return 1;                                             // After 1st Encounter (covers 1, 2)
+        return 0;                                                              // Not Started
+    }
+
+    function shadowQuestStateLabel(value) {
+        const s = SHADOW_STATES.find(st => st.value === value);
+        return s ? s.label : String(value);
+    }
+
+    function applyShadowQuestState(newValue) {
+        if (!isSessionReady()) {
+            return false;
+        }
+        const target = SHADOW_STATES.find(s => s.value === newValue);
+        if (!target) {
+            return false;
+        }
+        const oldValue = readShadowQuestState();
+        const api = CabbyCodes.freezeTime;
+        const token = (api && typeof api.exemptFromRestore === 'function')
+            ? api.exemptFromRestore({
+                variables: [SHADOW_VAR_STATE, SHADOW_VAR_DISPO],
+                switches: [SHADOW_SWITCH_RECRUITED, SHADOW_SWITCH_GIFT, SHADOW_SWITCH_ITEM_LEFT]
+            })
+            : { release: () => {} };
+        try {
+            $gameVariables.setValue(SHADOW_VAR_STATE, target.phase);
+            $gameVariables.setValue(SHADOW_VAR_DISPO, target.dispo);
+            $gameSwitches.setValue(SHADOW_SWITCH_RECRUITED, target.recruited);
+            $gameSwitches.setValue(SHADOW_SWITCH_GIFT, target.gift);
+            $gameSwitches.setValue(SHADOW_SWITCH_ITEM_LEFT, target.itemLeft);
+            CabbyCodes.warn(`${LOG_PREFIX} Shadow Quest: ${shadowQuestStateLabel(oldValue)} -> ${shadowQuestStateLabel(newValue)}. var ${SHADOW_VAR_STATE}=${target.phase}, var ${SHADOW_VAR_DISPO}=${target.dispo}, sw ${SHADOW_SWITCH_RECRUITED}=${target.recruited}, sw ${SHADOW_SWITCH_GIFT}=${target.gift}, sw ${SHADOW_SWITCH_ITEM_LEFT}=${target.itemLeft}.`);
+            return true;
+        } catch (error) {
+            CabbyCodes.error(`${LOG_PREFIX} Apply failed for Shadow Quest: ${error?.message || error}`);
             return false;
         } finally {
             token.release();

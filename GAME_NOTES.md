@@ -129,7 +129,6 @@ at `Map003.json:23690+` which labels each branch by character name.
 
 | Switch ID | Name | Actor ID | Notes |
 | --- | --- | --- | --- |
-| 27  | `recruitedShadow`     | (none)        | Shadow is summoned, not a normal party actor |
 | 32  | `recruitedDan`        | 6             | Dev menu confirms `"Recruit Dan"` → switch 32 |
 | 33  | `recruitedJoel`       | 4             | High-traffic flag; gated by lots of dialogue |
 | 34  | `recruitedLeigh`      | 5             | Dev menu confirms `"Recruit Leigh"` → switch 34 |
@@ -204,6 +203,45 @@ directly so toggles take effect without the player walking back home.
 baby→adult transition. The cheat intentionally does NOT touch var 37:
 the natural game has no inverse and toggling Adult→Off→Adult would
 double-count.
+
+### Masked Shadow questline (var 150 + 152, switches 27 + 28 + 161)
+
+Shadow is **not a recruit** — it never joins the party. The questline
+is a sequence of haunting encounters culminating in either a befriended
+NPC, a survived-but-evicted state, or an overworld battle defeat. The
+Story Flags cheat exposes it under **Quest States → Shadow Quest**, not
+Recruits.
+
+- `shadowState` (var 150) is the canonical phase variable. Even values
+  (0/2/4/6/8) are stable post-encounter waypoints; odd values (1/3/5/7)
+  are mid-encounter transients that CE 6 `newDay` advances to the next
+  even value (phase 7 → 8 only when `shadowDispo` ≥ 10). Terminal
+  values: `20` (befriended via the bedroom-encounter "Can you behave?"
+  branch), `999` (defeated by the overworld Shadow Man events on every
+  outdoor map — Map001 ev3 et al, troop 18 win branch).
+- `shadowDispo` (var 152) is the disposition counter. Bumped by Troop
+  18's friendly dialog choices and the food-offering branch, decremented
+  by hostile choices. Required ≥ 10 to advance phase 7 → 8.
+- `shadowItemLeft` (switch 161) ON during phase 7 means a gift is parked
+  outside Sam's apartment door — Map006 EV040 pages 3-7 read `var 155
+  shadowChosenGift` to render which item (knife / tonic / wallet / rose)
+  and turn 161 OFF on pickup.
+- `recruitedShadow` (switch 27) + `shadowGift` (switch 28) flip ON
+  together inside the Troop 18 fifth-encounter "Can you behave?" branch
+  alongside `var 150 = 20`. Switch 27 is read by CE 96
+  `ratFriendInteraction`, CE 162-165 dialog tables, and CE 234
+  `ClownNightmare` for "the player has befriended the masked thing"
+  branching; CE 6 `newDay` (line 347) re-asserts switch 28 daily while
+  switch 27 is ON.
+- `spawnShadow` (switch 80) gates CE 54 `MaskedShadowSpawn`'s per-room
+  spawn roll; spawn chance scales by `shadowState` (10/20/15/15/100/100%
+  at phases 0/1/2/4/6/8 respectively). The Shadow Quest cheat does NOT
+  touch switch 80 — natural day-cycle parallels manage it.
+- The dev "Recruit ALL" menu in `Map003.json` event 28 sets switch 27
+  alone; the matching Map003 event 51 `Shadow_Gifts` requires switch 27
+  + switch 28 + var 150 == 8, a combination the natural game never lands
+  on (the bedroom-befriend path lands at var 150 == 20). The cheat lands
+  on the natural value (20) and skips the dev-menu shortcut.
 
 ---
 
