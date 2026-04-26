@@ -23,8 +23,7 @@ repo-root/
 │   ├── cabbycodes-settings.js    # Options-menu integration, slider/number UI
 │   ├── cabbycodes-book-ui.js     # Shared drawing helpers for "book" windows
 │   └── cabbycodes-<feature>.js   # One file per gameplay toggle / action
-├── CommonEvents.json             # Reference dump of the game's common events
-├── game_files/                   # Vanilla reference copies for diffing
+├── game_files/                   # Vanilla game-data mirror (gitignored, refreshed via /refresh-game-files)
 ├── scripts/                      # Node / Python helpers for data digs
 ├── Makefile                      # Windows-centric build / deploy (cmd + PowerShell)
 ├── README.md                     # Player-facing install guide
@@ -159,17 +158,16 @@ Feature categories currently shipped:
 
 ## 6. Data / tooling
 
-### 6.1 `CommonEvents.json` & `game_files/`
+### 6.1 `game_files/` reference mirror
 
-- `CommonEvents.json` at the repo root is the modded / annotated version used for reference while developing time-freeze rules.
-- `game_files/CommonEvents.json` is a pristine copy. `scripts/compare-common-events.py` diffs the two to show which events diverge.
-- Both files are ~10–20 MB apiece. Keeping them in git has real repo-size cost (see `IMPROVEMENTS.md`).
+- `game_files/` is a vanilla mirror of the relevant subset of the installed game (`data/`, `js/`, etc.). It is `.gitignore`d and never shipped — populate it locally via `/refresh-game-files` (or `node scripts/refresh-game-files.js`).
+- Treat it as read-only reference. Anything CabbyCodes needs to "know" about specific common events, switches, or variables is cited from feature files by `(id, name)` and indexed in `GAME_NOTES.md §5`.
+- A previous workflow checked in a 20-MB `CommonEvents.json` at the repo root as an "annotated" copy. That file was removed: 12 of its annotations were navigation labels (preserved in `GAME_NOTES.md §5.1`), and the rest was a stale duplicate of pristine data. To compare the current pristine against an older snapshot, refresh `game_files/` and `git diff` whatever local snapshot you keep — there is no in-repo diff tool today.
 
 ### 6.2 Node / Python helper scripts (`scripts/`)
 
 All one-off CLI tools that dig through the game's `data/` folder. They all read from the hard-coded absolute path `C:/Program Files (x86)/Steam/steamapps/common/Look Outside/data/...`. Portable alternatives would need a flag or env var.
 
-- `compare-common-events.py` — BOM-aware JSON diff of common events.
 - `dump-map-event.js` — dumps a specific page of a specific map event.
 - `find-common-event-usage.js` — finds `code:117` references to a common-event id on a map.
 - `find-common-time-writers.js` — finds `code:122` (Control Variables) writers to time variables within common events.

@@ -1,5 +1,5 @@
 const path = require('path');
-const data = require(path.join(__dirname, '..', 'game_files', 'CommonEvents.json'));
+const data = require(path.join(__dirname, '..', 'game_files', 'data', 'CommonEvents.json'));
 const label = 'endCraft';
 const targetEvents = new Set([42, 44, 45]);
 let found = false;

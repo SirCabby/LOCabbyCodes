@@ -247,6 +247,11 @@ Recruits.
 
 ## 5. Common events (`data/CommonEvents.json`, 301 entries)
 
+The pristine source lives at `game_files/data/CommonEvents.json` (gitignored;
+populated by `/refresh-game-files`). Inline references throughout the
+`CabbyCodes/cabbycodes-*.js` modules cite events by `(id, name)` so they
+remain valid as long as the game's event IDs do not shift.
+
 Hot parallels you will see patched or referenced by CabbyCodes:
 
 | ID | Name | Trigger | Switch | Notes |
@@ -263,6 +268,38 @@ Hot parallels you will see patched or referenced by CabbyCodes:
 | 21–39 | `game:<TitleName>` | Call | — | Per-cartridge videogame logic |
 
 IDs beyond 40 are story / mission scripts. Treat them as read-only references.
+
+### 5.1 Navigation hints for dense events
+
+A handful of common events are large dispatch / news structures with many
+nested conditional branches. The labels below were transcribed from a
+modder's annotated working copy of the file (now removed from the repo to
+avoid shipping derived game data). They name what each branch is *about*,
+so when you grep through the pristine `game_files/data/CommonEvents.json`
+you can quickly orient inside the event.
+
+**CE 154 `neighborYournews_Story`** — Sybil's "did you hear?" gossip
+dispatcher. Branches in source order:
+
+- `Electrophage` — boss-killed gossip
+- `Slime King` — boss-killed gossip
+- `Recruited Lyle`
+- `Recruited Aster`
+- `Recruited Rat` (Rat Child)
+- `Recruited Wretch`
+- `Recruited Big` (Charan; the Sybil narration line follows immediately)
+- `Recruited Kind`
+- `Recruited Melt`
+- `Recruited Spider`
+- `Recruited Shadow`
+
+To find a branch in pristine, grep for the matching `recruited*` switch or
+`*Dead` flag (e.g. `recruitedLyle`, `permaSlimeKing`).
+
+**CE 163 `DT_OnePerson|201-300`** — door-talk dispatcher (visitor IDs
+201–300). Branches in source order include a section labelled
+**`Philippe Events`** (gated on switch `379`); the rest of the event is
+self-describing per-visitor.
 
 ---
 

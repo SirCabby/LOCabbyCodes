@@ -89,14 +89,14 @@ Then **add the filename to the `scripts` array in `CabbyCodes.js`** — the load
 
 ## Reference data
 
-- `CommonEvents.json` at the repo root is the *annotated/modded* reference; `game_files/CommonEvents.json` is pristine. `scripts/compare-common-events.py` diffs them.
-- `game_files/` is gitignored and refreshed by `/refresh-game-files`. Do not edit it, do not commit it.
+- The pristine game data lives under `game_files/` (gitignored; refreshed by `/refresh-game-files`). Common events specifically are at `game_files/data/CommonEvents.json`. Do not edit, do not commit, do not duplicate into the repo root.
+- Inline references to common events from `CabbyCodes/cabbycodes-*.js` cite events by `(id, name)` so they remain valid against any locally-refreshed pristine copy. `GAME_NOTES.md §5` has the hot-event table and §5.1 the navigation-hint labels for the few large dispatch events.
 - `scripts/` holds one-off Node/Python tools that hard-code the Steam install path — update the path at the top of the script, not inline.
 
 ## Editing etiquette
 
 - Do not introduce new runtime dependencies or a build step.
-- Do not modify `game_files/` or the root `CommonEvents.json` without a clear reason documented in the commit.
+- Do not modify or commit `game_files/` — it is a pristine reference mirror, not a source.
 - When patching a method another module already patches, use `CabbyCodes.callOriginal` (not `_cabbycodesOriginals?.fn`) to preserve the chain.
 - Keep commits scoped to one feature file where possible. No tests exist — changes must be readable and defensive on their own.
 - **Keep the README's "Current Features" list in sync.** Any change that adds, removes, or renames a player-facing setting registered via `CabbyCodes.registerSetting` must also update the matching bullet in `README.md`. If you change a feature's behavior enough that the existing blurb is misleading, rewrite the blurb in the same commit. Support-only modules (`book-ui`, `item-editor`, `oven-navigation`, `version-display`, `time-advance-logger`, core/patches/settings/logger/session-state/debug) do not get README entries.

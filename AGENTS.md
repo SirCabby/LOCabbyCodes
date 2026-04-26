@@ -86,7 +86,7 @@ Guidelines for AI coding assistants (and human contributors) working in this rep
   - `CabbyCodes.version = '...'` in `cabbycodes-core.js`,
   - the "Current Version" line in `README.md`.
 - Always bump the version before building a distribution zip with `make package`.
-- Packaging includes the loader, the `CabbyCodes/` folder, `README.md`, and `LICENSE`. It does **not** include `VERSION`, `CommonEvents.json`, `game_files/`, `scripts/`, or the Makefile.
+- Packaging includes the loader, the `CabbyCodes/` folder, `README.md`, and `LICENSE`. It does **not** include `VERSION`, `game_files/`, `scripts/`, or the Makefile.
 
 ## 11. Deploy / run rules
 
@@ -97,8 +97,7 @@ Guidelines for AI coding assistants (and human contributors) working in this rep
 ## 12. Editing etiquette for AI agents
 
 - Do not introduce new runtime dependencies. The repo intentionally has no `package.json`, `npm install`, `eslint`, or build chain.
-- Do not modify `game_files/` — it is a pristine reference mirror.
-- Do not touch `CommonEvents.json` at the repo root unless you are updating the annotated reference (document any change in the commit message).
+- Do not modify or commit `game_files/` — it is a pristine reference mirror, populated by `/refresh-game-files`. Do not re-introduce a checked-in copy of `CommonEvents.json` (or any other game-data file) at the repo root; cite events from feature files by `(id, name)` and put navigation hints for dense events in `GAME_NOTES.md §5.1`.
 - When adding helper scripts under `scripts/`, mirror the existing style: tiny Node or Python CLI, documented usage in a leading comment, path to the game install configurable at the top.
 - Prefer small, reviewable commits that touch one feature file at a time. Tests do not exist; your changes must be readable and defensive enough to merge without one.
 - When in doubt about whether something is the "true original" vs. a wrapper, read `cabbycodes-patches.js` before writing more patches. Several subtle bugs listed in `IMPROVEMENTS.md` come from assuming otherwise.

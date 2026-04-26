@@ -201,14 +201,9 @@ Battle sprites are hot-path territory. Without reading the whole file, the risk 
 
 ## F. Tooling & repo hygiene
 
-### F1. `CommonEvents.json` (20 MB) and `game_files/CommonEvents.json` (10 MB) are in git — **high**
+### F1. ~~`CommonEvents.json` (20 MB) and `game_files/CommonEvents.json` (10 MB) are in git~~ — **resolved**
 
-This is proprietary game data and also bloats every clone. At the current size, `git clone` transfers ≈ 30 MB of JSON alone.
-
-**Fix options:**
-- Move to Git LFS.
-- Exclude both from the repo and document their origin in `ARCHITECTURE.md` + a `scripts/dump-common-events.js` helper that extracts them from the local install.
-- At minimum, store them in a `reference/` folder that is `.gitignore`d, with a README that points to where to obtain them.
+The root `CommonEvents.json` (a one-commit, never-updated 20 MB modder snapshot) was removed; pristine game data has always been gitignored at `game_files/` and is populated locally via `/refresh-game-files`. The 12 hand-added navigation labels worth keeping moved to `GAME_NOTES.md §5.1`. See `ARCHITECTURE.md §6.1` for the new policy: do not re-check-in derived game data.
 
 Relatedly: `log.txt` in the repo root looks like a stray artifact; confirm it's intentional or add to `.gitignore`.
 
@@ -270,7 +265,7 @@ The `onActivate` hook is used by cookbook, recipe-book, refill-status, max-cooki
 
 ### H2. Common Events reference is out of date — **medium**
 
-The freeze-time module references dozens of common event IDs with inline comments. There's no single table of "Event N = X" for future contributors. Generate one from `game_files/CommonEvents.json` via a new `scripts/dump-common-events-index.js` and check in a terse Markdown table.
+The freeze-time module references dozens of common event IDs with inline comments. `GAME_NOTES.md §5` has a partial table of hot events; the rest could be auto-generated from `game_files/data/CommonEvents.json` via a new `scripts/dump-common-events-index.js` and merged into that section.
 
 ---
 
@@ -279,7 +274,7 @@ The freeze-time module references dozens of common event IDs with inline comment
 1. Fix A1 + A2 together (patch-chain correctness) — unlocks safe sharing of the hook points.
 2. Sweep A3 (replace hand-rolled `callOriginal` calls) now that the chain is trustworthy.
 3. Performance pass: B1 (async logging) + B2 (optional debug wrap) — measurable frame-time gains.
-4. Repo hygiene: F1 (pull the large JSON out of git) + F6 (eslint).
+4. Repo hygiene: F6 (eslint). (F1 — large JSON out of git — is now resolved.)
 5. Nice-to-have: F3 (cross-platform deploy), H2 (common-events index).
 
 Each is isolated enough to ship on its own, and together they materially reduce the risk of adding new cheats without breaking existing ones.
