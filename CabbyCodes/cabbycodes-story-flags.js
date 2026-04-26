@@ -733,6 +733,71 @@
     ];
     const CHARAN_OPTIONS = CHARAN_STATES.map(s => ({ value: s.value, label: s.label }));
 
+    // Kevin questline (basement-worm Worm-Egg trader). Kevin lives at
+    // Map094 ev43 (`footwormGrpBa`) and trades through Troop 560 — when
+    // the player walks onto the event the troop's friendly-encounter
+    // page hands out Worm Juice / Worm-Baked Pie / Worm-O'-Nine-Tails /
+    // Wormskin Robe / Worm Crown in exchange for Worm Eggs (item 382).
+    // The cheat does NOT track which trades have happened or grant any
+    // of the reward items — those are inventory state the player can
+    // grant directly via the item-editor cheat. This entry exists only
+    // to make Kevin REACHABLE without grinding the prerequisite Nestor
+    // questline.
+    //
+    // Natural appearance gate (Map094 ev43 page 0):
+    //   • var 437 (`nestorBodyState`) >= 12, AND
+    //   • self-switch C on the same event is OFF (page 1 takes over once
+    //     C is ON and renders an empty post-encounter sprite).
+    //
+    // Var 437 is the Nestor-questline state machine. Worm body-part
+    // events scattered across many maps (Map007/009/012/013/026/027/047/
+    // 054/092/094/104/131/132/338) write 1..5 / 10 as the player whittles
+    // down Nestor's anatomy; CE 6 newDay then increments the var by 1
+    // each day while sw 448 (`wormBodyDead`) is OFF, walking it past
+    // 10 -> 11 (foot-worm groups in Map013 + Map092 begin spawning) ->
+    // 12 (Kevin's group becomes active in Map094). So var 437 == 12
+    // represents "Nestor questline reached the body-part trickle phase
+    // plus 2 in-game days of newDay ticks". There is no Kevin-specific
+    // gate that doesn't also bump nestorBodyState — bumping the var
+    // unavoidably touches the rest of the Nestor questline by however
+    // many days are still missing, so the cheat does the smallest
+    // possible bump (exactly to 12) and documents the trade-off.
+    //
+    // The picker is a 2-state Off / On toggle:
+    //   Not Available -> if var 437 >= 12, clamp it back down to 11
+    //                    (preserves the foot-worm threshold while
+    //                    closing Kevin's gate). Self-switch C on the
+    //                    Map094 event is left alone so a player who
+    //                    organically engaged Kevin keeps that state.
+    //   Available     -> var 437 = max(current, 12); the Map094 ev43
+    //                    self-switch C is cleared so any prior post-
+    //                    encounter state on the event flips back to
+    //                    page 0 (the friendly-encounter trigger).
+    //                    $gameMap.requestRefresh() runs at the end so
+    //                    the sprite swap is visible immediately if the
+    //                    player is currently on Map094.
+    //
+    // Var 735 (`WormDeal`) — the orthogonal "long-term coexistence"
+    // deal outcome — is intentionally not managed: the natural game
+    // grants the `Misc_WormyDeal` achievement via a setAchievement
+    // script call inside Troop 560's deal sub-menu, so writing var 735
+    // alone would not award the achievement. Var 734 (`WormKevin`,
+    // trade-tier high-water mark) and switches 961/962 (`wormBoughtRobe`
+    // / `wormBoughtCrown`, "already bought" hide-gates on the trade
+    // menu) are similarly untouched — once Kevin is reachable the
+    // player handles trades naturally through the in-game menu.
+    const KEVIN_NESTOR_VAR = 437;
+    const KEVIN_NESTOR_THRESHOLD = 12;
+    const KEVIN_NESTOR_PRE_GATE = 11;
+    const KEVIN_MAP_ID = 94;
+    const KEVIN_EVENT_ID = 43;
+    const KEVIN_POST_SELFSW = 'C';
+    const KEVIN_STATES = [
+        { value: 0, label: 'Not Available' },
+        { value: 1, label: 'Available'     }
+    ];
+    const KEVIN_OPTIONS = KEVIN_STATES.map(s => ({ value: s.value, label: s.label }));
+
     // Quest-state variables. Each entry needs a real understanding of what
     // the variable drives in-game; speculative entries on under-investigated
     // variables previously lived here (Joel/Papineau/Lyle/Nestor/Goth/
@@ -811,6 +876,14 @@
           targetLabel: `var ${CHARAN_VAR_DISPO} + switches ${CHARAN_SWITCH_LEAVE_EARLY}+${CHARAN_SWITCH_SHOOK_HAND}+${CHARAN_SWITCH_MENTIONED_LOVE}+${CHARAN_SWITCH_GAVE_ROSE}+${CHARAN_SWITCH_SWORD_GIFT}`,
           readValue: () => readCharanQuestState(),
           applyValue: (v) => applyCharanQuestState(v) },
+        // Kevin questline — basement-worm trade availability. See the
+        // KEVIN_* constants block above.
+        { id: 'kevinQuest',    label: 'Kevin Quest',          kind: 'variable', varId: KEVIN_NESTOR_VAR,
+          options: KEVIN_OPTIONS,
+          displayAs: 'switch',
+          targetLabel: `var ${KEVIN_NESTOR_VAR} + Map${KEVIN_MAP_ID} ev${KEVIN_EVENT_ID} self-sw ${KEVIN_POST_SELFSW}`,
+          readValue: () => readKevinQuestState(),
+          applyValue: (v) => applyKevinQuestState(v) },
         // Lyle's Mazes and Wizards campaign — sessions completed (var 701).
         // Each session is a distinct adventure; 6 = wrap-up.
         { id: 'mazesWizardsQuest', label: 'Mazes and Wizards', kind: 'variable', varId: MW_VAR_SESSION,
@@ -1932,6 +2005,111 @@
             return true;
         } catch (error) {
             CabbyCodes.error(`${LOG_PREFIX} Apply failed for Charan Quest: ${error?.message || error}`);
+            return false;
+        } finally {
+            token.release();
+        }
+    }
+
+    // ---- Kevin Quest (basement-worm trade availability) ----
+    //
+    // The natural game gates Kevin's appearance behind two conditions
+    // on Map094 ev43 page 0: var 437 (`nestorBodyState`) >= 12 AND the
+    // event's self-switch C is OFF. The cheat exposes a 2-state toggle
+    // that flips both into a Kevin-reachable configuration without
+    // exposing trade tiers — reward items (Worm Juice / Pie / Nine-
+    // Tails / Robe / Crown) are inventory state the player can grant
+    // directly via the item-editor cheat once Kevin is reachable.
+    //
+    // Read returns "Available" only if the natural appearance gate is
+    // satisfied right now (var >= 12 AND selfSw C OFF). The post-fight
+    // dead-state (selfSw C ON) reads as "Not Available" since Kevin's
+    // event is no longer interactable in that state regardless of var
+    // 437. If $gameSelfSwitches isn't loaded yet (pre-save state) the
+    // helper returns false, so a Title-screen read is harmless.
+
+    function readKevinSelfSwitchC() {
+        if (typeof $gameSelfSwitches === 'undefined' || !$gameSelfSwitches) {
+            return false;
+        }
+        try {
+            return Boolean($gameSelfSwitches.value([KEVIN_MAP_ID, KEVIN_EVENT_ID, KEVIN_POST_SELFSW]));
+        } catch (error) {
+            return false;
+        }
+    }
+
+    function readKevinQuestState() {
+        if (readVar(KEVIN_NESTOR_VAR) >= KEVIN_NESTOR_THRESHOLD && !readKevinSelfSwitchC()) {
+            return 1; // Available
+        }
+        return 0;     // Not Available
+    }
+
+    function kevinQuestStateLabel(value) {
+        const s = KEVIN_STATES.find(st => st.value === value);
+        return s ? s.label : String(value);
+    }
+
+    function applyKevinQuestState(newValue) {
+        if (!isSessionReady()) {
+            return false;
+        }
+        const target = KEVIN_STATES.find(s => s.value === newValue);
+        if (!target) {
+            return false;
+        }
+        const oldValue = readKevinQuestState();
+        const wantAvailable = newValue === 1;
+        const api = CabbyCodes.freezeTime;
+        const token = (api && typeof api.exemptFromRestore === 'function')
+            ? api.exemptFromRestore({ variables: [KEVIN_NESTOR_VAR] })
+            : { release: () => {} };
+        try {
+            const curVar = readVar(KEVIN_NESTOR_VAR);
+            let varNote;
+            if (wantAvailable) {
+                if (curVar < KEVIN_NESTOR_THRESHOLD) {
+                    $gameVariables.setValue(KEVIN_NESTOR_VAR, KEVIN_NESTOR_THRESHOLD);
+                    varNote = `var ${KEVIN_NESTOR_VAR}=${KEVIN_NESTOR_THRESHOLD} (was ${curVar})`;
+                } else {
+                    varNote = `var ${KEVIN_NESTOR_VAR}=${curVar} (already at gate)`;
+                }
+            } else if (curVar >= KEVIN_NESTOR_THRESHOLD) {
+                $gameVariables.setValue(KEVIN_NESTOR_VAR, KEVIN_NESTOR_PRE_GATE);
+                varNote = `var ${KEVIN_NESTOR_VAR}=${KEVIN_NESTOR_PRE_GATE} (was ${curVar})`;
+            } else {
+                varNote = `var ${KEVIN_NESTOR_VAR}=${curVar} (already below gate)`;
+            }
+            // Self-switch C is only flipped on Available so any prior
+            // post-encounter / dead-state on the event re-opens. Not
+            // Available leaves it alone — clearing it could revive a
+            // Kevin the player has organically engaged, while setting
+            // it ON would permanently mark him as fought.
+            let selfNote = `sw${KEVIN_MAP_ID}/${KEVIN_EVENT_ID}/${KEVIN_POST_SELFSW} unchanged`;
+            if (wantAvailable && typeof $gameSelfSwitches !== 'undefined' && $gameSelfSwitches) {
+                try {
+                    if (readKevinSelfSwitchC()) {
+                        $gameSelfSwitches.setValue([KEVIN_MAP_ID, KEVIN_EVENT_ID, KEVIN_POST_SELFSW], false);
+                        selfNote = `sw${KEVIN_MAP_ID}/${KEVIN_EVENT_ID}/${KEVIN_POST_SELFSW} cleared`;
+                    } else {
+                        selfNote = `sw${KEVIN_MAP_ID}/${KEVIN_EVENT_ID}/${KEVIN_POST_SELFSW} already off`;
+                    }
+                } catch (error) {
+                    CabbyCodes.warn(`${LOG_PREFIX} Self-switch clear failed for Kevin: ${error?.message || error}`);
+                    selfNote = `sw${KEVIN_MAP_ID}/${KEVIN_EVENT_ID}/${KEVIN_POST_SELFSW} err`;
+                }
+            }
+            // Refresh map so any sprite swap on Map094 takes effect
+            // immediately; events on other maps re-evaluate page
+            // conditions on next entry.
+            if (typeof $gameMap !== 'undefined' && $gameMap && typeof $gameMap.requestRefresh === 'function') {
+                $gameMap.requestRefresh();
+            }
+            CabbyCodes.warn(`${LOG_PREFIX} Kevin Quest: ${kevinQuestStateLabel(oldValue)} -> ${kevinQuestStateLabel(newValue)}. ${varNote}, ${selfNote}.`);
+            return true;
+        } catch (error) {
+            CabbyCodes.error(`${LOG_PREFIX} Apply failed for Kevin Quest: ${error?.message || error}`);
             return false;
         } finally {
             token.release();
