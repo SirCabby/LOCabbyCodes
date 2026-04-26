@@ -72,6 +72,7 @@
             'cabbycodes-story-flags.js',
             'cabbycodes-video-games.js',
             'cabbycodes-sewer-kids.js',
+            'cabbycodes-character-name.js',
             'cabbycodes-fast-credits.js'
         ];
         
