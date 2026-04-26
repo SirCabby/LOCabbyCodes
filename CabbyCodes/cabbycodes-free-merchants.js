@@ -7,9 +7,10 @@
  * @author CabbyCodes
  * @help
  * Adds an Options menu toggle that drops the price of every merchant item to
- * zero. When enabled, standard shop interfaces display a cost of 0 and the
+ * zero. When enabled, standard shop interfaces display a cost of 0, the
  * custom event-driven "BuyItemTable" purchase flow (Eugene's shop) no longer
- * deducts gold on the Buy choice.
+ * deducts gold on the Buy choice, and Mutt's special-inventory shop on
+ * Map056 (which prices via common event 291 / var 7) is also free.
  */
 
 (() => {
@@ -68,6 +69,15 @@
     const BUY_ITEM_TABLE_CE = 46;
     const PRICE_VARIABLE_ID = 487;
 
+    // Mutt's special shop (Map056) builds its own dialog/choice flow per
+    // shelf: the parent event sets var 7 to the base price, calls common
+    // event 291 (MuttSpecialPrice) to apply HARDMODE/repeat-buy/haggle
+    // multipliers, then renders "$\V[7]" and runs command125 [1, 1, 7]
+    // to deduct gold. Zeroing var 7 inside CE 291 makes both the dialog
+    // and the deduction read 0.
+    const MUTT_SPECIAL_PRICE_CE = 291;
+    const MUTT_PRICE_VARIABLE_ID = 7;
+
     CabbyCodes.override(
         Game_Interpreter.prototype,
         'command117',
@@ -79,15 +89,22 @@
                 if (ceId === BUY_ITEM_TABLE_CE || this._cabbycodesInBuyItemTable) {
                     this._childInterpreter._cabbycodesInBuyItemTable = true;
                 }
+                if (ceId === MUTT_SPECIAL_PRICE_CE) {
+                    this._childInterpreter._cabbycodesInMuttSpecialPrice = true;
+                }
             }
 
             return result;
         }
     );
 
-    // Zero out var 487 after any command122 write that touches it while
-    // BuyItemTable is running. Makes the displayed price read "$0" and
-    // keeps the haggle math consistent (any discount of 0% * 0 is still 0).
+    // Zero out the active shop's price variable after every command122
+    // while a relevant pricing CE is running. Eugene's flow only writes
+    // var 487 via command122, so range-checking is enough. Mutt's CE 291
+    // writes var 7 once via command122 (the HARDMODE +20) and then via
+    // script-eval (multiplications) — forcing var 7 = 0 after every
+    // command122 makes the subsequent `var7 * X` evals stay at 0, and
+    // Math.floor(0) = 0 so the final value sticks.
     CabbyCodes.override(
         Game_Interpreter.prototype,
         'command122',
@@ -96,20 +113,25 @@
 
             if (
                 isFeatureEnabled() &&
-                this._cabbycodesInBuyItemTable &&
-                Array.isArray(params)
+                Array.isArray(params) &&
+                typeof $gameVariables !== 'undefined' &&
+                $gameVariables
             ) {
-                const startId = Number(params[0]);
-                const endId = Number(params[1]);
-                if (
-                    Number.isFinite(startId) &&
-                    Number.isFinite(endId) &&
-                    startId <= PRICE_VARIABLE_ID &&
-                    PRICE_VARIABLE_ID <= endId &&
-                    typeof $gameVariables !== 'undefined' &&
-                    $gameVariables
-                ) {
-                    $gameVariables.setValue(PRICE_VARIABLE_ID, 0);
+                if (this._cabbycodesInBuyItemTable) {
+                    const startId = Number(params[0]);
+                    const endId = Number(params[1]);
+                    if (
+                        Number.isFinite(startId) &&
+                        Number.isFinite(endId) &&
+                        startId <= PRICE_VARIABLE_ID &&
+                        PRICE_VARIABLE_ID <= endId
+                    ) {
+                        $gameVariables.setValue(PRICE_VARIABLE_ID, 0);
+                    }
+                }
+
+                if (this._cabbycodesInMuttSpecialPrice) {
+                    $gameVariables.setValue(MUTT_PRICE_VARIABLE_ID, 0);
                 }
             }
 
