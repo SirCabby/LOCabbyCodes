@@ -232,7 +232,6 @@
         { id: 'papineau',   label: 'Papineau',              kind: 'switch', switchId: 378, actorId: 13 },
         { id: 'philippe',   label: 'Philippe',              kind: 'switch', switchId: 379, actorId: 26 },
         { id: 'audrey',     label: 'Audrey',                kind: 'switch', switchId: 380, actorId: 22 },
-        { id: 'ernestTemp', label: 'Ernest (Temp Recruit)', kind: 'switch', switchId: 792 },
     ];
 
     // Hellen Garden Quest state. The natural progression lives in var 869
@@ -819,6 +818,41 @@
     // killed" sentinel; once it's ON, Marshall ev41's defeated page wins
     // (Chara_Worms idx 5 frozen) and the WormFoot battle ev30 is bypassed.
     //
+    // The bathroom stall door (Map054 ev2 `StallDoor2`) needs to read as open
+    // whenever Marshall has left it. Three pages drive the door sprite:
+    //   page 0: default — closed (direction 2), plays the voice-from-stall
+    //           dialog list keyed off var 733 `MarshallStall`
+    //   page 1: selfSwitch A ON — open (direction 4), empty list
+    //   page 2: var 435 == 10 — open (direction 4), empty list
+    // Pages evaluate highest-index first, so page 2 wins at the stronger
+    // chase phase regardless of self-switch state. At var 435 == 5 (our
+    // Mutated state), only page 1 can open the door — and the natural game
+    // never sets that self-switch on StallDoor2 (no `this.sOn("A")` script
+    // in its list, unlike StallDoor1), so without help from the cheat the
+    // door would stay closed even though Marshall is roaming as a worm.
+    // applyMarshallQuestState therefore writes Map054 ev2 self-switch A
+    // alongside the var/switch flips so the stall opens for every Mutated
+    // state and re-closes for In Stall.
+    //
+    // Layered on top of the door is `DarknessStall2` (Map054 ev7) — a
+    // `!LargeFurniture` sprite that draws a black box obscuring the stall
+    // interior until the Marshall encounter resolves. Four pages:
+    //   page 0: default — black box drawn over stall
+    //   page 1: selfSwitch A ON — same black box, runs a parallel reveal
+    //           animation (player-camera tilt sweep) that ends by setting
+    //           selfSwitch B ON
+    //   page 2: selfSwitch B ON — empty graphic (box gone)
+    //   page 3: var 435 == 10 — empty graphic (box gone)
+    // Mirror logic: page 3 self-clears at the stronger chase phase, but at
+    // var 435 == 5 (Mutated) only page 2 (selfSwitch B ON) can hide the box.
+    // For consistency with the door fix, applyMarshallQuestState writes both
+    // DarknessStall2 self-switches to match the chosen state — A and B both
+    // ON for any mutated/defeated state (page 2 wins, box hidden), both OFF
+    // for In Stall (page 0 wins, box drawn). Writing A = OFF on In Stall
+    // matters because a save where the player previously triggered the
+    // reveal animation would otherwise have A still ON and re-fire that
+    // animation on page 1 if we cleared B alone.
+    //
     // We expose 4 picker states. The dialog-stage var 733 `MarshallStall` is
     // left alone — the natural game leaves the bathroom stall talkable forever
     // regardless of whether Marshall has mutated, and rewinding it would
@@ -840,16 +874,27 @@
     const MARSHALL_VAR_FOOT_CHASE = 435;
     const MARSHALL_SWITCH_PARTS_SPAWNED = 422;
     const MARSHALL_SWITCH_FOOT_DEAD = 451;
+    const MARSHALL_MAP_ID = 54;
+    const MARSHALL_STALL_EVENT_ID = 2; // StallDoor2
+    const MARSHALL_STALL_OPEN_SELFSW = 'A';
+    const MARSHALL_DARKNESS_EVENT_ID = 7; // DarknessStall2
+    const MARSHALL_DARKNESS_REVEAL_SELFSW = 'A';
+    const MARSHALL_DARKNESS_CLEAR_SELFSW = 'B';
     const MARSHALL_FOOT_CHASE_INITIAL = 0;
     const MARSHALL_FOOT_CHASE_BATTLE = 5;
     const MARSHALL_FOOT_CHASE_STRONGER = 10;
     const MARSHALL_STATES = [
         // value: picker ordinal; footChase: var 435; partsSpawned: switch 422;
-        // footDead: switch 451.
-        { value: 0, label: 'In Stall',           footChase: MARSHALL_FOOT_CHASE_INITIAL,  partsSpawned: false, footDead: false },
-        { value: 1, label: 'Mutated',            footChase: MARSHALL_FOOT_CHASE_BATTLE,   partsSpawned: true,  footDead: false },
-        { value: 2, label: 'Mutated (Stronger)', footChase: MARSHALL_FOOT_CHASE_STRONGER, partsSpawned: true,  footDead: false },
-        { value: 3, label: 'Defeated',           footChase: MARSHALL_FOOT_CHASE_STRONGER, partsSpawned: true,  footDead: true  }
+        // footDead: switch 451; stallOpen: Map054 ev2 self-switch A (drives
+        // the StallDoor2 sprite — closed when OFF, open when ON);
+        // darknessCleared: Map054 ev7 self-switches A+B (drives the
+        // DarknessStall2 black-box overlay — drawn when OFF, hidden when ON,
+        // both written together so a prior reveal-animation A=ON state can't
+        // re-fire when we re-close).
+        { value: 0, label: 'In Stall',           footChase: MARSHALL_FOOT_CHASE_INITIAL,  partsSpawned: false, footDead: false, stallOpen: false, darknessCleared: false },
+        { value: 1, label: 'Mutated',            footChase: MARSHALL_FOOT_CHASE_BATTLE,   partsSpawned: true,  footDead: false, stallOpen: true,  darknessCleared: true  },
+        { value: 2, label: 'Mutated (Stronger)', footChase: MARSHALL_FOOT_CHASE_STRONGER, partsSpawned: true,  footDead: false, stallOpen: true,  darknessCleared: true  },
+        { value: 3, label: 'Defeated',           footChase: MARSHALL_FOOT_CHASE_STRONGER, partsSpawned: true,  footDead: true,  stallOpen: true,  darknessCleared: true  }
     ];
     const MARSHALL_OPTIONS = MARSHALL_STATES.map(s => ({ value: s.value, label: s.label }));
 
@@ -1010,7 +1055,7 @@
         { id: 'marshallQuest', label: 'Marshall Quest',       kind: 'variable', varId: MARSHALL_VAR_FOOT_CHASE,
           options: MARSHALL_OPTIONS,
           displayAs: 'switch',
-          targetLabel: `var ${MARSHALL_VAR_FOOT_CHASE} + switches ${MARSHALL_SWITCH_PARTS_SPAWNED}+${MARSHALL_SWITCH_FOOT_DEAD}`,
+          targetLabel: `var ${MARSHALL_VAR_FOOT_CHASE} + switches ${MARSHALL_SWITCH_PARTS_SPAWNED}+${MARSHALL_SWITCH_FOOT_DEAD} + Map${MARSHALL_MAP_ID} ev${MARSHALL_STALL_EVENT_ID}/${MARSHALL_DARKNESS_EVENT_ID} self-sw`,
           readValue: () => readMarshallQuestState(),
           applyValue: (v) => applyMarshallQuestState(v) },
         // Fuzzy quest — pick which Fuzzy variant Joel wields (the rat-child
@@ -2310,13 +2355,32 @@
             $gameVariables.setValue(MARSHALL_VAR_FOOT_CHASE, target.footChase);
             $gameSwitches.setValue(MARSHALL_SWITCH_PARTS_SPAWNED, target.partsSpawned);
             $gameSwitches.setValue(MARSHALL_SWITCH_FOOT_DEAD, target.footDead);
+            let stallNote = `sw${MARSHALL_MAP_ID}/${MARSHALL_STALL_EVENT_ID}/${MARSHALL_STALL_OPEN_SELFSW} unchanged`;
+            let darknessNote = `sw${MARSHALL_MAP_ID}/${MARSHALL_DARKNESS_EVENT_ID}/${MARSHALL_DARKNESS_REVEAL_SELFSW}+${MARSHALL_DARKNESS_CLEAR_SELFSW} unchanged`;
+            if (typeof $gameSelfSwitches !== 'undefined' && $gameSelfSwitches) {
+                try {
+                    $gameSelfSwitches.setValue([MARSHALL_MAP_ID, MARSHALL_STALL_EVENT_ID, MARSHALL_STALL_OPEN_SELFSW], target.stallOpen);
+                    stallNote = `sw${MARSHALL_MAP_ID}/${MARSHALL_STALL_EVENT_ID}/${MARSHALL_STALL_OPEN_SELFSW}=${target.stallOpen}`;
+                } catch (error) {
+                    CabbyCodes.warn(`${LOG_PREFIX} Stall self-switch write failed for Marshall: ${error?.message || error}`);
+                    stallNote = `sw${MARSHALL_MAP_ID}/${MARSHALL_STALL_EVENT_ID}/${MARSHALL_STALL_OPEN_SELFSW} err`;
+                }
+                try {
+                    $gameSelfSwitches.setValue([MARSHALL_MAP_ID, MARSHALL_DARKNESS_EVENT_ID, MARSHALL_DARKNESS_REVEAL_SELFSW], target.darknessCleared);
+                    $gameSelfSwitches.setValue([MARSHALL_MAP_ID, MARSHALL_DARKNESS_EVENT_ID, MARSHALL_DARKNESS_CLEAR_SELFSW], target.darknessCleared);
+                    darknessNote = `sw${MARSHALL_MAP_ID}/${MARSHALL_DARKNESS_EVENT_ID}/${MARSHALL_DARKNESS_REVEAL_SELFSW}+${MARSHALL_DARKNESS_CLEAR_SELFSW}=${target.darknessCleared}`;
+                } catch (error) {
+                    CabbyCodes.warn(`${LOG_PREFIX} Darkness self-switch write failed for Marshall: ${error?.message || error}`);
+                    darknessNote = `sw${MARSHALL_MAP_ID}/${MARSHALL_DARKNESS_EVENT_ID}/${MARSHALL_DARKNESS_REVEAL_SELFSW}+${MARSHALL_DARKNESS_CLEAR_SELFSW} err`;
+                }
+            }
             // Refresh map so any sprite swap on Map054 takes effect
             // immediately; events on other maps re-evaluate page conditions
             // on next entry.
             if (typeof $gameMap !== 'undefined' && $gameMap && typeof $gameMap.requestRefresh === 'function') {
                 $gameMap.requestRefresh();
             }
-            CabbyCodes.warn(`${LOG_PREFIX} Marshall Quest: ${marshallQuestStateLabel(oldValue)} -> ${marshallQuestStateLabel(newValue)}. var ${MARSHALL_VAR_FOOT_CHASE}=${target.footChase}, sw ${MARSHALL_SWITCH_PARTS_SPAWNED}=${target.partsSpawned}, sw ${MARSHALL_SWITCH_FOOT_DEAD}=${target.footDead}.`);
+            CabbyCodes.warn(`${LOG_PREFIX} Marshall Quest: ${marshallQuestStateLabel(oldValue)} -> ${marshallQuestStateLabel(newValue)}. var ${MARSHALL_VAR_FOOT_CHASE}=${target.footChase}, sw ${MARSHALL_SWITCH_PARTS_SPAWNED}=${target.partsSpawned}, sw ${MARSHALL_SWITCH_FOOT_DEAD}=${target.footDead}, ${stallNote}, ${darknessNote}.`);
             return true;
         } catch (error) {
             CabbyCodes.error(`${LOG_PREFIX} Apply failed for Marshall Quest: ${error?.message || error}`);
