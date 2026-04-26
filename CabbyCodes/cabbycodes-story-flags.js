@@ -533,6 +533,146 @@
     ];
     const SHADOW_OPTIONS = SHADOW_STATES.map(s => ({ value: s.value, label: s.label }));
 
+    // Frederic questline ("the painter's apartment"). The painter, Frederic,
+    // made 9 self-portraits that came to life and now share a hive-mind with
+    // him. Each portrait roams a specific map as a hostile NPC; killing one
+    // in battle (a) sets its state var to 99, (b) flips a self switch on
+    // its event so the dead-body page renders next time the map evaluates,
+    // and (c) decrements `PortraitsLeft` (var 306). When the player visits
+    // the Painter NPC (CE 327, the original Frederic / var 305 `PainterState`)
+    // with `PortraitsLeft` below the matching threshold, the Painter hands
+    // out a tiered reward. Once a single portrait remains alive, the final
+    // reward branch fires (paint palette + thank-you cutscene).
+    //
+    // The Faceless / Portrait5 hat side-event (var 313, switch 535
+    // `portrait5Friendly`, switches 523/524/525 part-kill flags) is a
+    // separate beat layered on top of Portrait5's encounter; the cheat
+    // sets var 313 to 99 / 0 to flip the wall painting + Painter dialog
+    // gate, but does NOT touch Portrait5's roaming-NPC self switches
+    // because the natural game spreads Faceless across many events on
+    // Map119/Map042/Map217/Map236/Map237 with a multi-stage encounter
+    // (parts split, hat clamp, body possession). Reviving Portrait5 from
+    // the cheat reopens var 313 but leaves any partially-played hat events
+    // in their existing self-switch state — the player may need to visit
+    // the relevant maps to clean up if they had started the encounter.
+    //
+    // Per-portrait state encoding: each portrait has its own state variable
+    // with its own alive-progression (Portrait1 0..8, Portrait2 1..5/90..93,
+    // Portrait4 1..5/10, etc.) but ALL of them use 99 as the canonical
+    // "dead" sentinel (verified by enumerating Code 122 writes across
+    // CommonEvents.json + every Map*.json). So setting "dead" is uniform
+    // even though "alive" varies; we write 0 for the survivor (= pre-
+    // encounter / undisturbed) and let the player encounter that Frederic
+    // naturally if they haven't already.
+    //
+    // Painter reward gate (CE 327 conditionals, verified):
+    //   var 305 == 1 AND var 306 <= 8 -> turpentine
+    //   var 305 == 2 AND var 306 <= 7 -> canvas carry bag
+    //   var 305 == 3 AND var 306 <= 5 -> medical supplies
+    //   var 305 == 4 AND var 306 <= 1 -> paint palette (final, sets var 305=5)
+    // For "Last Alive" / "All Killed" cheat states we set var 305 = 4 so the
+    // next visit to the Painter NPC fires the final reward branch directly;
+    // intermediate rewards (turpentine/canvas/medical) are skipped — grab
+    // them via the item editor cheat if you want them.
+    //
+    // Roaming-NPC mapping. Each portrait has one canonical map event whose
+    // page-0 "alive" branch runs the battle and flips a specific self switch
+    // ON to render the dead-body page on subsequent renders. Verified by
+    // enumerating code 122 writes (var = 99) AND code 123 (self switch)
+    // commands across every map. The cheat mirrors both halves of the
+    // natural game's death write — set the state var AND flip the dead
+    // self-switch — so the roaming NPC actually swaps to dead-body, and
+    // the wall portrait in the painter's living room (Map217 events
+    // 12/14/16/17/18/19/21/23, all gated on `state var == 99`) shows
+    // the framed painting. Reviving instead clears the state var to 0
+    // AND clears all four self switches (A/B/C/D) on the event so the
+    // alive page wins again.
+    const FREDERIC_PORTRAIT_VARS = {
+        1: 304, // Portrait1_state
+        2: 308, // Portrait2_state
+        3: 309, // Portrait3_state
+        4: 311, // Portrait4_state
+        5: 313, // Portrait5_state (Faceless — also has the hat side-event)
+        6: 315, // Portrait6_state
+        7: 320, // Portrait7_state
+        8: 302, // Portrait8
+        9: 300  // Portrait9
+    };
+    // Roaming-NPC event for each portrait. `deadSelfSwitch` is the self
+    // switch the natural battle-event flips ON to render the dead-body
+    // page. Portrait5 is null because Faceless spans many events across
+    // many maps and the multi-stage hat encounter doesn't reduce to one
+    // self-switch flip — the cheat only manages var 313 for that one and
+    // accepts that revival/death will be visually approximate until the
+    // player actually re-engages or skips the side event.
+    const FREDERIC_PORTRAIT_NPCS = {
+        1: { mapId: 95,  eventId: 8,  deadSelfSwitch: 'C' },
+        2: { mapId: 96,  eventId: 23, deadSelfSwitch: 'D' },
+        3: { mapId: 236, eventId: 17, deadSelfSwitch: 'C' },
+        4: { mapId: 238, eventId: 2,  deadSelfSwitch: 'C' },
+        5: null,
+        6: { mapId: 237, eventId: 16, deadSelfSwitch: 'B' },
+        7: { mapId: 218, eventId: 2,  deadSelfSwitch: 'C' },
+        8: { mapId: 97,  eventId: 25, deadSelfSwitch: 'C' },
+        9: { mapId: 239, eventId: 6,  deadSelfSwitch: 'C' }
+    };
+    const FREDERIC_PORTRAIT_DEAD = 99;
+    const FREDERIC_PORTRAIT_ALIVE = 0;
+    const FREDERIC_SELF_SWITCH_KEYS = ['A', 'B', 'C', 'D'];
+    const FREDERIC_PAINTER_VAR = 305;
+    const FREDERIC_PORTRAITS_LEFT_VAR = 306;
+    const FREDERIC_PAINTER_REWARD_READY = 4;
+    const FREDERIC_PAINTER_INITIAL = 0;
+    const FREDERIC_PAINTER_ACCEPTED = 1;
+    // PortraitsLeft initial value seen in CE 327 line 98 — var 306 is set
+    // to 10 on first meeting the Painter (10 = symbolic, the dialog itself
+    // says "9 of them in total"). Decrements to 1 when only one survivor
+    // remains, at which point the final-reward branch fires.
+    const FREDERIC_PORTRAITS_INITIAL = 10;
+    const FREDERIC_PAINTER_DEAD = 99;
+    const FREDERIC_PAINTER_REWARD_GIVEN = 5;
+    // Per-portrait labels reflect the most distinctive in-game trait so
+    // the picker reads naturally instead of "Portrait 1..9". Sourced from
+    // each portrait's troop dialog (Troops.json 328..336):
+    //   1 var 304 Tumor    - shifting flesh mass; drops {Tumor Lumps}
+    //   2 var 308 Ring     - claims a "red-gem ring"; gives a refrigerator
+    //   3 var 309 Rage     - calm, gives {Rage Armor} companion gear
+    //   4 var 311 Godly    - "WE ARE FREDERIC THE MANY" deity persona
+    //   5 var 313 Hat      - parasitic hat / Faceless side-event; splits
+    //                        in combat (this is the one we leave alone)
+    //   6 var 315 Closet   - hides in closet, paranoid of the others
+    //   7 var 320 Healer   - heals party HP; gives {Medic-in-a-jar}
+    //   8 var 302 Shy      - "DON'T LOOK AT ME"; refuses to be seen
+    //   9 var 300 Faceless - the original Frederic whose face was stolen;
+    //                        accepts {Torn-Off Face} to paint gear duplicates
+    const FREDERIC_QUEST_STATES = [
+        // value: picker ordinal. Encoding:
+        //   survivor: number 1..9         -> "<Name> Frederic Last Alive"
+        //   survivor: 'painter'           -> "Painter Last Alive" (all 9 portraits dead, Painter NPC alive)
+        //   survivor: null + allDead:true -> "All Killed" (all 10 Fredrics dead, Painter included)
+        //   survivor: null                -> "Not Started" / "In Progress" (don't reconcile portraits)
+        { value: 0,  label: 'Not Started',                  survivor: null,      allDead: false, painter: FREDERIC_PAINTER_INITIAL,      portraitsLeft: FREDERIC_PORTRAITS_INITIAL },
+        { value: 1,  label: 'In Progress',                  survivor: null,      allDead: false, painter: FREDERIC_PAINTER_ACCEPTED,     portraitsLeft: 9 },
+        { value: 2,  label: 'Tumor Frederic Last Alive',    survivor: 1,         allDead: false, painter: FREDERIC_PAINTER_REWARD_READY, portraitsLeft: 1 },
+        { value: 3,  label: 'Ring Frederic Last Alive',     survivor: 2,         allDead: false, painter: FREDERIC_PAINTER_REWARD_READY, portraitsLeft: 1 },
+        { value: 4,  label: 'Rage Frederic Last Alive',     survivor: 3,         allDead: false, painter: FREDERIC_PAINTER_REWARD_READY, portraitsLeft: 1 },
+        { value: 5,  label: 'Godly Frederic Last Alive',    survivor: 4,         allDead: false, painter: FREDERIC_PAINTER_REWARD_READY, portraitsLeft: 1 },
+        { value: 6,  label: 'Hat Frederic Last Alive',      survivor: 5,         allDead: false, painter: FREDERIC_PAINTER_REWARD_READY, portraitsLeft: 1 },
+        { value: 7,  label: 'Closet Frederic Last Alive',   survivor: 6,         allDead: false, painter: FREDERIC_PAINTER_REWARD_READY, portraitsLeft: 1 },
+        { value: 8,  label: 'Healer Frederic Last Alive',   survivor: 7,         allDead: false, painter: FREDERIC_PAINTER_REWARD_READY, portraitsLeft: 1 },
+        { value: 9,  label: 'Shy Frederic Last Alive',      survivor: 8,         allDead: false, painter: FREDERIC_PAINTER_REWARD_READY, portraitsLeft: 1 },
+        { value: 10, label: 'Faceless Frederic Last Alive', survivor: 9,         allDead: false, painter: FREDERIC_PAINTER_REWARD_READY, portraitsLeft: 1 },
+        // Painter Last Alive: the natural "good ending". Player has killed
+        // all 9 portrait copies; the Painter NPC is still around at his
+        // post-reward state (var 305 = 5, paint palette given). Distinct
+        // from "All Killed" — that one folds the Painter into the death
+        // sweep too (var 305 = 99) for a "no Frederic survives" state.
+        { value: 11, label: 'Painter Last Alive',           survivor: 'painter', allDead: true,  painter: FREDERIC_PAINTER_REWARD_GIVEN, portraitsLeft: 0 },
+        { value: 12, label: 'All Killed',                   survivor: null,      allDead: true,  painter: FREDERIC_PAINTER_DEAD,         portraitsLeft: 0 }
+    ];
+    const FREDERIC_QUEST_OPTIONS = FREDERIC_QUEST_STATES.map(s => ({ value: s.value, label: s.label }));
+    const FREDERIC_PORTRAIT_INDICES = Object.keys(FREDERIC_PORTRAIT_VARS).map(n => Number(n));
+
     // Quest-state variables. Each entry needs a real understanding of what
     // the variable drives in-game; speculative entries on under-investigated
     // variables previously lived here (Joel/Papineau/Lyle/Nestor/Goth/
@@ -594,6 +734,15 @@
           targetLabel: `vars ${SHADOW_VAR_STATE}+${SHADOW_VAR_DISPO} + switches ${SHADOW_SWITCH_RECRUITED}+${SHADOW_SWITCH_GIFT}+${SHADOW_SWITCH_ITEM_LEFT}`,
           readValue: () => readShadowQuestState(),
           applyValue: (v) => applyShadowQuestState(v) },
+        // Frederic / Painter questline — pick which of the 9 portraits
+        // survives, or set "All Killed" / "Not Started" / "In Progress".
+        // See the FREDERIC_* constants block above.
+        { id: 'fredericQuest', label: 'Frederic Quest',       kind: 'variable', varId: FREDERIC_PAINTER_VAR,
+          options: FREDERIC_QUEST_OPTIONS,
+          displayAs: 'switch',
+          targetLabel: `vars ${FREDERIC_PAINTER_VAR}+${FREDERIC_PORTRAITS_LEFT_VAR} + 9 portrait state vars`,
+          readValue: () => readFredericQuestState(),
+          applyValue: (v) => applyFredericQuestState(v) },
         // Lyle's Mazes and Wizards campaign — sessions completed (var 701).
         // Each session is a distinct adventure; 6 = wrap-up.
         { id: 'mazesWizardsQuest', label: 'Mazes and Wizards', kind: 'variable', varId: MW_VAR_SESSION,
@@ -1464,6 +1613,171 @@
             return true;
         } catch (error) {
             CabbyCodes.error(`${LOG_PREFIX} Apply failed for Shadow Quest: ${error?.message || error}`);
+            return false;
+        } finally {
+            token.release();
+        }
+    }
+
+    // ---- Frederic Quest (9 portrait state vars + Painter + counter) ----
+    //
+    // Read priority: count alive portraits (state var != 99) and bucket:
+    //   0 portraits alive AND var 305 == 99 -> "All Killed" (state 12)
+    //   0 portraits alive AND var 305 != 99 -> "Painter Last Alive" (state 11)
+    //                                          natural good-ending state
+    //                                          (palette given, all copies dead,
+    //                                          original Frederic still alive)
+    //   1 portrait alive  -> "Portrait N Last Alive" (state 2..10)
+    //   2+ portraits alive -> "In Progress" if Painter has been engaged
+    //                          (var 305 >= 1) or var 306 has been touched
+    //                          (< initial), else "Not Started"
+    // The Painter (var 305) participates in the alive-count for the 0-portrait
+    // case so a save in the natural good-ending doesn't misleadingly read as
+    // "All Killed" when the Painter NPC is still standing in his apartment.
+
+    // Cache the previous bucketed result so we only log a diagnostic dump
+    // when the read transitions states — not every frame the picker is
+    // open. Cleared whenever the session resets so the first read of a
+    // newly-loaded save logs once.
+    let _fredericLastReadValue = null;
+
+    function readFredericQuestState() {
+        const portraitValues = FREDERIC_PORTRAIT_INDICES.map(idx => ({
+            idx,
+            varId: FREDERIC_PORTRAIT_VARS[idx],
+            value: readVar(FREDERIC_PORTRAIT_VARS[idx])
+        }));
+        const aliveIndices = portraitValues
+            .filter(p => p.value !== FREDERIC_PORTRAIT_DEAD)
+            .map(p => p.idx);
+        const painter = readVar(FREDERIC_PAINTER_VAR);
+        const left = readVar(FREDERIC_PORTRAITS_LEFT_VAR);
+        let result;
+        if (aliveIndices.length === 0) {
+            result = painter === FREDERIC_PAINTER_DEAD ? 12 : 11;
+        } else if (aliveIndices.length === 1) {
+            const survivor = aliveIndices[0];
+            const state = FREDERIC_QUEST_STATES.find(s => s.survivor === survivor);
+            result = state ? state.value : 1;
+        } else if (painter >= 1 || (left > 0 && left < FREDERIC_PORTRAITS_INITIAL)) {
+            result = 1; // In Progress
+        } else {
+            result = 0; // Not Started
+        }
+        // One-shot diagnostic dump: helps debug saves where the cheat row
+        // disagrees with what the player sees in-game (e.g. an NPC that
+        // looks alive on its map but reads as dead). Fires only when the
+        // bucketed result changes so it doesn't spam the log.
+        if (_fredericLastReadValue !== result) {
+            _fredericLastReadValue = result;
+            const summary = portraitValues.map(p => `P${p.idx}(v${p.varId})=${p.value}`).join(' ');
+            CabbyCodes.warn(`${LOG_PREFIX} Frederic read -> ${fredericQuestStateLabel(result)} | painter(v${FREDERIC_PAINTER_VAR})=${painter} left(v${FREDERIC_PORTRAITS_LEFT_VAR})=${left} | ${summary}`);
+        }
+        return result;
+    }
+
+    function fredericQuestStateLabel(value) {
+        const s = FREDERIC_QUEST_STATES.find(st => st.value === value);
+        return s ? s.label : String(value);
+    }
+
+    // Flip a portrait's roaming-NPC self switches to match its alive/dead
+    // intent. Mirrors the natural battle-event's post-victory self-switch
+    // flip (e.g. Portrait1's Map095 ev8 page 0 sets self switch C ON after
+    // the troop 328 win) so the dead-body page renders without the player
+    // having to win the fight. For revival, clears all four self switches
+    // so the page-0 "alive" branch wins on the next refresh.
+    //
+    // Returns a short tag for the per-portrait log summary. No-op for
+    // Portrait5 (Faceless, multi-event side encounter — see comment block
+    // above) and silently no-ops if `$gameSelfSwitches` isn't loaded yet.
+    function syncPortraitNpcSelfSwitches(idx, wantDead) {
+        const npc = FREDERIC_PORTRAIT_NPCS[idx];
+        if (!npc) {
+            return idx === 5 ? 'P5:skip-faceless' : `P${idx}:no-npc`;
+        }
+        if (typeof $gameSelfSwitches === 'undefined' || !$gameSelfSwitches) {
+            return `P${idx}:no-selfsw`;
+        }
+        try {
+            if (wantDead) {
+                $gameSelfSwitches.setValue([npc.mapId, npc.eventId, npc.deadSelfSwitch], true);
+                return `P${idx}:dead-sw${npc.deadSelfSwitch}`;
+            }
+            FREDERIC_SELF_SWITCH_KEYS.forEach(ch => {
+                $gameSelfSwitches.setValue([npc.mapId, npc.eventId, ch], false);
+            });
+            return `P${idx}:alive-cleared`;
+        } catch (error) {
+            CabbyCodes.warn(`${LOG_PREFIX} Self-switch sync failed for Portrait${idx}: ${error?.message || error}`);
+            return `P${idx}:err`;
+        }
+    }
+
+    function applyFredericQuestState(newValue) {
+        if (!isSessionReady()) {
+            return false;
+        }
+        const target = FREDERIC_QUEST_STATES.find(s => s.value === newValue);
+        if (!target) {
+            return false;
+        }
+        const portraitVarIds = FREDERIC_PORTRAIT_INDICES.map(idx => FREDERIC_PORTRAIT_VARS[idx]);
+        const oldValue = readFredericQuestState();
+        const api = CabbyCodes.freezeTime;
+        const token = (api && typeof api.exemptFromRestore === 'function')
+            ? api.exemptFromRestore({
+                variables: [
+                    FREDERIC_PAINTER_VAR,
+                    FREDERIC_PORTRAITS_LEFT_VAR,
+                    ...portraitVarIds
+                ]
+            })
+            : { release: () => {} };
+        try {
+            // Reconcile portrait state when the target picks a definite
+            // configuration (specific portrait survives, Painter survives
+            // alone, or all 10 Fredrics dead). Not Started clears all 9
+            // to the pre-encounter baseline (vars + self switches). In
+            // Progress is the only state that leaves portrait kill state
+            // alone — it's a bookkeeping-only state for "the player is
+            // mid-quest, leave their kill configuration as-is and just
+            // ensure the Painter dialog is engaged".
+            const npcSyncTags = [];
+            const reconcilePortraits = target.survivor !== null || target.allDead;
+            if (reconcilePortraits) {
+                FREDERIC_PORTRAIT_INDICES.forEach(idx => {
+                    const isSurvivorPortrait = typeof target.survivor === 'number' && idx === target.survivor;
+                    const wantDead = target.allDead || !isSurvivorPortrait;
+                    $gameVariables.setValue(
+                        FREDERIC_PORTRAIT_VARS[idx],
+                        wantDead ? FREDERIC_PORTRAIT_DEAD : FREDERIC_PORTRAIT_ALIVE
+                    );
+                    npcSyncTags.push(syncPortraitNpcSelfSwitches(idx, wantDead));
+                });
+            } else if (target.value === 0) {
+                FREDERIC_PORTRAIT_INDICES.forEach(idx => {
+                    $gameVariables.setValue(FREDERIC_PORTRAIT_VARS[idx], FREDERIC_PORTRAIT_ALIVE);
+                    npcSyncTags.push(syncPortraitNpcSelfSwitches(idx, false));
+                });
+            }
+            $gameVariables.setValue(FREDERIC_PAINTER_VAR, target.painter);
+            $gameVariables.setValue(FREDERIC_PORTRAITS_LEFT_VAR, target.portraitsLeft);
+            // Request a refresh so any portrait NPC or wall-painting event
+            // on the current map re-evaluates its page conditions and the
+            // sprite swap is visible immediately. Off-map events update
+            // automatically when the player next visits.
+            if (typeof $gameMap !== 'undefined' && $gameMap && typeof $gameMap.requestRefresh === 'function') {
+                $gameMap.requestRefresh();
+            }
+            const portraitSummary = FREDERIC_PORTRAIT_INDICES
+                .map(idx => `P${idx}=${readVar(FREDERIC_PORTRAIT_VARS[idx])}`)
+                .join(',');
+            const npcSummary = npcSyncTags.length ? ` npc[${npcSyncTags.join(',')}]` : '';
+            CabbyCodes.warn(`${LOG_PREFIX} Frederic Quest: ${fredericQuestStateLabel(oldValue)} -> ${fredericQuestStateLabel(newValue)}. var ${FREDERIC_PAINTER_VAR}=${target.painter}, var ${FREDERIC_PORTRAITS_LEFT_VAR}=${target.portraitsLeft}, portraits[${portraitSummary}].${npcSummary}`);
+            return true;
+        } catch (error) {
+            CabbyCodes.error(`${LOG_PREFIX} Apply failed for Frederic Quest: ${error?.message || error}`);
             return false;
         } finally {
             token.release();
