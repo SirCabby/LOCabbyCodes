@@ -163,21 +163,6 @@
         return typeof symbol === 'string' && symbol.startsWith(SETTING_SYMBOL_PREFIX);
     }
 
-    function shouldDisplayCabbyCodesOptions() {
-        if (typeof CabbyCodes.canShowCabbyCodesOptions === 'function') {
-            try {
-                return Boolean(CabbyCodes.canShowCabbyCodesOptions());
-            } catch (error) {
-                CabbyCodes.warn(`[CabbyCodes] Failed to check options visibility: ${error?.message || error}`);
-                return false;
-            }
-        }
-        if (typeof $gameParty !== 'undefined' && typeof $gameParty.members === 'function') {
-            return $gameParty.members().length > 0;
-        }
-        return false;
-    }
-    
     /**
      * Applies a value change for a setting, invoking callbacks as needed.
      * @param {string} key
@@ -343,20 +328,10 @@
         return setting ? setting.displayName : key;
     };
     
-    // Hook into Window_Options to add CabbyCodes settings
-    const _Window_Options_addGeneralOptions = Window_Options.prototype.addGeneralOptions;
-    Window_Options.prototype.addGeneralOptions = function() {
-        _Window_Options_addGeneralOptions.call(this);
-        
-        if (!shouldDisplayCabbyCodesOptions()) {
-            return;
-        }
-        
-        CabbyCodes.settingsRegistry.forEach(setting => {
-            this.addCommand(setting.displayName, cabbyCodesSymbol(setting.key), true);
-        });
-    };
-    
+    // CabbyCodes settings live in the dedicated Cheats menu (Scene_CabbyCodesCheats),
+    // not in the standard Options menu. The Window_Options hooks below still apply
+    // because Window_CabbyCodesCheats inherits from Window_Options.
+
     // Hook into Window_Options to handle setting values
     const _Window_Options_getConfigValue = Window_Options.prototype.getConfigValue;
     Window_Options.prototype.getConfigValue = function(symbol) {
@@ -743,10 +718,49 @@
         }
         return 8;
     }
-    
-    // Example: Register a sample setting (can be removed or used as template)
-    // CabbyCodes.registerSetting('exampleFeature', 'Example Feature', false);
-    
+
+    // Expose the symbol helper so the dedicated Cheats menu (in
+    // cabbycodes-cheats-menu.js) can build the same command symbols without
+    // duplicating the prefix constant.
+    CabbyCodes.cabbyCodesSettingSymbol = cabbyCodesSymbol;
+
+    /**
+     * Dedicated Cheats menu — opened from the in-game main menu's "Cheats"
+     * entry. Subclasses Scene_Options/Window_Options so the existing cabby
+     * symbol handlers (slider adjust, numeric input, blue gradient,
+     * onActivate, etc.) apply to it via prototype inheritance.
+     */
+    function Scene_CabbyCodesCheats() {
+        this.initialize(...arguments);
+    }
+
+    window.Scene_CabbyCodesCheats = Scene_CabbyCodesCheats;
+
+    Scene_CabbyCodesCheats.prototype = Object.create(Scene_Options.prototype);
+    Scene_CabbyCodesCheats.prototype.constructor = Scene_CabbyCodesCheats;
+
+    Scene_CabbyCodesCheats.prototype.createOptionsWindow = function() {
+        const rect = this.optionsWindowRect();
+        this._optionsWindow = new Window_CabbyCodesCheats(rect);
+        this._optionsWindow.setHandler('cancel', this.popScene.bind(this));
+        this.addWindow(this._optionsWindow);
+    };
+
+    function Window_CabbyCodesCheats() {
+        this.initialize(...arguments);
+    }
+
+    window.Window_CabbyCodesCheats = Window_CabbyCodesCheats;
+
+    Window_CabbyCodesCheats.prototype = Object.create(Window_Options.prototype);
+    Window_CabbyCodesCheats.prototype.constructor = Window_CabbyCodesCheats;
+
+    Window_CabbyCodesCheats.prototype.makeCommandList = function() {
+        CabbyCodes.settingsRegistry.forEach(setting => {
+            this.addCommand(setting.displayName, cabbyCodesSymbol(setting.key), true);
+        });
+    };
+
     CabbyCodes.log('[CabbyCodes] Settings module loaded');
 })();
 

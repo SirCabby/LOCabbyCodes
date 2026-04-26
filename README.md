@@ -133,8 +133,8 @@ This is the most important step. You need to add the CabbyCodes plugin to the ga
 1. Launch "Look Outside"
 2. The mod should load automatically when the game starts
 3. You can verify it's working by:
-   - Opening the game's Options menu
-   - Looking for CabbyCodes options such as "Invincibility" near the bottom of the list
+   - Opening the game's main menu and selecting the new **Cheats** entry (alongside Item, Skill, Options, etc.)
+   - Looking for CabbyCodes options such as "Invincibility" inside the Cheats menu
    - Opening the `CabbyCodes.log` file (created beside the game's executable) and confirming new `[CabbyCodes]` entries are being written when you toggle options
 
 ### Log Output
@@ -144,13 +144,13 @@ This is the most important step. You need to add the CabbyCodes plugin to the ga
 
 ## Current Features
 
-- **Invincibility Toggle:** Adds an "Invincibility" option to the CabbyCodes section of the Options menu. When enabled, any actor currently in the player's party is prevented from losing HP through combat damage, poison/regen ticks, scripted deaths, or other harmful effects. Toggle it on/off at any time while playing.
+- **Invincibility Toggle:** Adds an "Invincibility" option to the CabbyCodes Cheats menu. When enabled, any actor currently in the player's party is prevented from losing HP through combat damage, poison/regen ticks, scripted deaths, or other harmful effects. Toggle it on/off at any time while playing.
 - **One Hit Kill Enemies:** Adds a toggle that amplifies any HP damage dealt to an enemy battler into a lethal blow, so a single hit drops even bosses. Party actors are never affected — healing, regen, and friendly HP changes pass through unchanged.
 - **Never Miss Attacks:** Adds a toggle that forces every party attack to connect: the hit roll is treated as 100% and the target's evasion is treated as 0 while the option is on. Enemy accuracy and evasion are untouched, so foes can still miss or be dodged normally.
 - **Status Immunity:** Adds a toggle that blocks negative status effects from being applied to party actors, protecting them from action-restricting, parameter-reducing, or otherwise harmful states.
 - **Always Escape Battles:** Guarantees that the Escape party command succeeds instantly, bypassing the normal escape ratio so you can bail out of encounters without relying on luck.
 - **Stamina Control:** Prevents party actors from spending MP (stamina) when using skills, letting you cast freely without worrying about resource management.
-- **EXP Rate Slider:** Adds a CabbyCodes options-slider that scales all party EXP gains from 0x (no EXP) up through 10x, plus an "Instant Max" stop that gives enough EXP on the next event to hit the level cap immediately.
+- **EXP Rate Slider:** Adds a CabbyCodes Cheats menu slider that scales all party EXP gains from 0x (no EXP) up through 10x, plus an "Instant Max" stop that gives enough EXP on the next event to hit the level cap immediately.
 - **Infinite Items:** Adds an option that keeps item counts from decreasing. Whether you use them, craft with them, or hand them to a visitor, the inventory count stays put. You can still pick up more; weapons, armor, key items, and a curated set of quest-triggered pseudo-key items (Rat Baby Thing, Dog Tags, Plumbing Tools, colored keys, etc.) are unaffected so scripted events can still progress. Planet / puzzle discs are an explicit exception — they stay in your inventory even after being inserted into a socket.
 - **Unbreakable Items:** Adds a toggle that stops weapons (and any other breakable gear) from losing durability when you attack or when enemies use weapon-breaking abilities. Keep your favorite equipment intact regardless of difficulty or special encounters.
 - **Unstick Equipment:** Adds a toggle that lets you unequip "stuck" gear directly from the standard Equip menu. While on, every equipment slot becomes selectable even when the slot would normally be class-locked or state-sealed; picking the blank "(no item)" entry sends the removed gear back to the party's inventory through the vanilla equip-change path. Only affects party actors, since the Equip menu only exposes party members.
@@ -223,10 +223,10 @@ This is the most important step. You need to add the CabbyCodes plugin to the ga
    - Copy the contents of `plugins.js` (just the `$plugins` array part)
    - Paste it into an online JSON validator to check for syntax errors
 
-### Settings don't appear in Options menu
+### Settings don't appear in the Cheats menu
 
-- The settings menu will only show options if settings have been registered by mod features
-- If no features are active yet, the menu section may not appear
+- The Cheats menu will only show options if settings have been registered by mod features
+- If no features are active yet, the menu may appear empty
 - This is normal - the mod framework is still loaded and ready for features to be added
 
 ## Uninstallation

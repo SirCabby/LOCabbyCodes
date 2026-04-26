@@ -3,17 +3,25 @@
 //=============================================================================
 /*:
  * @target MZ
- * @plugindesc CabbyCodes UI - Shows the CabbyCodes version on the Options screen
+ * @plugindesc CabbyCodes UI - Shows the CabbyCodes version on the Cheats menu
  * @author CabbyCodes
  * @help
  * Displays the currently running CabbyCodes version at the bottom of the
- * Options menu so players can quickly confirm which build is installed.
+ * Cheats menu so players can quickly confirm which build is installed.
  */
 
 (() => {
     'use strict';
 
     if (typeof window.CabbyCodes === 'undefined') {
+        return;
+    }
+
+    if (typeof Scene_CabbyCodesCheats === 'undefined') {
+        // Cheats scene must already be defined by cabbycodes-settings.js. If it
+        // isn't, the loader order is wrong; bail rather than patching the wrong
+        // scene.
+        CabbyCodes.warn?.('[CabbyCodes] Version display: Scene_CabbyCodesCheats not defined; check loader order.');
         return;
     }
 
@@ -27,23 +35,11 @@
     const CABBYCODES_LABEL = 'CabbyCodes';
     const CABBYCODES_LABEL_COLOR = '#3f82ff';
 
-    function cabbyCodesOptionsAreVisible() {
-        if (typeof CabbyCodes.canShowCabbyCodesOptions === 'function') {
-            try {
-                return Boolean(CabbyCodes.canShowCabbyCodesOptions());
-            } catch (error) {
-                CabbyCodes.warn?.(`[CabbyCodes] Option visibility error: ${error?.message || error}`);
-                return false;
-            }
-        }
-        return false;
-    }
-
     function cabbyCodesOptionCount() {
         if (!Array.isArray(CabbyCodes.settingsRegistry)) {
             return 0;
         }
-        return cabbyCodesOptionsAreVisible() ? CabbyCodes.settingsRegistry.length : 0;
+        return CabbyCodes.settingsRegistry.length;
     }
 
     function desiredOptionsWidth() {
@@ -71,9 +67,9 @@
 
     function applyOverride(methodName, implementation) {
         if (typeof CabbyCodes.override === 'function') {
-            CabbyCodes.override(Scene_Options.prototype, methodName, implementation);
+            CabbyCodes.override(Scene_CabbyCodesCheats.prototype, methodName, implementation);
         } else {
-            Scene_Options.prototype[methodName] = implementation;
+            Scene_CabbyCodesCheats.prototype[methodName] = implementation;
         }
     }
 
@@ -116,22 +112,16 @@
     };
 
     /**
-     * Expand the options list to reflect the real CabbyCodes setting count.
+     * Size the Cheats command list to the actual cabby setting count and
+     * give the window a consistent top-anchored layout that leaves room for
+     * the version footer.
      */
-    const _Scene_Options_maxCommands = Scene_Options.prototype.maxCommands;
     applyOverride('maxCommands', function() {
-        const base = typeof _Scene_Options_maxCommands === 'function'
-            ? _Scene_Options_maxCommands.call(this)
-            : 7;
-        return base + cabbyCodesOptionCount();
+        return Math.max(1, cabbyCodesOptionCount());
     });
 
-    const _Scene_Options_maxVisibleCommands = Scene_Options.prototype.maxVisibleCommands;
     applyOverride('maxVisibleCommands', function() {
-        const base = typeof _Scene_Options_maxVisibleCommands === 'function'
-            ? _Scene_Options_maxVisibleCommands.call(this)
-            : 12;
-        return Math.max(base, this.maxCommands());
+        return Math.max(12, this.maxCommands());
     });
 
     applyOverride('optionsWindowRect', function() {
@@ -142,11 +132,8 @@
         return new Rectangle(wx, wy, ww, wh);
     });
 
-    /**
-     * Calculates and creates the version window for Scene_Options.
-     */
-    Scene_Options.prototype.createCabbyCodesVersionWindow = function() {
-        if (this._cabbyCodesVersionWindow || !cabbyCodesOptionsAreVisible()) {
+    Scene_CabbyCodesCheats.prototype.createCabbyCodesVersionWindow = function() {
+        if (this._cabbyCodesVersionWindow) {
             return;
         }
         const rect = this.cabbyCodesVersionWindowRect();
@@ -154,7 +141,7 @@
         this.addWindow(this._cabbyCodesVersionWindow);
     };
 
-    Scene_Options.prototype.cabbyCodesVersionWindowRect = function() {
+    Scene_CabbyCodesCheats.prototype.cabbyCodesVersionWindowRect = function() {
         const ww = this._optionsWindow ? this._optionsWindow.width : desiredOptionsWidth();
         const wh = versionWindowHeight(this);
         const wx = this._optionsWindow ? this._optionsWindow.x : (Graphics.boxWidth - ww) / 2;
@@ -173,18 +160,16 @@
     };
 
     if (typeof CabbyCodes.after === 'function') {
-        CabbyCodes.after(Scene_Options.prototype, 'create', function() {
+        CabbyCodes.after(Scene_CabbyCodesCheats.prototype, 'create', function() {
             attachVersionWindow.call(this);
         });
     } else {
-        const _Scene_Options_create = Scene_Options.prototype.create;
-        Scene_Options.prototype.create = function() {
-            _Scene_Options_create.call(this);
+        const _Scene_CabbyCodesCheats_create = Scene_CabbyCodesCheats.prototype.create;
+        Scene_CabbyCodesCheats.prototype.create = function() {
+            _Scene_CabbyCodesCheats_create.call(this);
             attachVersionWindow.call(this);
         };
     }
 
     CabbyCodes.log('[CabbyCodes] Version display initialized');
 })();
-
-
