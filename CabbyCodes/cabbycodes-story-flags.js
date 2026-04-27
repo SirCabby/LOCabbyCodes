@@ -1126,6 +1126,24 @@
           targetLabel: `var ${EUGENE_VAR_HEAD_CHASE} + switches ${EUGENE_SWITCH_PARTS_SPAWNED}+${EUGENE_SWITCH_HEAD_DEAD}`,
           readValue: () => readEugeneQuestState(),
           applyValue: (v) => applyEugeneQuestState(v) },
+        // Visitor Plan — per-astronomer "asked about killing the Visitor"
+        // toggles. Selecting this row pushes a dedicated sub-scene (one
+        // entry per astronomer) — see cabbycodes-visitor-plan.js for the
+        // scene + apply path. The row's value text shows a live "asked /
+        // total" summary so progress is visible from the Quest States list.
+        { id: 'visitorPlanQuest', label: 'Visitor Plan',                kind: 'switch', switchId: 1091,
+          targetLabel: 'switches 1089+1090+1091+1092 + var 898 + switch 1098 (when all asked)',
+          formatValue: () => (typeof CabbyCodes.getVisitorPlanSummary === 'function')
+              ? CabbyCodes.getVisitorPlanSummary()
+              : '?',
+          onSelect: () => {
+              if (typeof CabbyCodes.openVisitorPlanScene === 'function') {
+                  return CabbyCodes.openVisitorPlanScene();
+              }
+              CabbyCodes.warn(`${LOG_PREFIX} Visitor Plan module unavailable.`);
+              SoundManager.playBuzzer();
+              return false;
+          } },
         // Fuzzy quest — pick which Fuzzy variant Joel wields (the rat-child
         // shred + apology + repair paths grant 7 different weapons). See
         // the FUZZY_* constants block above.

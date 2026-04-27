@@ -130,7 +130,7 @@ When reporting an issue, include `<game>/CabbyCodes.log`. Each line is timestamp
 
 ## Current Features
 
-- **Invincibility Toggle:** When enabled, any actor currently in the player's party is prevented from losing HP through combat damage, poison/regen ticks, scripted damage, or other harmful effects.
+- **Invincibility Toggle:** When enabled, any actor currently in the player's party is prevented from losing HP through combat damage, poison/regen ticks, scripted damage, or other harmful effects. Carve-out for the Visitor final battle: once the party has been swapped to the Massacre Princess Catholicon cast, only Rush (and the original protagonist if he ends up in that party) keep invincibility, so the supporting MP cast still take damage normally.
 - **One Hit Kill Enemies:** Amplifies any HP damage dealt to an enemy into a lethal blow, so a single hit drops even bosses.
 - **Never Miss Attacks:** Forces every party attack to connect: the hit roll is treated as 100% and the target's evasion is treated as 0 while the option is on.
 - **Status Immunity:** Blocks negative status effects from being applied to the party.

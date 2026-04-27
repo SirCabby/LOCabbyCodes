@@ -37,7 +37,11 @@
     const isInvincibilityActive = () => CabbyCodes.getSetting(settingKey, false);
 
     /**
-     * Determines if the battler belongs to the player's party.
+     * Determines if the battler belongs to the player's party. During the
+     * Visitor final battle the party gets swapped to the Massacre Princess
+     * cast (actors 29-37); in that mode only Rush and the renamable primary
+     * keep protection so the boss fight isn't trivialised. See
+     * CabbyCodes.isMassacrePrincessForm in cabbycodes-session-state.js.
      * @param {Game_BattlerBase} battler
      * @returns {boolean}
      */
@@ -48,13 +52,20 @@
         if (typeof $gameParty === 'undefined' || !$gameParty) {
             return false;
         }
+        let inParty = false;
         if (typeof $gameParty.allMembers === 'function') {
-            return $gameParty.allMembers().includes(battler);
+            inParty = $gameParty.allMembers().includes(battler);
+        } else if (typeof $gameParty.members === 'function') {
+            inParty = $gameParty.members().includes(battler);
         }
-        if (typeof $gameParty.members === 'function') {
-            return $gameParty.members().includes(battler);
+        if (!inParty) {
+            return false;
         }
-        return false;
+        if (typeof CabbyCodes.isMassacrePrincessForm === 'function' && CabbyCodes.isMassacrePrincessForm()) {
+            const id = typeof battler.actorId === 'function' ? battler.actorId() : battler._actorId;
+            return id === CabbyCodes.MASSACRE_PRINCESS_RUSH_ACTOR_ID || id === CabbyCodes.PRIMARY_ACTOR_ID;
+        }
+        return true;
     }
 
     /**

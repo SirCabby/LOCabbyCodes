@@ -38,7 +38,12 @@
     const isStatusImmunityActive = () => CabbyCodes.getSetting(settingKey, false);
 
     /**
-     * Determines if the battler belongs to the player's party.
+     * Determines if the battler belongs to the player's party. The Massacre
+     * Princess carve-out (see CabbyCodes.isMassacrePrincessForm in
+     * cabbycodes-session-state.js) drops protection from the MP supporting
+     * cast during the Visitor final battle; without it, the Unconscious
+     * state (id 1, restriction 4) would be blocked here and they'd survive
+     * at 0 HP after Invincibility correctly let them take the lethal hit.
      * @param {Game_BattlerBase} battler
      * @returns {boolean}
      */
@@ -49,13 +54,20 @@
         if (typeof $gameParty === 'undefined' || !$gameParty) {
             return false;
         }
+        let inParty = false;
         if (typeof $gameParty.allMembers === 'function') {
-            return $gameParty.allMembers().includes(battler);
+            inParty = $gameParty.allMembers().includes(battler);
+        } else if (typeof $gameParty.members === 'function') {
+            inParty = $gameParty.members().includes(battler);
         }
-        if (typeof $gameParty.members === 'function') {
-            return $gameParty.members().includes(battler);
+        if (!inParty) {
+            return false;
         }
-        return false;
+        if (typeof CabbyCodes.isMassacrePrincessForm === 'function' && CabbyCodes.isMassacrePrincessForm()) {
+            const id = typeof battler.actorId === 'function' ? battler.actorId() : battler._actorId;
+            return id === CabbyCodes.MASSACRE_PRINCESS_RUSH_ACTOR_ID || id === CabbyCodes.PRIMARY_ACTOR_ID;
+        }
+        return true;
     }
 
     /**

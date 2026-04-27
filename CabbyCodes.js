@@ -73,6 +73,7 @@
             'cabbycodes-locked-doors.js',
             'cabbycodes-video-games.js',
             'cabbycodes-sewer-kids.js',
+            'cabbycodes-visitor-plan.js',
             'cabbycodes-character-name.js',
             'cabbycodes-fast-credits.js'
         ];

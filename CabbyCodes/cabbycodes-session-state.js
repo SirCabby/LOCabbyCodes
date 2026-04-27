@@ -53,6 +53,47 @@
         return CabbyCodes.isGameSessionActive();
     };
 
+    // Massacre Princess Catholicon cast (Actors.json IDs 29-37: Rush, Blast,
+    // Zonrath, Himiko, Zalatar, Rabu, Musashi, Mei, Maldark). The Visitor
+    // final battle swaps the party to this MP cast; vanilla play never sees
+    // these actor IDs in $gameParty, so their presence is the signal that
+    // we're in MP form. Cheats that protect "the party" (invincibility,
+    // status-immunity) consult this to carve out a not-trivialised final
+    // boss fight - typically by keeping protection only for actor 29 (Rush)
+    // and actor 1 (the renamable real protagonist).
+    const MP_FORM_ACTOR_ID_MIN = 29;
+    const MP_FORM_ACTOR_ID_MAX = 37;
+
+    CabbyCodes.MASSACRE_PRINCESS_RUSH_ACTOR_ID = 29;
+    CabbyCodes.PRIMARY_ACTOR_ID = 1;
+
+    /**
+     * Returns true when any current $gameParty member's actorId falls in
+     * the MP-cast range [29..37], i.e. the party has been swapped to the
+     * Massacre Princess Catholicon roster for the Visitor final battle.
+     * @returns {boolean}
+     */
+    CabbyCodes.isMassacrePrincessForm = function() {
+        if (typeof $gameParty === 'undefined' || !$gameParty) {
+            return false;
+        }
+        const members =
+            typeof $gameParty.allMembers === 'function'
+                ? $gameParty.allMembers()
+                : (typeof $gameParty.members === 'function' ? $gameParty.members() : []);
+        for (let i = 0; i < members.length; i += 1) {
+            const member = members[i];
+            if (!member) {
+                continue;
+            }
+            const id = typeof member.actorId === 'function' ? member.actorId() : member._actorId;
+            if (id >= MP_FORM_ACTOR_ID_MIN && id <= MP_FORM_ACTOR_ID_MAX) {
+                return true;
+            }
+        }
+        return false;
+    };
+
     function markSessionActive() {
         CabbyCodes.setGameSessionActive(true);
         CabbyCodes.log?.('[CabbyCodes] Game session marked active');
