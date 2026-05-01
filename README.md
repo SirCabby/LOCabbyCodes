@@ -141,7 +141,7 @@ When reporting an issue, include `<game>/CabbyCodes.log`. Each line is timestamp
 - **Unbreakable Items:** Stops weapons (and any other breakable gear) from losing durability when you attack or when enemies use weapon-breaking abilities.
 - **Unstick Equipment:** Lets you unequip "stuck" gear directly from the standard Equip menu. While on, every equipment slot becomes selectable even when the slot would normally be class-locked or state-sealed; picking the blank "(no item)" entry sends the removed gear back to the party's inventory through the vanilla equip-change path.
 - **Infinite Ammo:** Keeps every ranged weapon fully loaded and blocks all ammo item costs (magazines, marbles, gas cans, batteries, etc.) so you never have to reload or spend ammunition while the toggle is active.
-- **Enemy Health Bars:** Displays sleek HP plates above every enemy. The plates animate with delayed damage trails, show precise HP totals, and remain readable even when the battle screen tone changes.
+- **Enemy Health Bars:** Displays sleek HP plates above every enemy. The plates animate with delayed damage trails, show precise HP totals, list active status effects as a row of small icons below the gauge (the default above-head icon is hidden so the bar no longer covers it), and remain readable even when the battle screen tone changes.
 - **Friendly Door Visitors:** Removes the pool of cursed/hostile door-knock visitors so answering the door never triggers those surprise fights.
 - **Send Next Door Visitor:** Choose from the possible visitors pool and send them immediately knocking at the door.
 - **Free Merchants:** Forces every shop menu entry to show a cost of zero, including vending machines.
