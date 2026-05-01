@@ -37,6 +37,19 @@
 
     const isStatusImmunityActive = () => CabbyCodes.getSetting(settingKey, false);
 
+    // Intentional self-transformation states applied by party-member skills.
+    // Without this carve-out, Leigh's Grinning Beast (skill 65) and Unleashed
+    // Beast (skill 103, scope=user, unlocked after she throws Martin's ring on
+    // Map434) get blocked: states 70/266 trip the param-modifier heuristic
+    // (TRAIT_PARAM value 0.5) and 71 trips restriction>0 (Bloodlust = "attack
+    // anyone"). Treat them as positive transformations rather than debuffs.
+    const TRANSFORMATION_STATE_EXEMPTIONS = new Set([
+        70,  // Grinning Beast
+        71,  // Bloodlust (paired with Grinning Beast)
+        266, // Grinning Beast X (upgraded form after throwing the ring)
+        267  // Bloodlust X (paired with Grinning Beast X)
+    ]);
+
     /**
      * Determines if the battler belongs to the player's party. The Massacre
      * Princess carve-out (see CabbyCodes.isMassacrePrincessForm in
@@ -84,8 +97,12 @@
             return false;
         }
 
+        if (TRANSFORMATION_STATE_EXEMPTIONS.has(stateId)) {
+            return false;
+        }
+
         const state = $dataStates[stateId];
-        
+
         // Death state (ID 1) is typically handled by invincibility,
         // but we can block it here too for complete status immunity
         
