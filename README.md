@@ -2,8 +2,6 @@
 
 A cheats / quality-of-life mod for *Look Outside*, the RPG Maker MZ horror RPG. CabbyCodes adds a **Cheats** entry to the in-game menu with toggles and pickers for invincibility, infinite items, time control, story-flag editing, and dozens of other tweaks. It installs as a standard plugin — no game files are permanently modified, and uninstalling is just removing two files and one entry.
 
-**Current version:** `1.0.0`
-
 ---
 
 ## Installation
@@ -194,7 +192,7 @@ All targets assume `INSTALL_DIR` points at the game's install folder. Override p
 | --- | --- |
 | `make deploy` | Hash-verified copy of `CabbyCodes.js` + `CabbyCodes/` into `<install>/js/plugins/`. Existing files are removed and re-verified before the new ones land. |
 | `make package` | Build `dist/LOCabbyCodes.v<version>.zip` containing only the loader, the `CabbyCodes/` folder, the README, and the LICENSE. |
-| `make rev X.Y.Z` | Bump the version everywhere: `VERSION`, `CabbyCodes.version` in `cabbycodes-core.js`, and the `Current version` line in this README. Run before packaging a release. |
+| `make rev X.Y.Z` | Bump the version: `VERSION` and `CabbyCodes.version` in `cabbycodes-core.js`. Run before packaging a release. |
 | `make run` | Deploy, kill any running `Game.exe`, delete `CabbyCodes.log`, then launch via `steam://rungameid/3373660`. **Force-kills the game — save first.** |
 | `make clean-log` | Delete `CabbyCodes.log` from the install dir. |
 

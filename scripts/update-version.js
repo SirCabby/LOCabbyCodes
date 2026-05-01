@@ -41,17 +41,5 @@ replaceInFile(coreFile, (contents) => {
     return contents.replace(regex, `CabbyCodes.version = '${newVersion}';`);
 });
 
-const readmeFile = path.join(__dirname, '..', 'README.md');
-replaceInFile(readmeFile, (contents) => {
-    const regex = /Current Version: \*\*[^*]+\*\* \(tracked in the root `VERSION` file\)/;
-    if (!regex.test(contents)) {
-        throw new Error('Current Version line not found in README.md');
-    }
-    return contents.replace(
-        regex,
-        `Current Version: **${newVersion}** (tracked in the root \`VERSION\` file)`
-    );
-});
-
 console.log(`[version] Version synchronized to ${newVersion}`);
 

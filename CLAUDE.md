@@ -22,7 +22,7 @@ All `make` targets assume `INSTALL_DIR = C:/Program Files (x86)/Steam/steamapps/
 - `make deploy` — hash-verified copy of `CabbyCodes.js` + `CabbyCodes/` into the game's `js/plugins/`.
 - `make run` — `deploy`, then `taskkill /f /im Game.exe`, delete `CabbyCodes.log`, launch via `steam://rungameid/3373660`. **Force-kills the game** — save first.
 - `make package` — build `dist/LOCabbyCodes.v<ver>.zip` (loader + folder + README + LICENSE only).
-- `make rev X.Y.Z` — bump `VERSION`, `CabbyCodes.version` in `cabbycodes-core.js`, and README in one shot. Always run before `make package`.
+- `make rev X.Y.Z` — bump `VERSION` and `CabbyCodes.version` in `cabbycodes-core.js` in one shot. Always run before `make package`.
 - `make clean-log` — delete `CabbyCodes.log` from the install dir (no backup).
 - `/refresh-game-files` skill (or `node scripts/refresh-game-files.js`) — resync the local `game_files/` vanilla reference mirror when Steam patches the game.
 

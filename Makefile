@@ -19,7 +19,7 @@ help:
 	@echo "CabbyCodes automation"
 	@echo "  make deploy           Deploy CabbyCodes to the Look Outside install."
 	@echo "  make package          Build dist/$(PACKAGE_NAME) zip for distribution."
-	@echo "  make rev X.Y.Z        Bump VERSION, runtime constant, and README."
+	@echo "  make rev X.Y.Z        Bump VERSION and runtime constant."
 	@echo "  make run              Deploy, stop the game, launch via Steam."
 
 ensure-version:
