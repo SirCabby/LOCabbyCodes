@@ -77,12 +77,23 @@
     };
 
     const PLATE_WIDTH = 180;
-    const PLATE_HEIGHT = 60;
     const INNER_PADDING = 14;
     const NAME_TEXT_HEIGHT = 18;
     const GAUGE_TOP = 26;
     const GAUGE_HEIGHT = 10;
     const FOOTER_TOP = GAUGE_TOP + GAUGE_HEIGHT + 2;
+    const HP_TEXT_HEIGHT = 18;
+    const FOOTER_BOTTOM_PADDING = 4;
+    const ICON_ROW_TOP = FOOTER_TOP + HP_TEXT_HEIGHT + 2;
+    const ICON_SIZE = 16;
+    const ICON_GAP = 2;
+    const ICON_ROW_BOTTOM_PADDING = 4;
+    const COMPACT_PLATE_HEIGHT = FOOTER_TOP + HP_TEXT_HEIGHT + FOOTER_BOTTOM_PADDING;
+    const EXTENDED_PLATE_HEIGHT = ICON_ROW_TOP + ICON_SIZE + ICON_ROW_BOTTOM_PADDING;
+    const MAX_ICON_SLOTS = Math.max(
+        1,
+        Math.floor((PLATE_WIDTH - INNER_PADDING * 2 + ICON_GAP) / (ICON_SIZE + ICON_GAP))
+    );
     const VERTICAL_GAP_ABOVE_SPRITE = 12;
     const MAX_TICK_MARKS = 5;
     const SMOOTHING_PRIMARY = 0.18;
@@ -304,10 +315,11 @@
             this._layerPoint = new PIXI.Point(0, 0);
             this._previousName = '';
             this._needsFullRedraw = true;
+            this._currentPlateHeight = COMPACT_PLATE_HEIGHT;
             this.opacity = 0;
             this.anchor.set(0.5, 1);
             this.z = 100;
-            this.bitmap = new Bitmap(PLATE_WIDTH, PLATE_HEIGHT);
+            this.bitmap = new Bitmap(PLATE_WIDTH, COMPACT_PLATE_HEIGHT);
         }
 
         /**
@@ -338,6 +350,9 @@
                 this.opacity = clamp(this.opacity + delta, 0, 255);
             }
             this.visible = this.opacity > 0;
+            // Suppress the default above-head state icon while we own the
+            // status display — otherwise the plate visibly covers it.
+            this._syncDefaultStateIconVisibility(targetVisible);
             if (!this.visible || !this._battler) {
                 return;
             }
@@ -352,11 +367,33 @@
          * @param {object} options
          */
         destroy(options) {
+            this._syncDefaultStateIconVisibility(false);
             if (this.bitmap) {
                 this.bitmap.destroy();
                 this.bitmap = null;
             }
             super.destroy(options);
+        }
+
+        /**
+         * Hides or restores the enemy sprite's built-in state icon depending
+         * on whether our plate is currently claiming the status display.
+         * @param {boolean} ourPlateShouldShow
+         * @private
+         */
+        _syncDefaultStateIconVisibility(ourPlateShouldShow) {
+            const sprite = this._enemySprite;
+            if (!sprite || sprite._destroyed) {
+                return;
+            }
+            const stateIconSprite = sprite._stateIconSprite;
+            if (!stateIconSprite || stateIconSprite._destroyed) {
+                return;
+            }
+            const desired = !ourPlateShouldShow;
+            if (stateIconSprite.visible !== desired) {
+                stateIconSprite.visible = desired;
+            }
         }
 
         /**
@@ -453,10 +490,23 @@
             if (!bitmap) {
                 return;
             }
+            const icons = this._resolveIconList();
+            const desiredHeight =
+                icons.length > 0 ? EXTENDED_PLATE_HEIGHT : COMPACT_PLATE_HEIGHT;
+            if (desiredHeight !== this._currentPlateHeight) {
+                this._currentPlateHeight = desiredHeight;
+                bitmap.resize(PLATE_WIDTH, desiredHeight);
+                // Bitmap.resize updates the canvas + baseTexture, but the
+                // Sprite's _frame is fixed at the size the bitmap had on load.
+                // Without this the sprite would keep rendering at the old
+                // size and squash/clip the new texture.
+                this.setFrame(0, 0, PLATE_WIDTH, desiredHeight);
+            }
+            const plateHeight = this._currentPlateHeight;
             bitmap.clear();
             const ctx = bitmap._context;
             const colorSet = this._isBoss ? COLOR_SETS.boss : COLOR_SETS.normal;
-            const gradient = ctx.createLinearGradient(0, 0, 0, PLATE_HEIGHT);
+            const gradient = ctx.createLinearGradient(0, 0, 0, plateHeight);
             gradient.addColorStop(0, 'rgba(14, 18, 32, 0.96)');
             gradient.addColorStop(1, 'rgba(5, 8, 16, 0.92)');
 
@@ -464,7 +514,7 @@
             bitmap.paintOpacity = 70;
             bitmap.fillRect(
                 18,
-                PLATE_HEIGHT - 6,
+                plateHeight - 6,
                 PLATE_WIDTH - 36,
                 6,
                 'rgba(0, 0, 0, 0.65)'
@@ -475,7 +525,7 @@
                 x: 0,
                 y: 0,
                 width: PLATE_WIDTH,
-                height: PLATE_HEIGHT,
+                height: plateHeight,
                 radius: 0,
                 fillStyle: gradient,
                 strokeStyle: colorSet.border,
@@ -605,12 +655,72 @@
                 INNER_PADDING,
                 FOOTER_TOP,
                 PLATE_WIDTH - INNER_PADDING * 2,
-                18,
+                HP_TEXT_HEIGHT,
                 'left'
             );
 
+            this._drawStatusIcons(bitmap, icons);
+
             this._markBitmapDirty(bitmap);
             this._needsFullRedraw = false;
+        }
+
+        /**
+         * Returns the battler's currently active state/buff icon indices,
+         * trimmed to what the plate has room to display. The plate uses the
+         * count to decide whether to expand its height, so a shared resolution
+         * keeps the height check and the draw call in sync.
+         * @returns {number[]}
+         * @private
+         */
+        _resolveIconList() {
+            const battler = this._battler;
+            if (!battler || typeof battler.allIcons !== 'function') {
+                return [];
+            }
+            let icons;
+            try {
+                icons = battler.allIcons() || [];
+            } catch (e) {
+                return [];
+            }
+            if (!Array.isArray(icons) || icons.length === 0) {
+                return [];
+            }
+            const filtered = icons.filter(idx => Number.isFinite(idx) && idx > 0);
+            if (filtered.length <= MAX_ICON_SLOTS) {
+                return filtered;
+            }
+            return filtered.slice(0, MAX_ICON_SLOTS);
+        }
+
+        /**
+         * Draws active state/buff icons in a downscaled row beneath the HP
+         * footer. Replaces the default above-head Sprite_StateIcon, which the
+         * plate would otherwise visually cover.
+         * @param {Bitmap} bitmap
+         * @param {number[]} icons
+         * @private
+         */
+        _drawStatusIcons(bitmap, icons) {
+            if (!bitmap || !icons || icons.length === 0 || typeof ImageManager === 'undefined') {
+                return;
+            }
+            const iconSet = ImageManager.loadSystem('IconSet');
+            if (!iconSet || (typeof iconSet.isReady === 'function' && !iconSet.isReady())) {
+                return;
+            }
+            const srcW = ImageManager.iconWidth || 32;
+            const srcH = ImageManager.iconHeight || 32;
+            const stride = ICON_SIZE + ICON_GAP;
+            let drawX = INNER_PADDING;
+            for (let i = 0; i < icons.length; i += 1) {
+                const idx = icons[i];
+                const sx = (idx % 16) * srcW;
+                const sy = Math.floor(idx / 16) * srcH;
+                bitmap.blt(iconSet, sx, sy, srcW, srcH, drawX, ICON_ROW_TOP, ICON_SIZE, ICON_SIZE);
+                drawX += stride;
+            }
         }
 
         /**
@@ -650,7 +760,7 @@
             const halfWidth = PLATE_WIDTH / 2;
             const minX = SCREEN_EDGE_PADDING + halfWidth;
             const maxX = bounds.width - SCREEN_EDGE_PADDING - halfWidth;
-            const minY = SCREEN_EDGE_PADDING + PLATE_HEIGHT;
+            const minY = SCREEN_EDGE_PADDING + this._currentPlateHeight;
             const maxY = bounds.height - SCREEN_EDGE_PADDING;
             const clampedX = clamp(this._layerPoint.x, minX, maxX);
             const clampedY = clamp(this._layerPoint.y, minY, maxY);
