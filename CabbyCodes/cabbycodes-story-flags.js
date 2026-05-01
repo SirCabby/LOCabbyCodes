@@ -1466,6 +1466,114 @@
         }
     }
 
+    // ---- Challenges (end-of-game score bonuses) ----
+    //
+    // The credits scene (Map274 ev1 "Credits") tallies var 563 (scoreBonuses)
+    // by reading a handful of "did the player do X at least once?" flags.
+    // Each flag that is OFF awards a bonus, and the matching achievement
+    // (Misc_NoShowers / Misc_NoSleep / Misc_NoEat / Misc_NoFriends /
+    // Misc_NoGames / Misc_ColdShoulder) fires alongside — gated additionally
+    // on switch 1118 (`isRitualEnding`) for achievement firing only.
+    //
+    //   tookShowerOnce  (sw 602)  Miasma     +500pts   Misc_NoShowers
+    //   sleptOnce       (sw 603)  Insomnia   +500pts   Misc_NoSleep
+    //   ateMealOnce     (sw 604)  Ascetic    +500pts   Misc_NoEat
+    //   playedAGame     (sw 605)  Gamersbane +500pts   Misc_NoGames
+    //   NotALoner       (sw 1004) Loner      +bossPts  Misc_NoFriends
+    //                              (also gated on var 37 `peopleInAppt` == 0
+    //                              at credits time — the cheat only flips
+    //                              the switch; if the player has any
+    //                              recruit or visitor in the apartment when
+    //                              reaching the end the bonus is forfeit
+    //                              regardless of this flag)
+    //   savedGameOnce   (sw 1117) No Saves   +4000pts  Misc_ColdShoulder
+    //   IRONMAN         (sw 9)    Iron Man   +2000pts  Misc_ColdShoulder
+    //                              (positive polarity — the natural game
+    //                              flips this ON when the player tells
+    //                              Sybil to disable saves; awarded only
+    //                              when savedGameOnce is also ON, i.e. the
+    //                              player saved before disabling saves)
+    //
+    // The "Long Weekend" bonus (currentDay <= 3, +1000pts) is not exposed
+    // here because the day counter is a continuously ticking variable
+    // already editable via the Set Time cheat — it isn't a flag.
+    //
+    // All entries except Iron Man are inverted-polarity: the picker shows
+    // "On" = challenge active = bonus available = underlying switch OFF.
+    // applyInvertedChallengeSwitch handles the inversion so the underlying
+    // switch is always written to the game-correct value.
+
+    const CHALLENGE_INVERTED_OPTIONS = [
+        { value: 0, label: 'Off' },
+        { value: 1, label: 'On' }
+    ];
+
+    const CHALLENGE_SWITCH_TOOK_SHOWER = 602;
+    const CHALLENGE_SWITCH_SLEPT       = 603;
+    const CHALLENGE_SWITCH_ATE_MEAL    = 604;
+    const CHALLENGE_SWITCH_PLAYED_GAME = 605;
+    const CHALLENGE_SWITCH_NOT_LONER   = 1004;
+    const CHALLENGE_SWITCH_SAVED       = 1117;
+    const CHALLENGE_SWITCH_IRONMAN     = 9;
+
+    function applyInvertedChallengeSwitch(label, switchId, newValue) {
+        if (!isSessionReady()) {
+            return false;
+        }
+        const wantActive = Boolean(newValue);
+        const wantSwitchOn = !wantActive;
+        const oldActive = !readSwitch(switchId);
+        const api = CabbyCodes.freezeTime;
+        const token = (api && typeof api.exemptFromRestore === 'function')
+            ? api.exemptFromRestore({ switches: [switchId] })
+            : { release: () => {} };
+        try {
+            $gameSwitches.setValue(switchId, wantSwitchOn);
+            const readBack = !readSwitch(switchId);
+            CabbyCodes.warn(`${LOG_PREFIX} ${label} (switch ${switchId} inverted): ${oldActive ? 'On' : 'Off'} -> ${wantActive ? 'On' : 'Off'}. Read-back: ${readBack ? 'On' : 'Off'}.`);
+            return true;
+        } catch (error) {
+            CabbyCodes.error(`${LOG_PREFIX} Apply failed for ${label}: ${error?.message || error}`);
+            return false;
+        } finally {
+            token.release();
+        }
+    }
+
+    const CHALLENGE_FLAGS = [
+        { id: 'noShowers',    label: 'No Showers',     kind: 'switch', switchId: CHALLENGE_SWITCH_TOOK_SHOWER,
+          options: CHALLENGE_INVERTED_OPTIONS,
+          targetLabel: `switch ${CHALLENGE_SWITCH_TOOK_SHOWER} inverted`,
+          readValue: () => readSwitch(CHALLENGE_SWITCH_TOOK_SHOWER) ? 0 : 1,
+          applyValue: (v) => applyInvertedChallengeSwitch('No Showers', CHALLENGE_SWITCH_TOOK_SHOWER, v) },
+        { id: 'noSleep',      label: 'No Sleep',       kind: 'switch', switchId: CHALLENGE_SWITCH_SLEPT,
+          options: CHALLENGE_INVERTED_OPTIONS,
+          targetLabel: `switch ${CHALLENGE_SWITCH_SLEPT} inverted`,
+          readValue: () => readSwitch(CHALLENGE_SWITCH_SLEPT) ? 0 : 1,
+          applyValue: (v) => applyInvertedChallengeSwitch('No Sleep', CHALLENGE_SWITCH_SLEPT, v) },
+        { id: 'noMeals',      label: 'No Meals',       kind: 'switch', switchId: CHALLENGE_SWITCH_ATE_MEAL,
+          options: CHALLENGE_INVERTED_OPTIONS,
+          targetLabel: `switch ${CHALLENGE_SWITCH_ATE_MEAL} inverted`,
+          readValue: () => readSwitch(CHALLENGE_SWITCH_ATE_MEAL) ? 0 : 1,
+          applyValue: (v) => applyInvertedChallengeSwitch('No Meals', CHALLENGE_SWITCH_ATE_MEAL, v) },
+        { id: 'noVideoGames', label: 'No Video Games', kind: 'switch', switchId: CHALLENGE_SWITCH_PLAYED_GAME,
+          options: CHALLENGE_INVERTED_OPTIONS,
+          targetLabel: `switch ${CHALLENGE_SWITCH_PLAYED_GAME} inverted`,
+          readValue: () => readSwitch(CHALLENGE_SWITCH_PLAYED_GAME) ? 0 : 1,
+          applyValue: (v) => applyInvertedChallengeSwitch('No Video Games', CHALLENGE_SWITCH_PLAYED_GAME, v) },
+        { id: 'noFriends',    label: 'No Friends',     kind: 'switch', switchId: CHALLENGE_SWITCH_NOT_LONER,
+          options: CHALLENGE_INVERTED_OPTIONS,
+          targetLabel: `switch ${CHALLENGE_SWITCH_NOT_LONER} inverted`,
+          readValue: () => readSwitch(CHALLENGE_SWITCH_NOT_LONER) ? 0 : 1,
+          applyValue: (v) => applyInvertedChallengeSwitch('No Friends', CHALLENGE_SWITCH_NOT_LONER, v) },
+        { id: 'noSaves',      label: 'No Saves',       kind: 'switch', switchId: CHALLENGE_SWITCH_SAVED,
+          options: CHALLENGE_INVERTED_OPTIONS,
+          targetLabel: `switch ${CHALLENGE_SWITCH_SAVED} inverted`,
+          readValue: () => readSwitch(CHALLENGE_SWITCH_SAVED) ? 0 : 1,
+          applyValue: (v) => applyInvertedChallengeSwitch('No Saves', CHALLENGE_SWITCH_SAVED, v) },
+        { id: 'ironMan',      label: 'Iron Man Mode',  kind: 'switch', switchId: CHALLENGE_SWITCH_IRONMAN }
+    ];
+
     // The 'sacrifices' category label is rebuilt at menu-open time from the
     // protagonist's live actor-1 name (Sam by default, but renameable), so the
     // label here is just a placeholder that openCategoriesMenu overwrites.
@@ -1482,6 +1590,7 @@
         { id: 'quests',       label: 'Quest States...',               helpText: 'Per-questline progression variables.', flags: QUEST_FLAGS },
         { id: 'friendlyNpcs', label: 'Friendly NPCs...',              helpText: 'Alive/dead status of named non-recruit NPCs.', flags: FRIENDLY_NPC_FLAGS },
         { id: 'bossNpcs',     label: 'Bosses & Notable Enemies...',   helpText: 'Alive/dead status of unique bosses.', flags: BOSS_NPC_FLAGS },
+        { id: 'challenges',   label: 'Challenges...',                 helpText: 'End-of-game score-bonus flags. On = bonus available at credits.', flags: CHALLENGE_FLAGS },
         { id: 'videoGames',   label: 'Video Games...',                helpText: 'Plays left and skill per cartridge.', onSelect: () => {
             if (typeof CabbyCodes.openVideoGamesScene === 'function') {
                 return CabbyCodes.openVideoGamesScene();
