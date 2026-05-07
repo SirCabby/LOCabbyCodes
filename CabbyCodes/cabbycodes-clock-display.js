@@ -93,15 +93,12 @@
 
     function readDayPrefix() {
         const primary = Number($gameVariables.value(CURRENT_DAY_VARIABLE_ID));
-        if (Number.isFinite(primary) && primary > 0) {
-            return `D${primary}`;
+        if (Number.isFinite(primary)) {
+            return `D${primary + 1}`;
         }
         const fallback = Number($gameVariables.value(CALENDAR_DAY_VARIABLE_ID));
-        if (Number.isFinite(fallback) && fallback > 0) {
-            return `D${fallback}`;
-        }
-        if (Number.isFinite(primary)) {
-            return `D${primary}`;
+        if (Number.isFinite(fallback)) {
+            return `D${fallback + 1}`;
         }
         return null;
     }
