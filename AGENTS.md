@@ -74,7 +74,7 @@ Guidelines for AI coding assistants (and human contributors) working in this rep
 ## 9. Performance guardrails
 
 - Do not put expensive work inside hot loops — `Game_Interpreter.prototype.update`, `Scene_Map.prototype.update`, `Window_Base.prototype.update`, sprite `update` methods. These run every frame or every interpreter tick.
-- The debug module records `new Error().stack` on every entry into a patched function. Treat every `CabbyCodes.override` as having nontrivial overhead and reach for `after` / `before` (or skip the hook entirely) when you only need a side effect.
+- The debug module captures `new Error().stack` lazily — only once a patched function's depth crosses 50% of its recursion threshold. The shallow common case is just a depth-counter increment. Patches still cost a function-call indirection plus a `try/finally`, so don't sprinkle `override` across hot loops, but don't avoid `override` for one-shot patches because of "stack capture overhead" — that overhead is no longer paid per call.
 - Avoid patching `Game_Variables.prototype.value` or any method called hundreds of times per frame.
 - File I/O: The logger uses `fs.appendFileSync`. Avoid spamming `CabbyCodes.log(...)` at frame rate — keep per-frame log lines behind `CabbyCodes.debug(...)`.
 

@@ -85,14 +85,15 @@ A patch-tracking array (`CabbyCodes._appliedPatches`) logs every applied patch a
 ### 4.4 Debug instrumentation (`cabbycodes-debug.js`)
 
 - Every `override / before / after` passes the produced wrapper through `CabbyCodes.debugWrap`, which:
-  - records `new Error().stack` into a per-function ring buffer (`callStacks`) on entry,
+  - tracks per-function call depth as a plain integer counter (`callDepths`) on entry/exit,
   - increments a total-call counter,
+  - **lazily** captures `new Error().stack` samples into a per-function ring buffer (`callStackSamples`) only once depth crosses 50% of the recursion threshold — the common shallow case never allocates an Error,
   - warns once when depth hits the recursion threshold (default 10, overridden to 250 for `Game_Interpreter.update`),
   - logs a richly annotated report on `RangeError: Maximum call stack` inside the wrapped call and on any top-level `window.onerror` / `unhandledrejection` that looks like a stack overflow.
 - Marks wrappers with `_cabbycodesDebugWrapped = true` and copies `_cabbycodesIsOverride` / `_cabbycodesOriginal` from the inner function so the outer debug wrapper looks like a normal chain link to `getPreviousInChain`. **Important:** because of that copy, a debug wrapper's `_cabbycodesOriginal` points at the *previous chain element*, not at the inner chainedFunction it wraps. Do not "unwrap debug wrappers" by walking `_cabbycodesOriginal` — it will skip an entire chain layer. `callOriginal` relies on `_overrideCallStack` to pick the right link instead.
 - Exposes `CabbyCodes.getCallStats()`, `logCallStats()`, `clearCallStats()`, `getAppliedPatches()`, `logAppliedPatches()` for live diagnostics.
 
-This module has measurable overhead — see performance notes below.
+Per-call hot-path overhead is now small (two `Map.get/set` pairs and an integer increment) — the expensive `new Error().stack` work is deferred to deep recursion only. Patching frame-rate hot paths is still discouraged because each wrapper still adds a function-call indirection and a `try/finally` boundary; see performance notes below.
 
 ### 4.5 Options-menu integration (`cabbycodes-settings.js`)
 

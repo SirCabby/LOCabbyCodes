@@ -92,16 +92,17 @@ It uses `setTimeout(applySaveAnywherePatch, 0)` *and* sets a `_applied` flag to 
 
 At minimum, downgrade any per-frame log line to `CabbyCodes.debug` (currently gated off by default) and audit current INFO lines for frame-rate usage.
 
-### B2. Debug instrumentation captures stack traces on every patched call — **high**
+### B2. Debug instrumentation captures stack traces on every patched call — **shipped**
 
-*File:* `CabbyCodes/cabbycodes-debug.js` (lines 66–107).
+*File:* `CabbyCodes/cabbycodes-debug.js`.
 
-`trackCallEntry` does `new Error().stack` on every entry into every patched function. `new Error().stack` in V8 is cheap-ish but not free (≈ a few hundred nanoseconds); wrapping `Game_Interpreter.update` means we collect a stack on every interpreter tick. The ring buffer caps memory usage (MAX_STACK_DEPTH = 50, 250 for interpreter), but CPU cost is constant per call.
+**Was:** `trackCallEntry` did `new Error().stack` on every entry into every patched function. Wrapping `Game_Interpreter.update` meant collecting a stack on every interpreter tick — a constant per-call cost that became visible under load.
 
-**Fix:**
-- Gate the whole `debugWrap` behind a runtime flag (`CabbyCodes.debugEnabled`). The module already defines it but always wraps.
-- If always-on instrumentation is desired, skip the `Error` creation unless `callStacks[callId].length + 1 >= threshold / 2`. Collect stacks only when we're close to warning.
-- Allow feature files to opt *out* of wrapping by passing a flag to `override / before / after`.
+**Shipped:** the per-call ring buffer was split. `callDepths` tracks depth as a plain integer (the only thing the hot path touches); `callStackSamples` is allocated lazily and only populated once depth crosses 50% of the recursion threshold (`STACK_CAPTURE_RATIO = 0.5`). For the overwhelmingly common shallow case no Error is ever allocated. Recursion warnings still log up to `MAX_STACK_DEPTH` recent samples (always available by the time the warning fires, since capture starts at threshold/2 and the warning fires at threshold). Stack-overflow logging uses `error.stack` plus whatever samples were retained; an explicit note is logged when the overflow happened before any samples were captured.
+
+**Still open / optional follow-ups:**
+- Allow feature files to opt *out* of wrapping by passing a flag to `override / before / after`. Useful as a hard cap if a feature has to patch a frame-rate hot path.
+- Provide a runtime kill switch (`CabbyCodes.debugInstrumentationEnabled`) that early-returns from the wrapper. Lower priority now that the per-call cost is small.
 
 ### B3. Recursion warnings only fire once per process — **low**
 
@@ -273,7 +274,7 @@ The freeze-time module references dozens of common event IDs with inline comment
 
 1. Fix A1 + A2 together (patch-chain correctness) — unlocks safe sharing of the hook points.
 2. Sweep A3 (replace hand-rolled `callOriginal` calls) now that the chain is trustworthy.
-3. Performance pass: B1 (async logging) + B2 (optional debug wrap) — measurable frame-time gains.
+3. Performance pass: B1 (async logging) — measurable frame-time gains. (B2 — debug-wrap stack capture — is shipped via lazy capture.)
 4. Repo hygiene: F6 (eslint). (F1 — large JSON out of git — is now resolved.)
 5. Nice-to-have: F3 (cross-platform deploy), H2 (common-events index).
 

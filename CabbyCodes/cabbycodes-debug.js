@@ -16,12 +16,20 @@
         window.CabbyCodes = {};
     }
 
-    // Call stack tracking for recursion detection
-    const callStacks = new Map();
+    // Call stack tracking for recursion detection.
+    // Hot path stays a plain integer counter (callDepths) — no Error allocation,
+    // no array work — until depth crosses STACK_CAPTURE_RATIO of the recursion
+    // threshold, at which point we start collecting `new Error().stack` samples
+    // into callStackSamples. This keeps recursion/stack-overflow diagnostics
+    // intact for genuinely deep call chains while removing per-tick overhead
+    // from the overwhelmingly common shallow case.
+    const callDepths = new Map();
     const callCounts = new Map();
+    const callStackSamples = new Map();
     const recursionWarningsIssued = new Set();
     const MAX_STACK_DEPTH = 50;
     const RECURSION_THRESHOLD = 10;
+    const STACK_CAPTURE_RATIO = 0.5;
     const recursionOverrides = new Map([
         // Game_Interpreter.update legitimately re-enters while events queue nested interpreters.
         // Only warn when the depth becomes extreme, and log as a warning instead of an error.
@@ -64,38 +72,51 @@
     }
 
     function trackCallEntry(callId) {
-        const stack = callStacks.get(callId) || [];
-        stack.push(new Error().stack);
-        
-        if (stack.length > MAX_STACK_DEPTH) {
-            stack.shift(); // Remove oldest entry
-        }
-        
-        callStacks.set(callId, stack);
-        
-        // Track call count
+        const depth = (callDepths.get(callId) || 0) + 1;
+        callDepths.set(callId, depth);
+
         const count = callCounts.get(callId) || 0;
         callCounts.set(callId, count + 1);
-        
-        // Check for recursion
+
         const override = getRecursionOverride(callId);
         const threshold = override?.threshold ?? RECURSION_THRESHOLD;
-        const shouldWarn =
-            stack.length >= threshold && !recursionWarningsIssued.has(callId);
-        if (shouldWarn) {
+        const captureFloor = Math.max(2, Math.floor(threshold * STACK_CAPTURE_RATIO));
+
+        // Defer the expensive `new Error().stack` until depth approaches the
+        // recursion threshold. For the common case (depth 1) this branch is
+        // skipped entirely.
+        if (depth >= captureFloor) {
+            let samples = callStackSamples.get(callId);
+            if (!samples) {
+                samples = [];
+                callStackSamples.set(callId, samples);
+            }
+            samples.push(new Error().stack);
+            if (samples.length > MAX_STACK_DEPTH) {
+                samples.shift();
+            }
+        }
+
+        if (depth >= threshold && !recursionWarningsIssued.has(callId)) {
             recursionWarningsIssued.add(callId);
             const log = getRecursionLogger(override);
-            log(`[CabbyCodes] Potential recursion detected: ${callId} called ${stack.length} times`);
+            log(`[CabbyCodes] Potential recursion detected: ${callId} called ${depth} times`);
             if (override?.note) {
                 log(`[CabbyCodes]   Note: ${override.note}`);
             }
             if (override?.includeStack !== false) {
+                const samples = callStackSamples.get(callId) || [];
                 log(`[CabbyCodes] Call stack for ${callId}:`);
                 const detailCount = Number.isFinite(override?.stackEntries)
                     ? override.stackEntries
                     : 5;
-                stack.slice(-detailCount).forEach((trace, idx) => {
-                    log(`[CabbyCodes]   Call ${stack.length - detailCount + idx + 1}:`);
+                const detailedSamples = samples.slice(-detailCount);
+                detailedSamples.forEach((trace, idx) => {
+                    // Each sample was captured during a trackCallEntry, so the
+                    // newest one corresponds to the current depth and earlier
+                    // samples step back from there.
+                    const sampleDepth = depth - (detailedSamples.length - 1 - idx);
+                    log(`[CabbyCodes]   Call ${sampleDepth}:`);
                     const lines = trace.split('\n').slice(0, 5);
                     lines.forEach(line => {
                         log(`[CabbyCodes]     ${line.trim()}`);
@@ -103,21 +124,29 @@
                 });
             }
         }
-        
-        return stack.length;
+
+        return depth;
     }
 
     /**
      * Track a function call exit
      */
     function trackCallExit(callId) {
-        const stack = callStacks.get(callId);
-        if (stack && stack.length > 0) {
-            stack.pop();
-            if (stack.length === 0) {
-                recursionWarningsIssued.delete(callId);
+        const depth = callDepths.get(callId) || 0;
+        if (depth <= 0) {
+            return;
+        }
+        const newDepth = depth - 1;
+        if (newDepth === 0) {
+            callDepths.delete(callId);
+            callStackSamples.delete(callId);
+            recursionWarningsIssued.delete(callId);
+        } else {
+            callDepths.set(callId, newDepth);
+            const samples = callStackSamples.get(callId);
+            if (samples && samples.length > 0) {
+                samples.pop();
             }
-            callStacks.set(callId, stack);
         }
     }
 
@@ -151,7 +180,7 @@
                 CabbyCodes.error(`[CabbyCodes]   ${line.trim()}`);
             });
             
-            const recentCalls = callStacks.get(callId) || [];
+            const recentCalls = callStackSamples.get(callId) || [];
             if (recentCalls.length > 0) {
                 CabbyCodes.error(`[CabbyCodes] Recent call history for ${callId} (showing last 3):`);
                 recentCalls.slice(-3).forEach((trace, idx) => {
@@ -161,6 +190,8 @@
                         CabbyCodes.error(`[CabbyCodes]     ${line.trim()}`);
                     });
                 });
+            } else {
+                CabbyCodes.error(`[CabbyCodes] No recent stack samples retained (overflow occurred before recursion-threshold capture floor); see the error.stack trace above for the recursion path.`);
             }
             
             CabbyCodes.error(`[CabbyCodes] Top 10 most called functions:`);
@@ -242,7 +273,7 @@
     CabbyCodes.getCallStats = function() {
         const stats = [];
         callCounts.forEach((count, callId) => {
-            const depth = callStacks.get(callId)?.length || 0;
+            const depth = callDepths.get(callId) || 0;
             stats.push({
                 callId,
                 totalCalls: count,
@@ -267,8 +298,10 @@
      * Clear call statistics
      */
     CabbyCodes.clearCallStats = function() {
-        callStacks.clear();
+        callDepths.clear();
         callCounts.clear();
+        callStackSamples.clear();
+        recursionWarningsIssued.clear();
         CabbyCodes.log('[CabbyCodes] Call statistics cleared');
     };
 

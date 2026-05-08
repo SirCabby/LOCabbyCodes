@@ -75,7 +75,7 @@ Then **add the filename to the `scripts` array in `CabbyCodes.js`** — the load
 
 ## Performance guardrails
 
-- `cabbycodes-debug.js` wraps every patched function and records `new Error().stack` on entry. Treat every `override` as non-trivial overhead.
+- `cabbycodes-debug.js` wraps every patched function. The hot path is a depth-counter increment; `new Error().stack` is captured lazily only when a function's depth approaches its recursion threshold. Patches still add a function-call indirection plus `try/finally`, so don't patch frame-rate-hot loops, but ordinary `override` use is cheap.
 - Do not patch hot loops (`Game_Interpreter.prototype.update`, `Scene_Map.prototype.update`, `Window_Base.prototype.update`, sprite `update`) or frequently-called accessors (`Game_Variables.prototype.value`).
 - HUD refresh intervals should be ≥ 6–12 frames.
 - Never spam `CabbyCodes.log(...)` at frame rate — keep per-frame lines behind `debug()`.
