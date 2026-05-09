@@ -51,7 +51,7 @@
     const FOUR_AM_MINUTES = 4 * 60;
     const MINUTE_STEP = 15;
     const DAY_MIN = 0;
-    const DAY_MIN_CEILING = 20;
+    const DAY_MIN_CEILING = 15;
     const DAY_LOOKAHEAD = 5;
 
     const HOUR_OPTIONS = buildHourOptions();
@@ -87,7 +87,7 @@
         const ceiling = Math.max(DAY_MIN_CEILING, Number(currentDay) + DAY_LOOKAHEAD);
         const list = [];
         for (let d = DAY_MIN; d <= ceiling; d += 1) {
-            list.push({ key: String(d), name: `Day ${d}`, value: d });
+            list.push({ key: String(d), name: `Day ${d + 1}`, value: d });
         }
         return list;
     }
@@ -105,7 +105,7 @@
     }
 
     function formatDayTime(day, hour, minute) {
-        return `D${day} ${formatTime(hour, minute)}`;
+        return `D${day + 1} ${formatTime(hour, minute)}`;
     }
 
     function snapMinute(value) {
@@ -513,7 +513,7 @@
     Scene_CabbyCodesSetTime.prototype.displayLabelForField = function(field) {
         if (field === 'hour') return formatHourLabel(this._selection.hour);
         if (field === 'minute') return formatMinuteLabel(this._selection.minute);
-        return `Day ${this._selection.day}`;
+        return `Day ${this._selection.day + 1}`;
     };
 
     Scene_CabbyCodesSetTime.prototype.refreshDropdownValues = function() {
