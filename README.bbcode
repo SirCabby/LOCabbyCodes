@@ -211,7 +211,19 @@ Launch the game. The mod loads automatically. To confirm it worked:
 
 [size=5][b]Features[/b][/size]
 
-[size=4][b]Combat & Survival[/b][/size]
+The in-game main menu shows two CabbyCodes entries — [b]QoL[/b] (quality-of-life) and [b]Cheats[/b] — each opening its own list of toggles. This section mirrors that split.
+
+[size=4][b]QoL[/b][/size]
+[list]
+[*][b]Hidden Needs HUD[/b] — dedicated window showing every hidden meter (hunger, fatigue, hygiene, morale, calm, social, and the breath-odor tracker).
+[*][b]Cook Book[/b] — dedicated scene listing every oven combination in the game, with completion state pulled straight from your save.
+[*][b]Recipe Book[/b] — dedicated scene listing every recipe the game tracks, marked off as you discover them.
+[*][b]Enemy Health Bars[/b] — sleek HP plates above every enemy with delayed damage trails, precise HP totals, and active status icons below the gauge. Remains readable when the battle screen tone changes.
+[*][b]Show Clock HUD[/b] — compact clock panel in the top-right corner of the map showing live in-game time.
+[*][b]Don't Pause When Unfocused[/b] — keeps the game running when its window loses focus, so you can alt-tab away (to look something up, check a guide, etc.) without the scene freezing. Toggle off to restore the normal auto-pause behavior.
+[/list]
+
+[size=4][b]Cheats[/b][/size]
 [list]
 [*][b]Invincibility Toggle[/b] — party members can't lose HP from combat, poison/regen ticks, or scripted damage. Carve-out for the Visitor final battle so only Rush (and the original protagonist if present) stays invincible in the Massacre Princess Catholicon party.
 [*][b]One Hit Kill Enemies[/b] — any damage dealt to an enemy becomes lethal, so a single hit drops even bosses.
@@ -220,68 +232,34 @@ Launch the game. The mod loads automatically. To confirm it worked:
 [*][b]Always Escape Battles[/b] — guarantees the Escape party command succeeds.
 [*][b]Stamina Control[/b] — prevents the party from spending MP (stamina) on skills.
 [*][b]EXP Rate Slider[/b] — scale EXP gains from 0x to 10x, plus an "Instant Max" that hits the level cap on the next event.
-[*][b]Refill Status[/b] — tops up HP/MP and maxes every hidden need meter on demand.
-[/list]
-
-[size=4][b]Items, Money & Equipment[/b][/size]
-[list]
 [*][b]Infinite Items[/b] — item counts never decrease when you use, craft, or hand them off. Weapons, armor, key items, and quest-triggered pseudo-keys (Rat Baby Thing, Dog Tags, colored keys, etc.) are unaffected so scripted events still progress. Planet / puzzle discs explicitly stay in inventory after being inserted into a socket.
 [*][b]Unbreakable Items[/b] — weapons (and any other breakable gear) stop losing durability.
 [*][b]Vanilla Bug Fix[/b] — bundle of fixes for base-game bugs. Currently fixes the durability-counter aliasing bug where a broken weapon's safe-hits counter persisted and caused the next instance of the same weapon to break almost immediately.
 [*][b]Unstick Equipment[/b] — unequip "stuck" gear directly from the standard Equip menu; class-locked and state-sealed slots become selectable and the removed gear goes back to inventory.
 [*][b]Infinite Ammo[/b] — keeps every ranged weapon fully loaded and blocks all ammo item costs (magazines, marbles, gas cans, batteries, etc.).
+[*][b]Friendly Door Visitors[/b] — removes the pool of cursed/hostile door-knock visitors so answering the door never triggers those surprise fights.
+[*][b]Send Next Door Visitor[/b] — pick from the visitors pool and send them immediately knocking at the door.
 [*][b]Free Merchants[/b] — every shop entry shows a cost of zero, including vending machines.
+[*][b]Floor 4 Always Available[/b] — keeps the apartment elevator's hidden Floor 4 choice permanently available.
 [*][b]Money Editor Button[/b] — adds a pencil icon to the gold display in the main menu for editing current gold.
 [*][b]Infinite Money[/b] — gold can only go up; spending never lowers the balance.
 [*][b]Give Item[/b] — browse every item, weapon, and armor in the game and grant any quantity directly to the party.
 [*][b]Give Missing Items[/b] — gives all missing non-key items to the party. Can filter by item type.
 [*][b]Max Items in Inventory[/b] — tops every stack up to the game's per-item limit.
-[/list]
-
-[size=4][b]Saving & Story[/b][/size]
-[list]
 [*][b]Save Anywhere[/b] — bypasses difficulty-based save restrictions so you can save from the main menu wherever you are.
 [*][b]Delete Save Buttons[/b] — adds an X button to every row of the Load and Save screens that prompts and deletes the selected save without needing to start a new game.
-[*][b]Story Flags[/b] — full editor for story-decision flags: Player flags, Recruits (toggle party member availability), Quest States, Friendly NPCs and Bosses (alive states), Challenges (end-of-game score-bonus flags: No Showers, No Sleep, No Meals, No Video Games, No Friends, No Saves, Iron Man), Video Games (own and complete them without playing), and Locked Doors.
-[/list]
-
-[size=4][b]Time & Schedule[/b][/size]
-[list]
 [*][b]Freeze Time of Day[/b] — locks the in-world clock at its current value. Time-burning actions (cooking, opening the door, playing a videogame) still execute fully, but the actual game time doesn't advance, so hour/day side effects (stamina drain, day-segment shifts, daily resets) don't fire.
 [*][b]Set Game Time[/b] — picker for hour, minute (15-min increments), and absolute day. Forward jumps run the game's TimePasses event so HourPassed and newDay fire normally (multi-day jumps add an extra newDay for each 4 AM crossing). Works even when Freeze Time is on: opens a scoped token that lets the cascade through for this one call, then re-freezes at the new moment.
 [*][b]Set Danger Level[/b] — picker for the time-based encounter danger bonus: None 0, Low 60, Medium 160, High 300, Critical 500. Available only when the player is outside the apartment (returning home zeroes the value).
 [*][b]Set Difficulty[/b] — picker for active difficulty (Easy / Normal / Hard). Writes to the game's three mutually-exclusive difficulty switches (EASYMODE / NORMALMODE / HARDMODE) so escape ratios, weapon-break chance, save restrictions, etc. all branch correctly.
 [*][b]Freeze Hygiene / Needs[/b] — locks all hidden need meters (hygiene, hunger, vigor, morale, social, calm) against worsening, and locks the bad-breath counter against rising. Positive actions (eating, showering, brushing teeth) still move meters in the good direction.
-[/list]
-
-[size=4][b]Doors, Visitors & Floor 4[/b][/size]
-[list]
-[*][b]Friendly Door Visitors[/b] — removes the pool of cursed/hostile door-knock visitors so answering the door never triggers those surprise fights.
-[*][b]Send Next Door Visitor[/b] — pick from the visitors pool and send them immediately knocking at the door.
-[*][b]Floor 4 Always Available[/b] — keeps the apartment elevator's hidden Floor 4 choice permanently available.
-[/list]
-
-[size=4][b]HUDs & UI[/b][/size]
-[list]
-[*][b]Enemy Health Bars[/b] — sleek HP plates above every enemy with delayed damage trails, precise HP totals, and active status icons below the gauge. Remains readable when the battle screen tone changes.
-[*][b]Hidden Needs HUD[/b] — dedicated window showing every hidden meter (hunger, fatigue, hygiene, morale, calm, social, breath odor).
-[*][b]Show Clock HUD[/b] — compact clock panel in the top-right corner of the map showing live in-game time.
-[/list]
-
-[size=4][b]Cooking & Crafting[/b][/size]
-[list]
+[*][b]Refill Status[/b] — tops up HP/MP and maxes every hidden need meter on demand.
 [*][b]Max Cooking Skill[/b] — permanently sets your Cooking skill to the top rank (currently Level 8, Amateur Chef).
 [*][b]Oven Ingredient Checkboxes[/b] — overlay checkboxes onto the oven ingredient menus showing which primary bases have every pairing finished and which secondary combinations you've cooked.
 [*][b]Craft Ingredient Checkboxes[/b] — overlay checkboxes onto the crafting station's ingredient menus. Ingredients or pairings not part of any recipe show a red dash instead.
-[*][b]Cook Book[/b] — dedicated scene listing every oven combination in the game, with completion state pulled straight from your save.
-[*][b]Recipe Book[/b] — dedicated scene listing every recipe the game tracks, marked off as you discover them.
-[/list]
-
-[size=4][b]Misc[/b][/size]
-[list]
 [*][b]Change Character Name[/b] — change the main character's name (default Sam). Three base-game names branch behavior: [b]Ash[/b] (also [b]Williams[/b] / [b]evildead[/b]) lets the player equip the Shotgun even after losing an arm; [b]Casanova[/b] enables the April Fools Day smooch flag that 94 NPC encounters key off of; [b]lumpy[/b] makes Sybil's intro hand the player a Straitjacket (intro-only — the Straitjacket only drops if the rename is in place on a new game before the Sybil intro fires).
 [*][b]Fast Credits Scroll[/b] — drops a contextual [b]Fast Credits: ON/OFF[/b] toggle into the top-right of the credits scene. Click to multiply the scroll speed by 20x; click again to drop back to normal.
-[*][b]Don't Pause When Unfocused[/b] — keeps the game running when its window loses focus, so you can alt-tab away (to look something up, check a guide, etc.) without the scene freezing. Toggle off to restore the normal auto-pause behavior.
+[*][b]Story Flags[/b] — full editor for story-decision flags: Player flags, Recruits (toggle party member availability), Quest States, Friendly NPCs and Bosses (alive states), Challenges (end-of-game score-bonus flags: No Showers, No Sleep, No Meals, No Video Games, No Friends, No Saves, Iron Man), Video Games (own and complete them without playing), and Locked Doors.
 [/list]
 
 [line]
