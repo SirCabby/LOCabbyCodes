@@ -3,13 +3,14 @@
 //=============================================================================
 /*:
  * @target MZ
- * @plugindesc CabbyCodes Cheats Menu - Adds a "Cheats" entry to the in-game main menu
+ * @plugindesc CabbyCodes Cheats Menu - Adds "Quality of Life" and "Cheats" entries to the in-game main menu
  * @author CabbyCodes
  * @help
- * Adds a "Cheats" command to the in-game main menu (alongside Item, Skill,
- * Options, etc.). Selecting it opens Scene_CabbyCodesCheats, which lists
- * every CabbyCodes-registered setting. The Options menu no longer holds
- * cabby cheats — they live in this dedicated menu instead.
+ * Adds two commands to the in-game main menu (alongside Item, Skill,
+ * Options, etc.): "Quality of Life" and "Cheats". Each opens a dedicated
+ * scene that lists the CabbyCodes-registered settings tagged with that
+ * category. The Options menu no longer holds cabby cheats — they live in
+ * these dedicated menus instead.
  */
 
 (() => {
@@ -20,8 +21,10 @@
         return;
     }
 
-    const COMMAND_SYMBOL = 'cabbycodes_cheats_menu';
-    const COMMAND_LABEL = 'Cheats';
+    const CHEATS_SYMBOL = 'cabbycodes_cheats_menu';
+    const CHEATS_LABEL = 'Cheats';
+    const QOL_SYMBOL = 'cabbycodes_qol_menu';
+    const QOL_LABEL = 'QoL';
 
     function canShowCheatsEntry() {
         if (typeof CabbyCodes.canShowCabbyCodesOptions === 'function') {
@@ -40,13 +43,15 @@
         if (!canShowCheatsEntry()) {
             return;
         }
-        this.addCommand(COMMAND_LABEL, COMMAND_SYMBOL, true);
+        this.addCommand(QOL_LABEL, QOL_SYMBOL, true);
+        this.addCommand(CHEATS_LABEL, CHEATS_SYMBOL, true);
     });
 
     CabbyCodes.override(Scene_Menu.prototype, 'createCommandWindow', function () {
         CabbyCodes.callOriginal(Scene_Menu.prototype, 'createCommandWindow', this, []);
         if (this._commandWindow && typeof this._commandWindow.setHandler === 'function') {
-            this._commandWindow.setHandler(COMMAND_SYMBOL, this.commandCabbyCodesCheats.bind(this));
+            this._commandWindow.setHandler(QOL_SYMBOL, this.commandCabbyCodesQoL.bind(this));
+            this._commandWindow.setHandler(CHEATS_SYMBOL, this.commandCabbyCodesCheats.bind(this));
         }
     });
 
@@ -57,6 +62,15 @@
             return;
         }
         SceneManager.push(Scene_CabbyCodesCheats);
+    };
+
+    Scene_Menu.prototype.commandCabbyCodesQoL = function () {
+        if (typeof Scene_CabbyCodesQoL === 'undefined') {
+            CabbyCodes.warn('[CabbyCodes][CheatsMenu] Scene_CabbyCodesQoL is not defined.');
+            this._commandWindow.activate();
+            return;
+        }
+        SceneManager.push(Scene_CabbyCodesQoL);
     };
 
     CabbyCodes.log('[CabbyCodes] Cheats menu entry loaded');

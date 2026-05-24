@@ -97,7 +97,7 @@ Per-call hot-path overhead is now small (two `Map.get/set` pairs and an integer 
 
 ### 4.5 Options-menu integration (`cabbycodes-settings.js`)
 
-- Maintains `CabbyCodes.settingsRegistry`, an array of setting definitions. Each definition carries: `{ key, displayName, defaultValue, onChange, type, min, max, step, maxDigits, formatValue, inputTitle, inputDescription, order, control, wrap, onActivate }`.
+- Maintains `CabbyCodes.settingsRegistry`, an array of setting definitions. Each definition carries: `{ key, displayName, defaultValue, onChange, type, min, max, step, maxDigits, formatValue, inputTitle, inputDescription, order, category, control, wrap, onActivate }`. `category` is either `'cheats'` (default) or `'qol'` and selects which of the two dedicated menus the setting appears under.
 - Hooks into `Window_Options`:
   - `addGeneralOptions` — appends every registered setting as a command (prefixed `cabbycodes_`), but only after `shouldDisplayCabbyCodesOptions()` returns true (i.e. a save/new-game is loaded).
   - `getConfigValue / setConfigValue` — reads/writes our storage rather than the stock options store.

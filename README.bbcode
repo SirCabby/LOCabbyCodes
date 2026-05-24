@@ -1,6 +1,6 @@
 [size=6][b]CabbyCodes[/b][/size]
 
-A cheats / quality-of-life mod for [i]Look Outside[/i], the RPG Maker MZ horror RPG. CabbyCodes adds a [b]Cheats[/b] entry to the in-game menu with toggles and pickers for invincibility, infinite items, time control, story-flag editing, and dozens of other tweaks.
+A cheats / quality-of-life mod for [i]Look Outside[/i], the RPG Maker MZ horror RPG. CabbyCodes adds two entries to the in-game menu — [b]QoL[/b] (quality-of-life additions like enemy health bars, hidden-needs HUD, recipe/cook books, and a clock display) and [b]Cheats[/b] (invincibility, infinite items, time control, story-flag editing, and dozens of other tweaks).
 
 It installs as a standard plugin — [b]no game files are permanently modified[/b], and uninstalling is just removing two files and one entry.
 
@@ -58,18 +58,18 @@ Save and close Notepad.
 
 [size=4][b]5. Launch the game and check[/b][/size]
 
-Start [i]Look Outside[/i] through Steam as you normally would. Load any save (or start a new game and reach a point where the menu is available), open the menu, and look for a new [b]Cheats[/b] entry next to [i]Item[/i], [i]Options[/i], etc.
+Start [i]Look Outside[/i] through Steam as you normally would. Load any save (or start a new game and reach a point where the menu is available), open the menu, and look for two new entries next to [i]Item[/i], [i]Options[/i], etc. — [b]QoL[/b] and [b]Cheats[/b].
 
-That's it. Open the [b]Cheats[/b] menu any time to enable or tweak features.
+That's it. Open either menu any time to enable or tweak features.
 
-If the [b]Cheats[/b] entry didn't appear, or the game won't start, open the [b]Troubleshooting[/b] spoiler below.
+If the [b]QoL[/b] / [b]Cheats[/b] entries didn't appear, or the game won't start, open the [b]Troubleshooting[/b] spoiler below.
 
 [line]
 
 [size=5][b]Troubleshooting[/b][/size]
 
-[b]Issue: The Cheats menu doesn't appear in-game.[/b]
-The game launches fine and plays normally, but there's no new [b]Cheats[/b] entry in the menu next to [i]Item[/i], [i]Options[/i], etc. Almost always a missing file, a wrong path, or a [b]"status": false[/b] in [b]plugins.js[/b].
+[b]Issue: The QoL / Cheats menu entries don't appear in-game.[/b]
+The game launches fine and plays normally, but there are no new [b]QoL[/b] or [b]Cheats[/b] entries in the menu next to [i]Item[/i], [i]Options[/i], etc. Almost always a missing file, a wrong path, or a [b]"status": false[/b] in [b]plugins.js[/b].
 [spoiler=Show fixes]
 [list]
 [*][b]Check file locations.[/b] [b]CabbyCodes.js[/b] should be in [b]<game>/js/plugins/[/b], with the [b]CabbyCodes/[/b] folder sitting beside it. The folder must contain [b]cabbycodes-core.js[/b] and the rest of the [b]cabbycodes-*.js[/b] files.
@@ -190,7 +190,7 @@ JSON syntax matters here — make sure there's a comma between every entry excep
 
 Launch the game. The mod loads automatically. To confirm it worked:
 [list]
-[*]Load into any save and open the menu — there should be a new [b]Cheats[/b] entry alongside Item, Skill, Options, etc.
+[*]Load into any save and open the menu — there should be two new entries, [b]QoL[/b] and [b]Cheats[/b], alongside Item, Skill, Options, etc.
 [*]Open [b]<game>/CabbyCodes.log[/b] in a text editor — recent [b][CabbyCodes][/b] lines confirm the loader ran.
 [/list]
 [/spoiler]
@@ -281,6 +281,7 @@ Launch the game. The mod loads automatically. To confirm it worked:
 [list]
 [*][b]Change Character Name[/b] — change the main character's name (default Sam). Three base-game names branch behavior: [b]Ash[/b] (also [b]Williams[/b] / [b]evildead[/b]) lets the player equip the Shotgun even after losing an arm; [b]Casanova[/b] enables the April Fools Day smooch flag that 94 NPC encounters key off of; [b]lumpy[/b] makes Sybil's intro hand the player a Straitjacket (intro-only — the Straitjacket only drops if the rename is in place on a new game before the Sybil intro fires).
 [*][b]Fast Credits Scroll[/b] — drops a contextual [b]Fast Credits: ON/OFF[/b] toggle into the top-right of the credits scene. Click to multiply the scroll speed by 20x; click again to drop back to normal.
+[*][b]Don't Pause When Unfocused[/b] — keeps the game running when its window loses focus, so you can alt-tab away (to look something up, check a guide, etc.) without the scene freezing. Toggle off to restore the normal auto-pause behavior.
 [/list]
 
 [line]

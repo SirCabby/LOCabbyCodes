@@ -29,7 +29,8 @@
         "Don't Pause When Unfocused",
         {
             defaultValue: false,
-            order: 175
+            order: 175,
+            category: 'qol'
         },
         newValue => {
             CabbyCodes.log(

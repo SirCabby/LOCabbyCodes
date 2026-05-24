@@ -61,6 +61,7 @@
             inputDescription: options.inputDescription,
             applyOnClose: options.applyOnClose,
             order: typeof options.order === 'number' ? options.order : 100,
+            category: options.category === 'qol' ? 'qol' : 'cheats',
             control: options.control,
             wrap: Boolean(options.wrap),
             onActivate: options.onActivate
@@ -99,6 +100,7 @@
                     inputDescription: '',
                     applyOnClose: false,
                     order: 100,
+                    category: 'cheats',
                     control: null,
                     wrap: false,
                     onActivate: null
@@ -729,6 +731,10 @@
      * entry. Subclasses Scene_Options/Window_Options so the existing cabby
      * symbol handlers (slider adjust, numeric input, blue gradient,
      * onActivate, etc.) apply to it via prototype inheritance.
+     *
+     * The sibling Quality-of-Life menu below uses the same machinery, with
+     * the only difference being which `category` of the settings registry
+     * it draws from.
      */
     function Scene_CabbyCodesCheats() {
         this.initialize(...arguments);
@@ -756,9 +762,44 @@
     Window_CabbyCodesCheats.prototype.constructor = Window_CabbyCodesCheats;
 
     Window_CabbyCodesCheats.prototype.makeCommandList = function() {
-        CabbyCodes.settingsRegistry.forEach(setting => {
-            this.addCommand(setting.displayName, cabbyCodesSymbol(setting.key), true);
-        });
+        CabbyCodes.settingsRegistry
+            .filter(setting => (setting.category || 'cheats') === 'cheats')
+            .forEach(setting => {
+                this.addCommand(setting.displayName, cabbyCodesSymbol(setting.key), true);
+            });
+    };
+
+    function Scene_CabbyCodesQoL() {
+        this.initialize(...arguments);
+    }
+
+    window.Scene_CabbyCodesQoL = Scene_CabbyCodesQoL;
+
+    Scene_CabbyCodesQoL.prototype = Object.create(Scene_Options.prototype);
+    Scene_CabbyCodesQoL.prototype.constructor = Scene_CabbyCodesQoL;
+
+    Scene_CabbyCodesQoL.prototype.createOptionsWindow = function() {
+        const rect = this.optionsWindowRect();
+        this._optionsWindow = new Window_CabbyCodesQoL(rect);
+        this._optionsWindow.setHandler('cancel', this.popScene.bind(this));
+        this.addWindow(this._optionsWindow);
+    };
+
+    function Window_CabbyCodesQoL() {
+        this.initialize(...arguments);
+    }
+
+    window.Window_CabbyCodesQoL = Window_CabbyCodesQoL;
+
+    Window_CabbyCodesQoL.prototype = Object.create(Window_Options.prototype);
+    Window_CabbyCodesQoL.prototype.constructor = Window_CabbyCodesQoL;
+
+    Window_CabbyCodesQoL.prototype.makeCommandList = function() {
+        CabbyCodes.settingsRegistry
+            .filter(setting => setting.category === 'qol')
+            .forEach(setting => {
+                this.addCommand(setting.displayName, cabbyCodesSymbol(setting.key), true);
+            });
     };
 
     CabbyCodes.log('[CabbyCodes] Settings module loaded');

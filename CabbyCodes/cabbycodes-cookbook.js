@@ -185,6 +185,7 @@
     CabbyCodes.registerSetting(settingKey, 'Cook Book', {
         defaultValue: false,
         order: 65,
+        category: 'qol',
         formatValue: () => 'Press',
         onChange: newValue => {
             if (!newValue) {

@@ -183,6 +183,7 @@
     CabbyCodes.registerSetting(settingKey, 'Recipe Book', {
         defaultValue: false,
         order: 70,
+        category: 'qol',
         formatValue: () => 'Press',
         onChange: newValue => {
             if (!newValue) {

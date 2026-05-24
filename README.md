@@ -173,6 +173,19 @@ Launch the game. The mod loads automatically. To confirm it worked:
 
 ## Current Features
 
+The in-game main menu shows two CabbyCodes entries — **QoL** (quality-of-life) and **Cheats** — each opening its own list of toggles. This section mirrors that split.
+
+### QoL
+
+- **Hidden Needs HUD:** Select it to pop open a dedicated window with every hidden meter (hunger, fatigue, hygiene, morale, calm, social, and the breath-odor tracker).
+- **Cook Book:** Opens a dedicated Cook Book scene listing every oven combination in the game, with completion state pulled straight from your save so you can see at a glance what you still need to cook.
+- **Recipe Book:** Opens a dedicated Recipe Book scene listing every recipe the game tracks, marked off as you discover them so you can plan what to make next without digging through in-game menus.
+- **Enemy Health Bars:** Displays sleek HP plates above every enemy. The plates animate with delayed damage trails, show precise HP totals, list active status effects as a row of small icons below the gauge (the default above-head icon is hidden so the bar no longer covers it), and remain readable even when the battle screen tone changes.
+- **Show Clock HUD:** Draws a compact clock panel in the top-right corner while you are on the map, showing the live in-game time so you can keep tabs on the schedule without opening menus.
+- **Don't Pause When Unfocused:** Keeps the game running when its window loses focus, so you can alt-tab away (to look something up, check a guide, etc.) without the scene freezing. Overrides `SceneManager.isGameActive` to bypass the vanilla focus check; toggle it off to restore the normal auto-pause behavior.
+
+### Cheats
+
 - **Invincibility Toggle:** When enabled, any actor currently in the player's party is prevented from losing HP through combat damage, poison/regen ticks, scripted damage, or other harmful effects. Carve-out for the Visitor final battle: once the party has been swapped to the Massacre Princess Catholicon cast, only Rush (and the original protagonist if he ends up in that party) keep invincibility, so the supporting MP cast still take damage normally.
 - **One Hit Kill Enemies:** Amplifies any HP damage dealt to an enemy into a lethal blow, so a single hit drops even bosses.
 - **Never Miss Attacks:** Forces every party attack to connect: the hit roll is treated as 100% and the target's evasion is treated as 0 while the option is on.
@@ -185,7 +198,6 @@ Launch the game. The mod loads automatically. To confirm it worked:
 - **Vanilla Bug Fix:** Bundle of small patches for base-game bugs. Currently fixes the durability-counter aliasing bug where breaking a weapon leaves the broken weapon ID's safe-hits counter at its high value, causing the next instance of the same weapon type to break almost immediately. When the toggle is on, the broken weapon's slot is zeroed after the vanilla check resolves so fresh copies start at full safe hits.
 - **Unstick Equipment:** Lets you unequip "stuck" gear directly from the standard Equip menu. While on, every equipment slot becomes selectable even when the slot would normally be class-locked or state-sealed; picking the blank "(no item)" entry sends the removed gear back to the party's inventory through the vanilla equip-change path.
 - **Infinite Ammo:** Keeps every ranged weapon fully loaded and blocks all ammo item costs (magazines, marbles, gas cans, batteries, etc.) so you never have to reload or spend ammunition while the toggle is active.
-- **Enemy Health Bars:** Displays sleek HP plates above every enemy. The plates animate with delayed damage trails, show precise HP totals, list active status effects as a row of small icons below the gauge (the default above-head icon is hidden so the bar no longer covers it), and remain readable even when the battle screen tone changes.
 - **Friendly Door Visitors:** Removes the pool of cursed/hostile door-knock visitors so answering the door never triggers those surprise fights.
 - **Send Next Door Visitor:** Choose from the possible visitors pool and send them immediately knocking at the door.
 - **Free Merchants:** Forces every shop menu entry to show a cost of zero, including vending machines.
@@ -202,17 +214,12 @@ Launch the game. The mod loads automatically. To confirm it worked:
 - **Set Danger Level:** Opens a picker for the time-based encounter danger bonus with five tiers (None 0, Low 60, Medium 160, High 300, Critical 500. Only available when the player is outside the apartment, since returning home zeroes the value.
 - **Set Difficulty:** Adds a press option that opens a picker for the active difficulty (Easy / Normal / Hard). Writes the chosen mode to the game's three mutually-exclusive difficulty switches (EASYMODE / NORMALMODE / HARDMODE), so existing logic that branches on them — escape ratios, weapon-break chance, save restrictions, etc.
 - **Freeze Hygiene / Needs:** Locks all of the hidden personal-need meters against worsening — hygiene, hunger, vigor, morale, social, and calm can't tick downward, and the bad-breath counter (where higher is worse, and the nightly Sleeping event adds +1) can't tick upward. Positive actions like eating, showering, or brushing teeth still move the meters in the good direction.
-- **Hidden Needs HUD:** Select it to pop open a dedicated window with every hidden meter (hunger, fatigue, hygiene, morale, calm, social, and the breath-odor tracker).
-- **Show Clock HUD:** Draws a compact clock panel in the top-right corner while you are on the map, showing the live in-game time so you can keep tabs on the schedule without opening menus.
 - **Refill Status:** Tops up every party member’s HP/MP and maxes out all hidden need meters (hunger, energy, hygiene, morale, calm, social, and breath odor) whenever you select it.
 - **Max Cooking Skill:** Permanently sets your Cooking skill to the game’s top rank (currently Level 8, Amateur Chef).
 - **Oven Ingredient Checkboxes:** Overlays checkboxes onto the oven ingredient menus so you can instantly see which primary bases have every pairing finished and which secondary combinations you’ve already cooked.
 - **Craft Ingredient Checkboxes:** Overlays checkboxes onto the crafting station’s ingredient menus so you can see at a glance which first ingredients still have undiscovered recipes and which (first + second) pairings you’ve already made. Ingredients or pairings that aren’t part of any recipe display a red dash instead of a checkbox.
-- **Cook Book:** Opens a dedicated Cook Book scene listing every oven combination in the game, with completion state pulled straight from your save so you can see at a glance what you still need to cook.
-- **Recipe Book:** Opens a dedicated Recipe Book scene listing every recipe the game tracks, marked off as you discover them so you can plan what to make next without digging through in-game menus.
 - **Change Character Name:** Allows changing of the main character's name (default Sam). The hint window above the editor lists the three base-game names that branch behavior: `Ash` (also `Williams` / `evildead`) allows player to equip the Shotgun even after losing an arm, `Casanova` enables the April Fools Day smooch/kiss flag that 94 npc encounters across the cast (Sybil, Shadow, Pierre, Vincent, Grinning Beast, etc.) gate their kiss dialog branches on, and `lumpy` makes Sybil's intro hand the player a Straitjacket. `lumpy` is intro-only — the rename takes effect cosmetically but the Straitjacket only drops if the rename is in place on a new game before the Sybil intro fires.
 - **Fast Credits Scroll:** Drops a contextual `Fast Credits: ON/OFF` toggle into the top-right of the screen, just under the CabbyCodes clock, whenever the player is on the end-credits scene. Click it to multiply the credits scroll speed by 20x so you can blow through and reach the post-credits portion quickly; click again to drop back to normal speed.
-- **Don't Pause When Unfocused:** Keeps the game running when its window loses focus, so you can alt-tab away (to look something up, check a guide, etc.) without the scene freezing. Overrides `SceneManager.isGameActive` to bypass the vanilla focus check; toggle it off to restore the normal auto-pause behavior.
 - **Story Flags:** Opens an editor for story-decision flags. Sections include Player flags, Recruits to toggle party member availability, Quest States, Friendly NPCs and Bosses allow changing alive states, Challenges to toggle the end-of-game score-bonus flags (No Showers, No Sleep, No Meals, No Video Games, No Friends, No Saves, Iron Man), Video Games allows for owning and completing video games without playing them, and Locked Doors
 
 ---

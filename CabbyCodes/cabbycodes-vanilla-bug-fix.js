@@ -58,7 +58,7 @@
 
     CabbyCodes.registerSetting(MENU_KEY, 'Vanilla Bug Fix', {
         defaultValue: 0,
-        order: 121,
+        order: 60,
         formatValue: () => 'Press',
         onActivate: () => {
             openPickerScene();

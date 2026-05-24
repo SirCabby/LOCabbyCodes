@@ -3,25 +3,20 @@
 //=============================================================================
 /*:
  * @target MZ
- * @plugindesc CabbyCodes UI - Shows the CabbyCodes version on the Cheats menu
+ * @plugindesc CabbyCodes UI - Shows the CabbyCodes version on the Cheats / QoL menus
  * @author CabbyCodes
  * @help
- * Displays the currently running CabbyCodes version at the bottom of the
- * Cheats menu so players can quickly confirm which build is installed.
+ * Displays the currently running CabbyCodes version at the bottom of both
+ * the Cheats and the QoL menus so players can quickly confirm which build
+ * is installed. Also sizes each menu's options window to fit its actual
+ * setting count, leaving room for the version footer and clamping to the
+ * available screen height when the list overflows.
  */
 
 (() => {
     'use strict';
 
     if (typeof window.CabbyCodes === 'undefined') {
-        return;
-    }
-
-    if (typeof Scene_CabbyCodesCheats === 'undefined') {
-        // Cheats scene must already be defined by cabbycodes-settings.js. If it
-        // isn't, the loader order is wrong; bail rather than patching the wrong
-        // scene.
-        CabbyCodes.warn?.('[CabbyCodes] Version display: Scene_CabbyCodesCheats not defined; check loader order.');
         return;
     }
 
@@ -35,11 +30,13 @@
     const CABBYCODES_LABEL = 'CabbyCodes';
     const CABBYCODES_LABEL_COLOR = '#3f82ff';
 
-    function cabbyCodesOptionCount() {
+    function settingsCountForCategory(category) {
         if (!Array.isArray(CabbyCodes.settingsRegistry)) {
             return 0;
         }
-        return CabbyCodes.settingsRegistry.length;
+        return CabbyCodes.settingsRegistry.filter(setting => {
+            return (setting.category || 'cheats') === category;
+        }).length;
     }
 
     function desiredOptionsWidth() {
@@ -65,16 +62,9 @@
         return Math.min(commandHeight, scene.calcWindowHeight(6, true));
     }
 
-    function applyOverride(methodName, implementation) {
-        if (typeof CabbyCodes.override === 'function') {
-            CabbyCodes.override(Scene_CabbyCodesCheats.prototype, methodName, implementation);
-        } else {
-            Scene_CabbyCodesCheats.prototype[methodName] = implementation;
-        }
-    }
-
     /**
      * Small informative window that renders the CabbyCodes version text.
+     * Shared by both the Cheats and the QoL menu footers.
      */
     function Window_CabbyCodesVersionInfo() {
         this.initialize(...arguments);
@@ -112,64 +102,83 @@
     };
 
     /**
-     * Size the Cheats command list to the actual cabby setting count and
-     * give the window a consistent top-anchored layout that leaves room for
-     * the version footer.
+     * Wire a CabbyCodes options-style scene with: a fitted options window
+     * (grows to its setting count, clamps when it overflows the screen) and
+     * a version footer below it. Used for both the Cheats and QoL menus so
+     * they look and behave identically.
      */
-    applyOverride('maxCommands', function() {
-        return Math.max(1, cabbyCodesOptionCount());
-    });
-
-    applyOverride('maxVisibleCommands', function() {
-        return Math.max(12, this.maxCommands());
-    });
-
-    applyOverride('optionsWindowRect', function() {
-        const ww = desiredOptionsWidth();
-        const wh = availableOptionsHeight(this);
-        const wx = (Graphics.boxWidth - ww) / 2;
-        const wy = OPTIONS_TOP_PADDING;
-        return new Rectangle(wx, wy, ww, wh);
-    });
-
-    Scene_CabbyCodesCheats.prototype.createCabbyCodesVersionWindow = function() {
-        if (this._cabbyCodesVersionWindow) {
+    function wireScene(SceneClass, category) {
+        if (typeof SceneClass === 'undefined') {
+            CabbyCodes.warn?.(`[CabbyCodes] Version display: scene for category '${category}' not defined; check loader order.`);
             return;
         }
-        const rect = this.cabbyCodesVersionWindowRect();
-        this._cabbyCodesVersionWindow = new Window_CabbyCodesVersionInfo(rect);
-        this.addWindow(this._cabbyCodesVersionWindow);
-    };
 
-    Scene_CabbyCodesCheats.prototype.cabbyCodesVersionWindowRect = function() {
-        const ww = this._optionsWindow ? this._optionsWindow.width : desiredOptionsWidth();
-        const wh = versionWindowHeight(this);
-        const wx = this._optionsWindow ? this._optionsWindow.x : (Graphics.boxWidth - ww) / 2;
-        const preferredWy = this._optionsWindow
-            ? this._optionsWindow.y + this._optionsWindow.height + VERSION_GAP
-            : Graphics.boxHeight - OPTIONS_BOTTOM_PADDING - wh;
-        const maxWy = Graphics.boxHeight - OPTIONS_BOTTOM_PADDING - wh;
-        const wy = Math.min(preferredWy, maxWy);
-        return new Rectangle(wx, wy, ww, wh);
-    };
-
-    const attachVersionWindow = function() {
-        if (typeof this.createCabbyCodesVersionWindow === 'function') {
-            this.createCabbyCodesVersionWindow();
+        function applyOverride(methodName, implementation) {
+            if (typeof CabbyCodes.override === 'function') {
+                CabbyCodes.override(SceneClass.prototype, methodName, implementation);
+            } else {
+                SceneClass.prototype[methodName] = implementation;
+            }
         }
-    };
 
-    if (typeof CabbyCodes.after === 'function') {
-        CabbyCodes.after(Scene_CabbyCodesCheats.prototype, 'create', function() {
-            attachVersionWindow.call(this);
+        applyOverride('maxCommands', function() {
+            return Math.max(1, settingsCountForCategory(category));
         });
-    } else {
-        const _Scene_CabbyCodesCheats_create = Scene_CabbyCodesCheats.prototype.create;
-        Scene_CabbyCodesCheats.prototype.create = function() {
-            _Scene_CabbyCodesCheats_create.call(this);
-            attachVersionWindow.call(this);
+
+        applyOverride('maxVisibleCommands', function() {
+            return Math.max(12, this.maxCommands());
+        });
+
+        applyOverride('optionsWindowRect', function() {
+            const ww = desiredOptionsWidth();
+            const wh = availableOptionsHeight(this);
+            const wx = (Graphics.boxWidth - ww) / 2;
+            const wy = OPTIONS_TOP_PADDING;
+            return new Rectangle(wx, wy, ww, wh);
+        });
+
+        SceneClass.prototype.createCabbyCodesVersionWindow = function() {
+            if (this._cabbyCodesVersionWindow) {
+                return;
+            }
+            const rect = this.cabbyCodesVersionWindowRect();
+            this._cabbyCodesVersionWindow = new Window_CabbyCodesVersionInfo(rect);
+            this.addWindow(this._cabbyCodesVersionWindow);
         };
+
+        SceneClass.prototype.cabbyCodesVersionWindowRect = function() {
+            const ww = this._optionsWindow ? this._optionsWindow.width : desiredOptionsWidth();
+            const wh = versionWindowHeight(this);
+            const wx = this._optionsWindow ? this._optionsWindow.x : (Graphics.boxWidth - ww) / 2;
+            const preferredWy = this._optionsWindow
+                ? this._optionsWindow.y + this._optionsWindow.height + VERSION_GAP
+                : Graphics.boxHeight - OPTIONS_BOTTOM_PADDING - wh;
+            const maxWy = Graphics.boxHeight - OPTIONS_BOTTOM_PADDING - wh;
+            const wy = Math.min(preferredWy, maxWy);
+            return new Rectangle(wx, wy, ww, wh);
+        };
+
+        const attachVersionWindow = function() {
+            if (typeof this.createCabbyCodesVersionWindow === 'function') {
+                this.createCabbyCodesVersionWindow();
+            }
+        };
+
+        if (typeof CabbyCodes.after === 'function') {
+            CabbyCodes.after(SceneClass.prototype, 'create', function() {
+                attachVersionWindow.call(this);
+            });
+        } else {
+            const _SceneClass_create = SceneClass.prototype.create;
+            SceneClass.prototype.create = function() {
+                _SceneClass_create.call(this);
+                attachVersionWindow.call(this);
+            };
+        }
     }
+
+    wireScene(typeof Scene_CabbyCodesCheats !== 'undefined' ? Scene_CabbyCodesCheats : undefined, 'cheats');
+    wireScene(typeof Scene_CabbyCodesQoL !== 'undefined' ? Scene_CabbyCodesQoL : undefined, 'qol');
 
     CabbyCodes.log('[CabbyCodes] Version display initialized');
 })();

@@ -52,6 +52,7 @@
     CabbyCodes.registerSetting(settingKey, 'Enemy Health Bars', {
         defaultValue: true,
         order: 165,
+        category: 'qol',
         onChange: () => moduleApi.refreshActiveBattleSpriteset()
     });
 
