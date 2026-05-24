@@ -76,7 +76,8 @@
             'cabbycodes-sewer-kids.js',
             'cabbycodes-visitor-plan.js',
             'cabbycodes-character-name.js',
-            'cabbycodes-fast-credits.js'
+            'cabbycodes-fast-credits.js',
+            'cabbycodes-no-unfocus-pause.js'
         ];
         
         scripts.forEach((scriptName) => {
