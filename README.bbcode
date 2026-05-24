@@ -1,0 +1,293 @@
+[size=6][b]CabbyCodes[/b][/size]
+
+A cheats / quality-of-life mod for [i]Look Outside[/i], the RPG Maker MZ horror RPG. CabbyCodes adds a [b]Cheats[/b] entry to the in-game menu with toggles and pickers for invincibility, infinite items, time control, story-flag editing, and dozens of other tweaks.
+
+It installs as a standard plugin — [b]no game files are permanently modified[/b], and uninstalling is just removing two files and one entry.
+
+[line]
+
+[size=5][b]Quick Install[/b][/size]
+
+This is the short version for the common case: you bought [i]Look Outside[/i] on Steam and left it in the default install folder. If anything below looks different on your machine, open the [b]Detailed Walkthrough[/b] spoiler further down — it covers every variation.
+
+[size=4][b]1. Download the mod[/b][/size]
+
+Grab the latest [b]LOCabbyCodes.v<version>.zip[/b] from the [url=https://github.com/SirCabby/LOCabbyCodes/releases]releases page on GitHub[/url] and unzip it. You should end up with:
+[list]
+[*]one file called [b]CabbyCodes.js[/b]
+[*]one folder called [b]CabbyCodes[/b]
+[/list]
+
+[size=4][b]2. Open the game's plugins folder[/b][/size]
+
+In Steam, right-click [i]Look Outside[/i] → [b]Manage[/b] → [b]Browse local files[/b]. A folder window opens. Inside it, go into [b]js[/b], then [b]plugins[/b]. That [b]plugins[/b] folder is where the mod goes.
+
+[size=4][b]3. Drop the mod files in[/b][/size]
+
+Copy [b]CabbyCodes.js[/b] and the entire [b]CabbyCodes[/b] folder into that [b]plugins[/b] folder.
+
+[size=4][b]4. Tell the game to load it[/b][/size]
+
+In the same [b]plugins[/b] folder there is a file called [b]plugins.js[/b].
+
+[b]Make a backup first.[/b] Right-click it, choose [b]Copy[/b], then [b]Paste[/b] in the same folder. You will have a [b]plugins - Copy.js[/b] to fall back on if anything goes wrong.
+
+Then open the original [b]plugins.js[/b] in Notepad (right-click → [b]Open with[/b] → [b]Notepad[/b]).
+
+Scroll to the very bottom. You will see one or more entries that look like [b]{ "name": "...", "status": true, ... }[/b] followed by [b]];[/b] on the last line. You need to add one new entry just before that [b]];[/b].
+
+After your edit, the bottom of the file should look like this:
+
+[code]    },
+    {
+        "name": "CabbyCodes",
+        "status": true,
+        "description": "CabbyCodes Mod Loader",
+        "parameters": {}
+    }
+];[/code]
+
+The important bits:
+[list]
+[*]There is a comma [b],[/b] after the closing [b]}[/b] of whatever entry was previously last.
+[*]There is [b]no[/b] comma after the closing [b]}[/b] of the new CabbyCodes entry.
+[*][b]];[/b] is still the last thing in the file.
+[/list]
+
+Save and close Notepad.
+
+[size=4][b]5. Launch the game and check[/b][/size]
+
+Start [i]Look Outside[/i] through Steam as you normally would. Load any save (or start a new game and reach a point where the menu is available), open the menu, and look for a new [b]Cheats[/b] entry next to [i]Item[/i], [i]Options[/i], etc.
+
+That's it. Open the [b]Cheats[/b] menu any time to enable or tweak features.
+
+If the [b]Cheats[/b] entry didn't appear, or the game won't start, open the [b]Troubleshooting[/b] spoiler below.
+
+[line]
+
+[size=5][b]Troubleshooting[/b][/size]
+
+[b]Issue: The Cheats menu doesn't appear in-game.[/b]
+The game launches fine and plays normally, but there's no new [b]Cheats[/b] entry in the menu next to [i]Item[/i], [i]Options[/i], etc. Almost always a missing file, a wrong path, or a [b]"status": false[/b] in [b]plugins.js[/b].
+[spoiler=Show fixes]
+[list]
+[*][b]Check file locations.[/b] [b]CabbyCodes.js[/b] should be in [b]<game>/js/plugins/[/b], with the [b]CabbyCodes/[/b] folder sitting beside it. The folder must contain [b]cabbycodes-core.js[/b] and the rest of the [b]cabbycodes-*.js[/b] files.
+[*][b]Check plugins.js.[/b] Open it and look for the word [b]CabbyCodes[/b]. The entry must have [b]"status": true[/b] (not [b]false[/b]).
+[*][b]Check the log.[/b] Open [b]<game>/CabbyCodes.log[/b] in Notepad. Lines that start with [b][CabbyCodes][/b] confirm the loader actually ran. If there is no such file, or it is empty, the plugin entry probably isn't being read — recheck step 4 of Quick Install.
+[/list]
+[/spoiler]
+
+[b]Issue: The game won't start at all after installing.[/b]
+You launch [i]Look Outside[/i] and it crashes immediately, hangs on a black screen, or throws a JavaScript error popup. This is almost always a typo in [b]plugins.js[/b] from step 4 of Quick Install — a missing comma, an extra one, or a mismatched brace.
+[spoiler=Show fixes]
+[list]
+[*][b]Restore your backup.[/b] Rename [b]plugins - Copy.js[/b] back to [b]plugins.js[/b] (delete the broken one first) and the game will start again.
+[*][b]Verify the game files through Steam.[/b] Right-click [i]Look Outside[/i] → [b]Properties[/b] → [b]Installed Files[/b] → [b]Verify integrity of game files[/b]. This will restore a clean [b]plugins.js[/b], but it also wipes any other plugins you had installed — only do this if the backup is gone.
+[/list]
+
+Common typos to look for if you want to fix it by hand:
+[list]
+[*]Missing comma between two entries.
+[*]Extra trailing comma after the last entry (the one right before [b]];[/b]).
+[*]A [b]{[/b] without a matching [b]}[/b].
+[*]Missing quotation marks around [b]"name"[/b], [b]"status"[/b], etc.
+[/list]
+[/spoiler]
+
+[b]Issue: Settings reset to defaults every time I launch the game.[/b]
+You toggle a cheat on, close the game, relaunch, and the toggle is back to off. CabbyCodes saves settings into the game's local storage on disk; if those writes silently fail, every session starts fresh.
+[spoiler=Show fixes]
+Settings are stored in the game's [b]localStorage[/b] under the key [b]CabbyCodes_Settings[/b]. If your game install is on a network drive, a OneDrive-synced folder, or a path with restrictive write permissions, NW.js may silently fail to save them.
+
+Move the game install to a normal local folder (e.g. somewhere on your [b]C:[/b] drive that isn't synced to the cloud).
+[/spoiler]
+
+[b]Need to report a bug or ask for help?[/b]
+Not a symptom — this is how to put useful info into a bug report so the issue can actually be diagnosed.
+[spoiler=Show how to file a useful report]
+When opening an issue on GitHub, attach [b]<game>/CabbyCodes.log[/b]. Every line is timestamped and most features log a startup message, so the file usually shows exactly which modules loaded and what was active when something went wrong.
+[/spoiler]
+
+[line]
+
+[size=5][b]Detailed Walkthrough[/b][/size]
+
+Open the spoiler below if any of the following apply — otherwise Quick Install already covered you:
+[list]
+[*]You don't have the game through Steam.
+[*]Your Steam library lives on a non-default drive or in a custom folder.
+[*]You're not sure how to find the game install folder.
+[*]You want every step spelled out (file tree diagram, explicit before/after of [b]plugins.js[/b]).
+[/list]
+
+[spoiler=Show the full step-by-step walkthrough]
+[b][size=4]Find your game install folder[/size][/b]
+
+You need the folder that contains [b]Game.exe[/b]. This guide refers to it as [b]<game>[/b].
+[list]
+[*][b]Steam, default location:[/b] [b]C:\Program Files (x86)\Steam\steamapps\common\Look Outside\[/b]
+[*][b]Steam, custom library or different drive:[/b] open Steam → right-click [i]Look Outside[/i] → [b]Manage[/b] → [b]Browse local files[/b]. The folder Steam opens is [b]<game>[/b].
+[*][b]Other distributions or manual installs:[/b] wherever you placed the game folder. It should contain [b]Game.exe[/b], a [b]js/[/b] subfolder, and a [b]data/[/b] subfolder.
+[/list]
+
+[b][size=4]Get the mod files[/size][/b]
+
+Download [b]LOCabbyCodes.v<version>.zip[/b] from the releases page and unzip it. You should end up with [b]CabbyCodes.js[/b] and a [b]CabbyCodes/[/b] folder side by side.
+
+[b][size=4]Copy the mod into the plugins folder[/size][/b]
+
+Copy both [b]CabbyCodes.js[/b] and the entire [b]CabbyCodes/[/b] folder into [b]<game>/js/plugins/[/b]. The result should look like:
+
+[code]<game>/
+└── js/
+    └── plugins/
+        ├── CabbyCodes.js              ← loader (you added this)
+        ├── CabbyCodes/                ← feature modules (you added this)
+        │   ├── cabbycodes-core.js
+        │   ├── cabbycodes-patches.js
+        │   ├── cabbycodes-settings.js
+        │   └── ...                    (many more cabbycodes-*.js files)
+        ├── plugins.js                 ← you'll edit this next
+        └── (existing plugin files)[/code]
+
+[b][size=4]Register the plugin in plugins.js[/size][/b]
+
+[b]<game>/js/plugins.js[/b] tells the game which plugins to load. CabbyCodes needs one entry added to the list.
+
+[list=1]
+[*][b]Make a backup of plugins.js first[/b] — right-click → [b]Copy[/b], then [b]Paste[/b] in the same folder. If anything goes wrong you can restore it instantly.
+[*]Open [b]plugins.js[/b] in a text editor (Notepad works fine).
+[*]Find the closing [b]];[/b] at the end of the [b]var $plugins = [ ... ][/b] array. Add a comma after the last existing entry, then add this new entry just before the [b]];[/b]:
+[/list]
+
+[code]    {
+        "name": "CabbyCodes",
+        "status": true,
+        "description": "CabbyCodes Mod Loader",
+        "parameters": {}
+    }[/code]
+
+Save the file. The end of the array should now look something like:
+
+[code]    {
+        "name": "TunicateScripts",
+        "status": true,
+        "description": "",
+        "parameters": {}
+    },
+    {
+        "name": "CabbyCodes",
+        "status": true,
+        "description": "CabbyCodes Mod Loader",
+        "parameters": {}
+    }
+];[/code]
+
+JSON syntax matters here — make sure there's a comma between every entry except the last one, no trailing comma after the CabbyCodes entry, and every [b]{[/b] has a matching [b]}[/b].
+
+[b][size=4]Verify it loaded[/size][/b]
+
+Launch the game. The mod loads automatically. To confirm it worked:
+[list]
+[*]Load into any save and open the menu — there should be a new [b]Cheats[/b] entry alongside Item, Skill, Options, etc.
+[*]Open [b]<game>/CabbyCodes.log[/b] in a text editor — recent [b][CabbyCodes][/b] lines confirm the loader ran.
+[/list]
+[/spoiler]
+
+[line]
+
+[size=5][b]Uninstalling[/b][/size]
+
+[list=1]
+[*]Open [b]<game>/js/plugins/[/b] (in Steam: right-click [i]Look Outside[/i] → [b]Manage[/b] → [b]Browse local files[/b], then go into [b]js/plugins/[/b]).
+[*]Delete [b]CabbyCodes.js[/b] and the [b]CabbyCodes[/b] folder.
+[*]Open [b]plugins.js[/b] in Notepad and remove the [b]CabbyCodes[/b] entry from the list, or restore the backup you made during install.
+[/list]
+
+[b]CabbyCodes.log[/b] in the game folder is harmless if left behind; you can delete it too.
+
+[line]
+
+[size=5][b]Features[/b][/size]
+
+[size=4][b]Combat & Survival[/b][/size]
+[list]
+[*][b]Invincibility Toggle[/b] — party members can't lose HP from combat, poison/regen ticks, or scripted damage. Carve-out for the Visitor final battle so only Rush (and the original protagonist if present) stays invincible in the Massacre Princess Catholicon party.
+[*][b]One Hit Kill Enemies[/b] — any damage dealt to an enemy becomes lethal, so a single hit drops even bosses.
+[*][b]Never Miss Attacks[/b] — every party attack connects; hit roll is treated as 100% and target evasion as 0.
+[*][b]Status Immunity[/b] — blocks negative status effects from being applied to the party.
+[*][b]Always Escape Battles[/b] — guarantees the Escape party command succeeds.
+[*][b]Stamina Control[/b] — prevents the party from spending MP (stamina) on skills.
+[*][b]EXP Rate Slider[/b] — scale EXP gains from 0x to 10x, plus an "Instant Max" that hits the level cap on the next event.
+[*][b]Refill Status[/b] — tops up HP/MP and maxes every hidden need meter on demand.
+[/list]
+
+[size=4][b]Items, Money & Equipment[/b][/size]
+[list]
+[*][b]Infinite Items[/b] — item counts never decrease when you use, craft, or hand them off. Weapons, armor, key items, and quest-triggered pseudo-keys (Rat Baby Thing, Dog Tags, colored keys, etc.) are unaffected so scripted events still progress. Planet / puzzle discs explicitly stay in inventory after being inserted into a socket.
+[*][b]Unbreakable Items[/b] — weapons (and any other breakable gear) stop losing durability.
+[*][b]Vanilla Bug Fix[/b] — bundle of fixes for base-game bugs. Currently fixes the durability-counter aliasing bug where a broken weapon's safe-hits counter persisted and caused the next instance of the same weapon to break almost immediately.
+[*][b]Unstick Equipment[/b] — unequip "stuck" gear directly from the standard Equip menu; class-locked and state-sealed slots become selectable and the removed gear goes back to inventory.
+[*][b]Infinite Ammo[/b] — keeps every ranged weapon fully loaded and blocks all ammo item costs (magazines, marbles, gas cans, batteries, etc.).
+[*][b]Free Merchants[/b] — every shop entry shows a cost of zero, including vending machines.
+[*][b]Money Editor Button[/b] — adds a pencil icon to the gold display in the main menu for editing current gold.
+[*][b]Infinite Money[/b] — gold can only go up; spending never lowers the balance.
+[*][b]Give Item[/b] — browse every item, weapon, and armor in the game and grant any quantity directly to the party.
+[*][b]Give Missing Items[/b] — gives all missing non-key items to the party. Can filter by item type.
+[*][b]Max Items in Inventory[/b] — tops every stack up to the game's per-item limit.
+[/list]
+
+[size=4][b]Saving & Story[/b][/size]
+[list]
+[*][b]Save Anywhere[/b] — bypasses difficulty-based save restrictions so you can save from the main menu wherever you are.
+[*][b]Delete Save Buttons[/b] — adds an X button to every row of the Load and Save screens that prompts and deletes the selected save without needing to start a new game.
+[*][b]Story Flags[/b] — full editor for story-decision flags: Player flags, Recruits (toggle party member availability), Quest States, Friendly NPCs and Bosses (alive states), Challenges (end-of-game score-bonus flags: No Showers, No Sleep, No Meals, No Video Games, No Friends, No Saves, Iron Man), Video Games (own and complete them without playing), and Locked Doors.
+[/list]
+
+[size=4][b]Time & Schedule[/b][/size]
+[list]
+[*][b]Freeze Time of Day[/b] — locks the in-world clock at its current value. Time-burning actions (cooking, opening the door, playing a videogame) still execute fully, but the actual game time doesn't advance, so hour/day side effects (stamina drain, day-segment shifts, daily resets) don't fire.
+[*][b]Set Game Time[/b] — picker for hour, minute (15-min increments), and absolute day. Forward jumps run the game's TimePasses event so HourPassed and newDay fire normally (multi-day jumps add an extra newDay for each 4 AM crossing). Works even when Freeze Time is on: opens a scoped token that lets the cascade through for this one call, then re-freezes at the new moment.
+[*][b]Set Danger Level[/b] — picker for the time-based encounter danger bonus: None 0, Low 60, Medium 160, High 300, Critical 500. Available only when the player is outside the apartment (returning home zeroes the value).
+[*][b]Set Difficulty[/b] — picker for active difficulty (Easy / Normal / Hard). Writes to the game's three mutually-exclusive difficulty switches (EASYMODE / NORMALMODE / HARDMODE) so escape ratios, weapon-break chance, save restrictions, etc. all branch correctly.
+[*][b]Freeze Hygiene / Needs[/b] — locks all hidden need meters (hygiene, hunger, vigor, morale, social, calm) against worsening, and locks the bad-breath counter against rising. Positive actions (eating, showering, brushing teeth) still move meters in the good direction.
+[/list]
+
+[size=4][b]Doors, Visitors & Floor 4[/b][/size]
+[list]
+[*][b]Friendly Door Visitors[/b] — removes the pool of cursed/hostile door-knock visitors so answering the door never triggers those surprise fights.
+[*][b]Send Next Door Visitor[/b] — pick from the visitors pool and send them immediately knocking at the door.
+[*][b]Floor 4 Always Available[/b] — keeps the apartment elevator's hidden Floor 4 choice permanently available.
+[/list]
+
+[size=4][b]HUDs & UI[/b][/size]
+[list]
+[*][b]Enemy Health Bars[/b] — sleek HP plates above every enemy with delayed damage trails, precise HP totals, and active status icons below the gauge. Remains readable when the battle screen tone changes.
+[*][b]Hidden Needs HUD[/b] — dedicated window showing every hidden meter (hunger, fatigue, hygiene, morale, calm, social, breath odor).
+[*][b]Show Clock HUD[/b] — compact clock panel in the top-right corner of the map showing live in-game time.
+[/list]
+
+[size=4][b]Cooking & Crafting[/b][/size]
+[list]
+[*][b]Max Cooking Skill[/b] — permanently sets your Cooking skill to the top rank (currently Level 8, Amateur Chef).
+[*][b]Oven Ingredient Checkboxes[/b] — overlay checkboxes onto the oven ingredient menus showing which primary bases have every pairing finished and which secondary combinations you've cooked.
+[*][b]Craft Ingredient Checkboxes[/b] — overlay checkboxes onto the crafting station's ingredient menus. Ingredients or pairings not part of any recipe show a red dash instead.
+[*][b]Cook Book[/b] — dedicated scene listing every oven combination in the game, with completion state pulled straight from your save.
+[*][b]Recipe Book[/b] — dedicated scene listing every recipe the game tracks, marked off as you discover them.
+[/list]
+
+[size=4][b]Misc[/b][/size]
+[list]
+[*][b]Change Character Name[/b] — change the main character's name (default Sam). Three base-game names branch behavior: [b]Ash[/b] (also [b]Williams[/b] / [b]evildead[/b]) lets the player equip the Shotgun even after losing an arm; [b]Casanova[/b] enables the April Fools Day smooch flag that 94 NPC encounters key off of; [b]lumpy[/b] makes Sybil's intro hand the player a Straitjacket (intro-only — the Straitjacket only drops if the rename is in place on a new game before the Sybil intro fires).
+[*][b]Fast Credits Scroll[/b] — drops a contextual [b]Fast Credits: ON/OFF[/b] toggle into the top-right of the credits scene. Click to multiply the scroll speed by 20x; click again to drop back to normal.
+[/list]
+
+[line]
+
+[size=5][b]Links & Source[/b][/size]
+[list]
+[*][url=https://github.com/SirCabby/LOCabbyCodes]GitHub repository[/url] — source code, full readme, and contributor docs
+[*][url=https://github.com/SirCabby/LOCabbyCodes/releases]Releases[/url] — download the latest version
+[*][url=https://github.com/SirCabby/LOCabbyCodes/issues]Issues[/url] — report bugs or request features (please attach [b]CabbyCodes.log[/b])
+[/list]

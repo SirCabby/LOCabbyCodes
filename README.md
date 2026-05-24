@@ -4,69 +4,26 @@ A cheats / quality-of-life mod for *Look Outside*, the RPG Maker MZ horror RPG. 
 
 ---
 
-## Installation
+## Quick Install
 
-CabbyCodes ships as one loader file (`CabbyCodes.js`) plus a folder of feature modules (`CabbyCodes/`). You drop both into the game's `js/plugins/` folder and add a single entry to `plugins.js`.
+This is the short version for the common case: you bought *Look Outside* on Steam and left it in the default install folder. If anything below looks different on your machine, the [Detailed Walkthrough](#detailed-walkthrough) further down covers every variation.
 
-### 1. Find your game install folder
+**1. Download the mod.**
+Grab the latest `LOCabbyCodes.v<version>.zip` from the [releases page](https://github.com/SirCabby/LOCabbyCodes/releases) and unzip it. You should end up with one file called `CabbyCodes.js` and one folder called `CabbyCodes`.
 
-You need the folder that contains `Game.exe`. From here on this guide refers to it as `<game>`.
+**2. Open the game's plugins folder.**
+In Steam, right-click *Look Outside* → *Manage* → *Browse local files*. A folder window opens. Inside it, go into `js`, then `plugins`. That `plugins` folder is where the mod goes.
 
-- **Steam (default location):** `C:\Program Files (x86)\Steam\steamapps\common\Look Outside\`
-- **Steam (custom library / different drive):** open Steam → right-click *Look Outside* → *Manage* → *Browse local files*. The folder Steam opens is `<game>`.
-- **Other distributions or manual installs:** wherever you placed the game folder. It will contain `Game.exe`, a `js/` subfolder, a `www/` or `data/` subfolder, etc.
+**3. Drop the mod files in.**
+Copy `CabbyCodes.js` and the entire `CabbyCodes` folder into that `plugins` folder.
 
-### 2. Get the mod files
+**4. Tell the game to load it.**
+In the same `plugins` folder there is a file called `plugins.js`. Make a backup first — right-click it, choose *Copy*, then *Paste* in the same folder. You will have a `plugins - Copy.js` to fall back on. Then open the original `plugins.js` in Notepad (right-click → *Open with* → *Notepad*).
 
-- Download the latest `LOCabbyCodes.v<version>.zip` from the releases page and unzip it
+Scroll to the very bottom of the file. You will see one or more entries that look like `{ "name": "...", "status": true, ... }` followed by `];` on the last line. You need to add one new entry just before that `];`.
 
-You should end up with a `CabbyCodes.js` file and a `CabbyCodes/` folder side by side.
+After your edit, the bottom of the file should look like this:
 
-### 3. Copy the mod into the plugins folder
-
-Copy both `CabbyCodes.js` and the entire `CabbyCodes/` folder into `<game>/js/plugins/`. The result should look like:
-
-```
-<game>/
-└── js/
-    └── plugins/
-        ├── CabbyCodes.js              ← loader (you added this)
-        ├── CabbyCodes/                ← feature modules (you added this)
-        │   ├── cabbycodes-core.js
-        │   ├── cabbycodes-patches.js
-        │   ├── cabbycodes-settings.js
-        │   └── ...                    (many more cabbycodes-*.js files)
-        ├── plugins.js                 ← you'll edit this next
-        └── (existing plugin files)
-```
-
-### 4. Register the plugin in `plugins.js`
-
-`<game>/js/plugins.js` tells the game which plugins to load. CabbyCodes needs one entry added to the list.
-
-1. **Make a backup of `plugins.js` first** — right-click → *Copy*, then *Paste* in the same folder. If anything goes wrong you can restore it instantly.
-2. Open `plugins.js` in a text editor.
-3. Find the closing `];` at the end of the `var $plugins = [ ... ]` array. Add a comma after the last existing entry, then add this new entry just before the `];`:
-
-   ```javascript
-   {
-       "name": "CabbyCodes",
-       "status": true,
-       "description": "CabbyCodes Mod Loader",
-       "parameters": {}
-   }
-   ```
-
-4. Save the file.
-
-The end of the array should now look something like:
-
-```javascript
-    {
-        "name": "TunicateScripts",
-        "status": true,
-        "description": "",
-        "parameters": {}
     },
     {
         "name": "CabbyCodes",
@@ -74,29 +31,32 @@ The end of the array should now look something like:
         "description": "CabbyCodes Mod Loader",
         "parameters": {}
     }
-];
-```
+    ];
 
-JSON syntax matters here — make sure there's a comma between every entry except the last one, no trailing comma after the CabbyCodes entry, and that every `{` has a matching `}`.
+The important bits:
 
-### 5. Verify it loaded
+- There is a comma `,` after the closing `}` of whatever entry was previously last.
+- There is **no** comma after the closing `}` of the new CabbyCodes entry.
+- `];` is still the last thing in the file.
 
-Launch the game. The mod loads automatically. To confirm it worked:
+Save and close Notepad.
 
-- Open loaded into a new or saved game, open the menu — there should be a new **Cheats** entry alongside Item, Skill, Options, etc.
-- Open `<game>/CabbyCodes.log` in a text editor — recent `[CabbyCodes]` lines confirm the loader ran and that toggle changes are being recorded.
+**5. Launch the game and check.**
+Start *Look Outside* through Steam as you normally would. Load any save (or start a new game and reach a point where the menu is available), open the menu, and look for a new **Cheats** entry next to *Item*, *Options*, etc.
 
-That's it. Open the Cheats menu in-game any time to enable, disable, or tweak features.
+That's it. Open the **Cheats** menu any time to enable or tweak features.
+
+If the **Cheats** entry didn't appear, or the game won't start, skip ahead to [Troubleshooting](#troubleshooting).
 
 ---
 
 ## Uninstalling
 
-1. Delete `CabbyCodes.js` from `<game>/js/plugins/`.
-2. Delete the `CabbyCodes/` folder from `<game>/js/plugins/`.
-3. Open `<game>/js/plugins.js` and remove the `CabbyCodes` entry from the `$plugins` array (or restore the backup you made during install).
+1. Open `<game>/js/plugins/` (in Steam: right-click *Look Outside* → *Manage* → *Browse local files*, then go into `js/plugins/`).
+2. Delete `CabbyCodes.js` and the `CabbyCodes` folder.
+3. Open `plugins.js` in Notepad and remove the `CabbyCodes` entry from the list, or restore the backup you made during install.
 
-`<game>/CabbyCodes.log` is harmless if left behind, but you can delete it too.
+`CabbyCodes.log` in the game folder is harmless if left behind; you can delete it too.
 
 ---
 
@@ -104,25 +64,110 @@ That's it. Open the Cheats menu in-game any time to enable, disable, or tweak fe
 
 ### The Cheats menu doesn't appear
 
-- **Verify file locations.** `CabbyCodes.js` should be in `<game>/js/plugins/`, with the `CabbyCodes/` folder beside it. The folder must contain `cabbycodes-core.js` (plus the rest of the `cabbycodes-*.js` files).
-- **Verify `plugins.js`.** Open it and search for "CabbyCodes". The entry must have `"status": true` (not `false`), and the surrounding JSON must be valid — commas between entries, no trailing comma after the last entry, balanced brackets.
-- **Check the log.** Open `<game>/CabbyCodes.log`. Recent `[CabbyCodes]` lines confirm the loader ran. Warnings or errors there usually point straight at the problem.
+- **Check file locations.** `CabbyCodes.js` should be in `<game>/js/plugins/`, with the `CabbyCodes/` folder sitting beside it. The folder must contain `cabbycodes-core.js` and the rest of the `cabbycodes-*.js` files.
+- **Check `plugins.js`.** Open it and look for the word `CabbyCodes`. The entry must have `"status": true` (not `false`).
+- **Check the log.** Open `<game>/CabbyCodes.log` in Notepad. Lines that start with `[CabbyCodes]` confirm the loader actually ran. If there is no such file, or it is empty, the plugin entry probably isn't being read — recheck step 4.
 
 ### The game won't start after installing
 
-This is almost always a `plugins.js` syntax error.
+This is almost always a typo in `plugins.js`.
 
-- **Restore your backup.** If you have one, swap it back in.
-- **Use the platform's repair tool.** On Steam: right-click *Look Outside* → *Properties* → *Installed Files* → *Verify integrity of game files*. Other distributions usually offer a similar option.
-- **Validate the JSON.** Paste the contents of `var $plugins = [ ... ];` (just the array) into an online JSON validator. Common offenders: missing commas between entries, trailing commas, unbalanced brackets, missing quotes around keys.
+- **Restore your backup.** Rename `plugins - Copy.js` back to `plugins.js` (delete the broken one first) and the game will start again.
+- **Verify the game files through Steam.** Right-click *Look Outside* → *Properties* → *Installed Files* → *Verify integrity of game files*. This will restore a clean `plugins.js`, but it also wipes any other plugins you had installed — only do this if the backup is gone.
+- **Common typos** to look for if you want to fix it by hand:
+    - Missing comma between two entries.
+    - Extra trailing comma after the last entry (the one right before `];`).
+    - A `{` without a matching `}`.
+    - Missing quotation marks around `"name"`, `"status"`, etc.
 
 ### Settings don't persist between launches
 
-Settings are saved in the game's `localStorage` under the key `CabbyCodes_Settings`. If your game install lives on a network drive or a folder with restrictive write permissions, NW.js may silently fail to write to it. Move the install to a normal local-disk location.
+Settings are stored in the game's `localStorage` under the key `CabbyCodes_Settings`. If your game install is on a network drive, a OneDrive-synced folder, or a path with restrictive write permissions, NW.js may silently fail to save them. Move the game install to a normal local folder (e.g. somewhere on your `C:` drive that isn't synced to the cloud).
 
-### Sharing diagnostics
+### Reporting an issue
 
-When reporting an issue, include `<game>/CabbyCodes.log`. Each line is timestamped and most modules log a load message at startup, so the file usually shows what was active at the time of the problem.
+When opening an issue, attach `<game>/CabbyCodes.log`. Every line is timestamped and most features log a startup message, so the file usually shows exactly which modules loaded and what was active when something went wrong.
+
+---
+
+## Detailed Walkthrough
+
+Use this section if any of the following apply:
+
+- You don't have the game through Steam.
+- Your Steam library lives on a non-default drive or in a custom folder.
+- You're not sure how to find the game install folder.
+- You're stuck and want every step spelled out.
+
+### Find your game install folder
+
+You need the folder that contains `Game.exe`. This guide refers to it as `<game>`.
+
+- **Steam, default location:** `C:\Program Files (x86)\Steam\steamapps\common\Look Outside\`
+- **Steam, custom library or different drive:** open Steam → right-click *Look Outside* → *Manage* → *Browse local files*. The folder Steam opens is `<game>`.
+- **Other distributions or manual installs:** wherever you placed the game folder. It should contain `Game.exe`, a `js/` subfolder, and a `data/` subfolder.
+
+### Get the mod files
+
+Download `LOCabbyCodes.v<version>.zip` from the [releases page](https://github.com/SirCabby/LOCabbyCodes/releases) and unzip it. You should end up with `CabbyCodes.js` and a `CabbyCodes/` folder side by side.
+
+### Copy the mod into the plugins folder
+
+Copy both `CabbyCodes.js` and the entire `CabbyCodes/` folder into `<game>/js/plugins/`. The result should look like:
+
+    <game>/
+    └── js/
+        └── plugins/
+            ├── CabbyCodes.js              ← loader (you added this)
+            ├── CabbyCodes/                ← feature modules (you added this)
+            │   ├── cabbycodes-core.js
+            │   ├── cabbycodes-patches.js
+            │   ├── cabbycodes-settings.js
+            │   └── ...                    (many more cabbycodes-*.js files)
+            ├── plugins.js                 ← you'll edit this next
+            └── (existing plugin files)
+
+### Register the plugin in `plugins.js`
+
+`<game>/js/plugins.js` tells the game which plugins to load. CabbyCodes needs one entry added to the list.
+
+1. **Make a backup of `plugins.js` first** — right-click → *Copy*, then *Paste* in the same folder. If anything goes wrong you can restore it instantly.
+2. Open `plugins.js` in a text editor (Notepad works fine).
+3. Find the closing `];` at the end of the `var $plugins = [ ... ]` array. Add a comma after the last existing entry, then add this new entry just before the `];`:
+
+        {
+            "name": "CabbyCodes",
+            "status": true,
+            "description": "CabbyCodes Mod Loader",
+            "parameters": {}
+        }
+
+4. Save the file.
+
+The end of the array should now look something like:
+
+        {
+            "name": "TunicateScripts",
+            "status": true,
+            "description": "",
+            "parameters": {}
+        },
+        {
+            "name": "CabbyCodes",
+            "status": true,
+            "description": "CabbyCodes Mod Loader",
+            "parameters": {}
+        }
+    ];
+
+JSON syntax matters here — make sure there's a comma between every entry except the last one, no trailing comma after the CabbyCodes entry, and every `{` has a matching `}`.
+
+### Verify it loaded
+
+Launch the game. The mod loads automatically. To confirm it worked:
+
+- Load into any save (or reach a point on a new game where the menu is available) and open the menu — there should be a new **Cheats** entry alongside Item, Skill, Options, etc.
+- Open `<game>/CabbyCodes.log` in a text editor — recent `[CabbyCodes]` lines confirm the loader ran and that toggle changes are being recorded.
 
 ---
 
@@ -173,7 +218,7 @@ When reporting an issue, include `<game>/CabbyCodes.log`. Each line is timestamp
 
 ## Development
 
-This section is for people working on the mod itself
+This section is for people working on the mod itself.
 
 ### Repo layout
 
