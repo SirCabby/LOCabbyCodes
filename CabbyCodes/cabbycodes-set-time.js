@@ -149,6 +149,9 @@
             CabbyCodes.warn(`${LOG_PREFIX} Dropdown widgets unavailable (item-giver module missing?).`);
             return;
         }
+        // Fresh open from the menu starts from the current game time, not a
+        // selection left over from a prior confirm round trip.
+        pendingSelection = null;
         SceneManager.push(Scene_CabbyCodesSetTime);
     }
 
@@ -394,6 +397,13 @@
     const DROPDOWN_SPACING = 12;
     const DROPDOWN_LIST_VISIBLE_ROWS = 6;
 
+    // Carries the in-progress picker selection across a confirm-scene round
+    // trip. SceneManager.pop() re-instantiates the picker from its class on the
+    // stack (rmmz_managers SceneManager.goto → new sceneClass()), so the picker
+    // we return to on "No, go back" is a fresh instance — create() reads this to
+    // restore the selection instead of resetting to the current game time.
+    let pendingSelection = null;
+
     // Matches cabbycodes-item-giver dropdown sizing (lineHeight 36 + 8).
     const DROPDOWN_BUTTON_HEIGHT = 44;
 
@@ -407,7 +417,8 @@
     Scene_CabbyCodesSetTime.prototype.create = function() {
         Scene_MenuBase.prototype.create.call(this);
         this._startState = readCurrentTime();
-        this._selection = { ...this._startState };
+        this._selection = pendingSelection ? { ...pendingSelection } : { ...this._startState };
+        pendingSelection = null;
         this._dayOptions = buildDayOptions(this._startState.day);
         this._activeDropdownField = null;
         this._lastDropdownField = FIELDS[0];
@@ -698,19 +709,24 @@
     Scene_CabbyCodesSetTime.prototype.openConfirmation = function() {
         const start = this._startState;
         const selection = { ...this._selection };
+        // Returning from the confirm scene re-creates this picker, so stash the
+        // selection for the new instance's create() to restore. Do NOT touch
+        // this (about-to-be-terminated) scene's windows after SceneManager.pop()
+        // — its cursor sprites are torn down and re-focusing them throws.
+        pendingSelection = { ...selection };
         SceneManager.push(Scene_CabbyCodesSetTimeConfirm);
         if (typeof SceneManager.prepareNextScene === 'function') {
             SceneManager.prepareNextScene({
                 start,
                 selection,
                 onConfirm: () => {
+                    pendingSelection = null;
                     applyTime(selection.hour, selection.minute, selection.day);
                     SceneManager.pop();
                     this.popScene();
                 },
                 onCancel: () => {
                     SceneManager.pop();
-                    this.setFocus('apply');
                 }
             });
         }
