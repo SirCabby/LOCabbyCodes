@@ -71,6 +71,7 @@
             'cabbycodes-item-editor.js',
             'cabbycodes-money-editor.js',
             'cabbycodes-story-flags.js',
+            'cabbycodes-mazes-wizards.js',
             'cabbycodes-locked-doors.js',
             'cabbycodes-video-games.js',
             'cabbycodes-sewer-kids.js',
