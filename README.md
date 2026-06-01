@@ -199,7 +199,7 @@ The in-game main menu shows two CabbyCodes entries — **QoL** (quality-of-life)
 - **Unstick Equipment:** Lets you unequip "stuck" gear directly from the standard Equip menu. While on, every equipment slot becomes selectable even when the slot would normally be class-locked or state-sealed; picking the blank "(no item)" entry sends the removed gear back to the party's inventory through the vanilla equip-change path.
 - **Infinite Ammo:** Keeps every ranged weapon fully loaded and blocks all ammo item costs (magazines, marbles, gas cans, batteries, etc.) so you never have to reload or spend ammunition while the toggle is active.
 - **Friendly Door Visitors:** Removes the pool of cursed/hostile door-knock visitors so answering the door never triggers those surprise fights.
-- **Send Next Door Visitor:** Choose from the possible visitors pool and send them immediately knocking at the door.
+- **Send Next Door Visitor:** Choose from the possible visitors pool and send them immediately knocking at the door. Each visitor is a single row; for the ones that have a cursed encounter (such as the Trickster) you can toggle Friendly/Cursed before hitting Send.
 - **Free Merchants:** Forces every shop menu entry to show a cost of zero, including vending machines.
 - **Floor 4 Always Available:** Keeps the apartment elevator's hidden Floor 4 choice permanently available.
 - **Money Editor Button:** Adds a pencil icon button to the gold display on the main menu to edit current gold.

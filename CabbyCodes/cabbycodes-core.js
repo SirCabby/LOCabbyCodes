@@ -21,7 +21,7 @@
      * VERSION file so it can be displayed inside the game.
      * @type {string}
      */
-    CabbyCodes.version = '1.2.1';
+    CabbyCodes.version = '1.3.0';
 
     /**
      * Log level control. When false (default), only WARN and ERROR messages are logged.

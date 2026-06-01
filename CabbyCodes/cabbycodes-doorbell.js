@@ -58,7 +58,11 @@
     );
 
     const EXCLUDED_VISITOR_IDS = Object.freeze([1]);
-    const DOOR_CURSED_VAR_ID = 168;
+    // A cursed door encounter is the base visitor's troop ID plus this offset
+    // (the game's knock-queue common event does `var += 200` when a base
+    // visitor in the "allowed cursed" list rolls its cursed variant). So
+    // troop 63 (Sophie) -> troop 263 ("Cursed Child" / the Trickster).
+    const CURSED_TROOP_OFFSET = 200;
 
     const typeLabels = Object.freeze({
         0: 'Trader',
@@ -144,22 +148,25 @@
         return point;
     }
 
-    function isHostileDoorVisitor(encounterId, rawValue = encounterId) {
-        const normalized = readNumber(encounterId);
-        if (!Number.isFinite(normalized)) {
+    const cursedVariantCache = new Map();
+
+    // True only when a base visitor actually has a real cursed troop at
+    // base+200 (i.e. a populated DoorEncs troop). Many IDs in the game's
+    // "allowed cursed" list have no distinct troop, so we never offer those.
+    function hasCursedDoorVariant(baseId) {
+        const normalized = readNumber(baseId);
+        if (!Number.isFinite(normalized) || normalized <= 0) {
             return false;
         }
-        if (Number.isFinite(rawValue) && rawValue >= 200) {
-            return true;
+        if (cursedVariantCache.has(normalized)) {
+            return cursedVariantCache.get(normalized);
         }
-        const cursedList =
-            typeof $gameVariables !== 'undefined' && $gameVariables
-                ? $gameVariables.value(DOOR_CURSED_VAR_ID)
-                : null;
-        return (
-            Array.isArray(cursedList) &&
-            cursedList.some(value => normalizeEncounterId(value) === normalized)
-        );
+        let result = false;
+        if (typeof $dataTroops !== 'undefined' && $dataTroops) {
+            result = isDoorTroop($dataTroops[normalized + CURSED_TROOP_OFFSET]);
+        }
+        cursedVariantCache.set(normalized, result);
+        return result;
     }
 
     function getTypeLabel(type) {
@@ -478,7 +485,10 @@
                 : inferDoorVisitorType(entry.id);
         const typeLabel = getTypeLabel(type);
         const rawValue = Number.isFinite(entry.rawValue) ? entry.rawValue : entry.id;
-        const hostile = isHostileDoorVisitor(entry.id, rawValue);
+        const canBeCursed = hasCursedDoorVariant(entry.id);
+        // If the game already promoted this queued/pooled entry to its cursed
+        // variant (raw troop ID >= base+200), default the toggle to Cursed.
+        const alreadyCursed = canBeCursed && Number.isFinite(rawValue) && rawValue >= CURSED_TROOP_OFFSET;
         const descriptor = {
             id: entry.id,
             name: getVisitorName(entry.id),
@@ -488,9 +498,14 @@
             helpText: '',
             source,
             sourceLabel: null,
-            isHostile: hostile,
+            canBeCursed,
+            variant: alreadyCursed ? 'cursed' : 'friendly',
             thumbnail: getVisitorThumbnail(entry.id)
         };
+
+        const cursedHint = canBeCursed
+            ? ' Has a cursed variant — use the Friendly/Cursed button to choose, then Send.'
+            : '';
 
         if (source === 'queue') {
             const hourText =
@@ -499,7 +514,7 @@
                     : 'Ready immediately';
             descriptor.detail = `${entry.slot.name} • ${typeLabel}`;
             descriptor.subtext = hourText;
-            descriptor.helpText = `Pulls the queued visitor "${descriptor.name}" (${typeLabel}) immediately and clears ${entry.slot.name}.`;
+            descriptor.helpText = `Pulls the queued visitor "${descriptor.name}" (${typeLabel}) immediately and clears ${entry.slot.name}.${cursedHint}`;
             descriptor.slot = entry.slot;
             descriptor.sourceLabel = entry.slot.name;
             return descriptor;
@@ -508,7 +523,7 @@
         if (source === 'pool') {
             descriptor.detail = `${entry.poolLabel} • ${typeLabel}`;
             descriptor.subtext = `Position ${entry.poolIndex + 1} in pool`;
-            descriptor.helpText = `Consumes "${descriptor.name}" from ${entry.poolLabel} so they knock right now.`;
+            descriptor.helpText = `Consumes "${descriptor.name}" from ${entry.poolLabel} so they knock right now.${cursedHint}`;
             descriptor.poolVarId = entry.poolVarId;
             descriptor.sourceLabel = entry.poolLabel;
             return descriptor;
@@ -516,17 +531,8 @@
 
         descriptor.detail = `${typeLabel} • Forced visit`;
         descriptor.subtext = 'Not in current pools';
-        descriptor.helpText = `Forces "${descriptor.name}" to knock even if unavailable. Pools remain unchanged.`;
+        descriptor.helpText = `Forces "${descriptor.name}" to knock even if unavailable. Pools remain unchanged.${cursedHint}`;
         descriptor.sourceLabel = 'Forced';
-        return descriptor;
-    }
-
-    function appendHostileLabel(descriptor) {
-        if (!descriptor || !descriptor.isHostile) {
-            return descriptor;
-        }
-        descriptor.detail = descriptor.detail ? `${descriptor.detail} • Hostile` : 'Hostile';
-        descriptor.helpText = `${descriptor.helpText || ''} Hostile visitors may start combat.`.trim();
         return descriptor;
     }
 
@@ -543,8 +549,7 @@
         const queueEntries = gatherQueueEntries();
         queueEntries.sort((a, b) => a.hour - b.hour);
         queueEntries.forEach(entry => {
-            const descriptor = appendHostileLabel(createEntryDescriptor(entry, 'queue'));
-            availableEntries.push(descriptor);
+            availableEntries.push(createEntryDescriptor(entry, 'queue'));
             availableIdSet.add(entry.id);
         });
 
@@ -553,24 +558,28 @@
             if (availableIdSet.has(entry.id)) {
                 return;
             }
-            const descriptor = appendHostileLabel(createEntryDescriptor(entry, 'pool'));
-            availableEntries.push(descriptor);
+            availableEntries.push(createEntryDescriptor(entry, 'pool'));
             availableIdSet.add(entry.id);
         });
 
         const unavailableEntries = [];
+        const unavailableIdSet = new Set();
         const knownIds = collectKnownDoorVisitorIds();
         knownIds.forEach(id => {
+            // A base visitor and its cursed troop (base+200) both normalize to
+            // the same id; collapse them into one row so each NPC appears once.
             const normalized = normalizeEncounterId(id);
             if (
                 normalized <= 0 ||
                 availableIdSet.has(normalized) ||
+                unavailableIdSet.has(normalized) ||
                 EXCLUDED_VISITOR_IDS.includes(normalized)
             ) {
                 return;
             }
+            unavailableIdSet.add(normalized);
             unavailableEntries.push(
-                appendHostileLabel(createEntryDescriptor({ id: normalized, rawValue: id }, 'unavailable'))
+                createEntryDescriptor({ id: normalized, rawValue: normalized }, 'unavailable')
             );
         });
 
@@ -665,14 +674,21 @@
             consumeVisitorFromPool(entry.poolVarId, entry.id);
         }
 
+        // Pool consumption keys off the base id, but the encounter we actually
+        // summon is the cursed troop (base+200) when the Cursed variant is
+        // selected for a visitor that has one.
+        const useCursed = entry.variant === 'cursed' && hasCursedDoorVariant(entry.id);
+        const summonId = useCursed ? entry.id + CURSED_TROOP_OFFSET : entry.id;
+
         activateDoorVisitor({
-            encounterId: entry.id,
+            encounterId: summonId,
             encounterType: entry.type,
             slot: entry.slot || null,
             sourceLabel: entry.sourceLabel || null
         });
 
-        return { success: true, message: `${entry.name} is heading to your door.` };
+        const variantSuffix = useCursed ? ' (Cursed)' : '';
+        return { success: true, message: `${entry.name}${variantSuffix} is heading to your door.` };
     }
 
     function openDoorbellSelectorScene() {
@@ -1064,6 +1080,7 @@
             unavailable: 'all'
         };
         this._items = [];
+        this._hoverButton = null;
         this.refresh();
     };
 
@@ -1235,6 +1252,136 @@
         }
     };
 
+    // Single column, so left/right are free to flip the variant of the
+    // selected visitor (keyboard parity with the on-row toggle button).
+    Window_CabbyCodesDoorVisitorList.prototype.cursorRight = function() {
+        this.toggleVariantAt(this.index());
+    };
+
+    Window_CabbyCodesDoorVisitorList.prototype.cursorLeft = function() {
+        this.toggleVariantAt(this.index());
+    };
+
+    Window_CabbyCodesDoorVisitorList.prototype.toggleVariantAt = function(index) {
+        const item = this.itemAt(index);
+        if (!item || item.kind !== 'entry' || !item.entry.canBeCursed) {
+            if (typeof SoundManager !== 'undefined' && typeof SoundManager.playBuzzer === 'function') {
+                SoundManager.playBuzzer();
+            }
+            return false;
+        }
+        item.entry.variant = item.entry.variant === 'cursed' ? 'friendly' : 'cursed';
+        this.redrawItem(index);
+        this.updateHelp();
+        return true;
+    };
+
+    // The right edge of each row carries a [Friendly/Cursed] toggle (only for
+    // visitors that have a cursed troop) and a [Send] button. Both drawing and
+    // hit-testing derive from itemRect so they stay aligned while scrolling.
+    Window_CabbyCodesDoorVisitorList.prototype.entryButtonRects = function(index) {
+        const item = this.itemAt(index);
+        const rect = this.itemRect(index);
+        const pad = 6;
+        const btnH = Math.min(this.lineHeight() - 2, rect.height - 6);
+        const btnY = rect.y + Math.floor((rect.height - btnH) / 2);
+        const sendW = 86;
+        const send = new Rectangle(rect.x + rect.width - pad - sendW, btnY, sendW, btnH);
+        let toggle = null;
+        if (item && item.kind === 'entry' && item.entry.canBeCursed) {
+            const togW = 118;
+            toggle = new Rectangle(send.x - 8 - togW, btnY, togW, btnH);
+        }
+        const textRight = (toggle ? toggle.x : send.x) - 8;
+        return { send, toggle, textRight };
+    };
+
+    // Convert window-local touch coords into content space (matching how
+    // Window_Selectable.hitTest maps a click onto itemRect) and report which
+    // button, if any, sits under the cursor.
+    Window_CabbyCodesDoorVisitorList.prototype.buttonAtLocal = function(index, local) {
+        if (!this.isEntryIndex(index)) {
+            return 'row';
+        }
+        const cx = this.origin.x + local.x - this.padding;
+        const cy = this.origin.y + local.y - this.padding;
+        const rects = this.entryButtonRects(index);
+        if (rects.toggle && rects.toggle.contains(cx, cy)) {
+            return 'toggle';
+        }
+        if (rects.send && rects.send.contains(cx, cy)) {
+            return 'send';
+        }
+        return 'row';
+    };
+
+    Window_CabbyCodesDoorVisitorList.prototype.processTouch = function() {
+        if (!this.isOpenAndActive()) {
+            return;
+        }
+        // A click spans two frames: isTriggered() on press, isClicked() on
+        // release. We must intercept BOTH frames for our button regions —
+        // otherwise the release frame falls through to the base handler, which
+        // fires onTouchOk() and sends/closes the menu on a toggle tap.
+        if (TouchInput.isTriggered() || TouchInput.isClicked()) {
+            const local = windowScreenToLocalCoords(this, TouchInput.x, TouchInput.y);
+            const hitIndex = this.hitTest(local.x, local.y);
+            if (hitIndex >= 0 && this.isEntryIndex(hitIndex)) {
+                const kind = this.buttonAtLocal(hitIndex, local);
+                if (kind === 'toggle') {
+                    if (TouchInput.isTriggered()) {
+                        this.select(hitIndex);
+                        this.toggleVariantAt(hitIndex);
+                    }
+                    return;
+                }
+                if (kind === 'send') {
+                    this.select(hitIndex);
+                    if (TouchInput.isClicked()) {
+                        this.processOk();
+                    }
+                    return;
+                }
+                if (TouchInput.isTriggered()) {
+                    this.select(hitIndex);
+                    if (typeof SoundManager !== 'undefined' && typeof SoundManager.playCursor === 'function') {
+                        SoundManager.playCursor();
+                    }
+                    this.updateHelp();
+                }
+                return;
+            }
+        }
+        Window_Selectable.prototype.processTouch.call(this);
+    };
+
+    Window_CabbyCodesDoorVisitorList.prototype.update = function() {
+        Window_Selectable.prototype.update.call(this);
+        this.updateButtonHover();
+    };
+
+    Window_CabbyCodesDoorVisitorList.prototype.updateButtonHover = function() {
+        let hover = null;
+        if (this.isOpen() && this.visible && typeof TouchInput !== 'undefined') {
+            const local = windowScreenToLocalCoords(this, TouchInput.x, TouchInput.y);
+            const idx = this.hitTest(local.x, local.y);
+            if (idx >= 0 && this.isEntryIndex(idx)) {
+                const kind = this.buttonAtLocal(idx, local);
+                if (kind === 'toggle' || kind === 'send') {
+                    hover = { index: idx, kind };
+                }
+            }
+        }
+        const previous = this._hoverButton;
+        const changed =
+            !!hover !== !!previous ||
+            (hover && previous && (hover.index !== previous.index || hover.kind !== previous.kind));
+        if (changed) {
+            this._hoverButton = hover;
+            this.refresh();
+        }
+    };
+
     Window_CabbyCodesDoorVisitorList.prototype.updateHelp = function() {
         if (!this._helpWindow) {
             return;
@@ -1284,20 +1431,71 @@
         }
 
         const entry = item.entry;
+        const buttons = this.entryButtonRects(index);
+        const textWidth = Math.max(40, buttons.textRight - textRect.x);
+
         this.resetTextColor();
-        this.drawText(entry.name, textRect.x, textRect.y, textRect.width);
+        this.drawText(entry.name, textRect.x, textRect.y, textWidth);
         this.changeTextColor(
             typeof ColorManager !== 'undefined' && typeof ColorManager.textColor === 'function'
                 ? ColorManager.textColor(6)
                 : this.normalColor()
         );
-        this.drawText(entry.detail || '', textRect.x, textRect.y, textRect.width, 'right');
+        this.drawText(entry.detail || '', textRect.x, textRect.y, textWidth, 'right');
         this.resetTextColor();
         const secondLineY = Math.min(
             textRect.y + this.lineHeight() - 2,
             rect.y + rect.height - this.lineHeight()
         );
-        this.drawText(entry.subtext || '', textRect.x, secondLineY, textRect.width);
+        this.drawText(entry.subtext || '', textRect.x, secondLineY, textWidth);
+
+        if (buttons.toggle) {
+            const isCursed = entry.variant === 'cursed';
+            this.drawListButton(buttons.toggle, isCursed ? 'Cursed' : 'Friendly', {
+                kind: 'toggle',
+                index,
+                active: isCursed
+            });
+        }
+        this.drawListButton(buttons.send, 'Send', { kind: 'send', index });
+    };
+
+    Window_CabbyCodesDoorVisitorList.prototype.drawListButton = function(rect, label, opts) {
+        const options = opts || {};
+        const hovered =
+            this._hoverButton &&
+            this._hoverButton.index === options.index &&
+            this._hoverButton.kind === options.kind;
+
+        let bgColor = 'rgba(255, 255, 255, 0.08)';
+        if (options.kind === 'toggle' && options.active) {
+            bgColor = 'rgba(190, 55, 55, 0.38)';
+        }
+        if (hovered) {
+            bgColor = options.kind === 'send' ? 'rgba(70, 150, 240, 0.5)' : 'rgba(255, 255, 255, 0.24)';
+        }
+        this.contents.fillRect(rect.x, rect.y, rect.width, rect.height, bgColor);
+        this.contents.fillRect(rect.x, rect.y, rect.width, 2, 'rgba(255, 255, 255, 0.28)');
+        this.contents.fillRect(rect.x, rect.y + rect.height - 2, rect.width, 2, 'rgba(0, 0, 0, 0.35)');
+
+        if (options.kind === 'toggle' && options.active) {
+            this.changeTextColor('#ffb0b0');
+        } else if (options.kind === 'send') {
+            this.changeTextColor(
+                typeof ColorManager !== 'undefined' && typeof ColorManager.systemColor === 'function'
+                    ? ColorManager.systemColor()
+                    : '#80c0ff'
+            );
+        } else {
+            this.resetTextColor();
+        }
+
+        const previousFontSize = this.contents.fontSize;
+        this.contents.fontSize = Math.max(18, previousFontSize - 4);
+        const textY = rect.y + Math.floor((rect.height - this.lineHeight()) / 2);
+        this.drawText(label, rect.x, textY, rect.width, 'center');
+        this.contents.fontSize = previousFontSize;
+        this.resetTextColor();
     };
 
     Window_CabbyCodesDoorVisitorList.prototype.thumbnailSize = function() {
