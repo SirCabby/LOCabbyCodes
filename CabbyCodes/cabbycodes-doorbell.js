@@ -22,9 +22,22 @@
 
     const settingKey = 'sendNextDoorVisitor';
     const settingSymbol = `cabbycodes_${settingKey}`;
+    const editorSettingKey = 'editUpcomingVisitors';
+    const editorSettingSymbol = `cabbycodes_${editorSettingKey}`;
+    // Set by the queue editor before it pushes the (shared) visitor selector so
+    // the selector assigns the picked visitor to a queue slot instead of
+    // summoning them immediately. Cleared after the assignment, and on cancel /
+    // terminate so a later Send-Now open never inherits assignment mode.
+    let pendingSlotAssignment = null;
+    const friendlyDoorVisitorsSettingKey = 'friendlyDoorVisitors';
     const logPrefix = '[CabbyCodes]';
     const doorKnockSwitchId = 24;
     const doorBattlerPrefix = 'DoorEncs/';
+    // The natural-knock event fires a slot when currentHour (var 16) lands
+    // exactly on the slot's hour, so any 0-23 hour is valid; the game's own
+    // visiting window is roughly 7-22 (see event 71 random ranges).
+    const MIN_DOOR_HOUR = 0;
+    const MAX_DOOR_HOUR = 23;
 
     const queueSlots = [
         { name: 'KnockEnc1', typeVar: 52, hourVar: 53, indexVar: 54 },
@@ -390,6 +403,16 @@
         }, 0);
     }
 
+    function scheduleEditorReset() {
+        if (typeof setTimeout !== 'function') {
+            CabbyCodes.setSetting(editorSettingKey, false);
+            return;
+        }
+        setTimeout(() => {
+            CabbyCodes.setSetting(editorSettingKey, false);
+        }, 0);
+    }
+
     function gatherQueueEntries() {
         if (!hasGameObjects()) {
             return [];
@@ -546,11 +569,20 @@
         const availableEntries = [];
         const availableIdSet = new Set();
 
+        // In queue-edit assignment mode, never offer a visitor who is already
+        // scheduled in a slot: each NPC can only knock once per day, so picking
+        // a duplicate just blanks the slot. Seeding availableIdSet with the
+        // queued ids (and skipping the queue section) hides them everywhere.
+        const assignmentMode = !!(pendingSlotAssignment && pendingSlotAssignment.slot);
+
         const queueEntries = gatherQueueEntries();
         queueEntries.sort((a, b) => a.hour - b.hour);
         queueEntries.forEach(entry => {
-            availableEntries.push(createEntryDescriptor(entry, 'queue'));
             availableIdSet.add(entry.id);
+            if (assignmentMode) {
+                return;
+            }
+            availableEntries.push(createEntryDescriptor(entry, 'queue'));
         });
 
         const poolEntries = gatherPoolEntries();
@@ -584,6 +616,16 @@
         });
 
         unavailableEntries.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+
+        if (assignmentMode) {
+            // Scheduling a slot, the in-pool vs not-in-pool split is meaningless
+            // (anyone can be slotted), and the pools are usually near-empty since
+            // queued visitors were pulled out of them — which left Available
+            // blank. Collapse everyone non-queued into one alphabetical list.
+            const merged = availableEntries.concat(unavailableEntries);
+            merged.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+            return { available: merged, unavailable: [] };
+        }
 
         return { available: availableEntries, unavailable: unavailableEntries };
     }
@@ -691,6 +733,134 @@
         return { success: true, message: `${entry.name}${variantSuffix} is heading to your door.` };
     }
 
+    // -------------------------------------------------------------------------
+    // Queue editing (writes the upcoming-knock slots WITHOUT summoning anyone)
+    //
+    // The natural-knock event (CommonEvents.json event 4, "TimePasses") copies a
+    // slot's indexVar into the live encounter when var 16 reaches the slot's
+    // hour, so editing the slot vars alone reschedules who knocks. We never set
+    // switch 24 / vars 50-51-67 here, and the slot vars are not in Freeze Time's
+    // frozen set, so no exemption token is needed (unlike the Send-Now path).
+    // -------------------------------------------------------------------------
+
+    function clampDoorHour(hour) {
+        const numeric = Math.round(readNumber(hour));
+        if (numeric < MIN_DOOR_HOUR) {
+            return MIN_DOOR_HOUR;
+        }
+        if (numeric > MAX_DOOR_HOUR) {
+            return MAX_DOOR_HOUR;
+        }
+        return numeric;
+    }
+
+    // Midpoint of each slot's natural visiting band (event 71, subsequent-day
+    // ranges 7-10 / 11-14 / 15-18 / 19-22) — used to seed an hour when filling a
+    // previously empty slot so the knock lands during waking hours.
+    function defaultHourForSlot(slot) {
+        const seeds = { KnockEnc1: 8, KnockEnc2: 12, KnockEnc3: 16, KnockEnc4: 20 };
+        return seeds[slot?.name] || 12;
+    }
+
+    function friendlyModeActive() {
+        return CabbyCodes.getSetting(friendlyDoorVisitorsSettingKey, false) === true;
+    }
+
+    // --- Draft model -------------------------------------------------------
+    // The editor stages edits in a draft and only writes the slot vars on
+    // Accept, so Cancel discards cleanly. The draft is module-level so it
+    // survives the scene recreation that happens when the (shared) visitor
+    // selector is pushed for the Reassign step.
+    let activeSlotDraft = null;
+
+    function makeSlotDraft(slot) {
+        const state = readSlotState(slot);
+        return {
+            slot,
+            id: state.baseId,
+            type: state.type,
+            hour: state.hour,
+            cursed: state.cursed,
+            filled: state.filled
+        };
+    }
+
+    function draftCanBeCursed(draft) {
+        return !!draft && draft.filled && draft.id > 0 && hasCursedDoorVariant(draft.id);
+    }
+
+    // Fold a picked catalog entry into the active draft (no var writes).
+    function applyEntryToDraft(entry) {
+        if (!activeSlotDraft || !entry || !entry.id) {
+            return;
+        }
+        activeSlotDraft.id = entry.id;
+        activeSlotDraft.type = typeof entry.type === 'number' && entry.type >= 0 ? entry.type : 0;
+        activeSlotDraft.cursed = entry.variant === 'cursed' && hasCursedDoorVariant(entry.id);
+        activeSlotDraft.filled = true;
+        // Seed a valid knock hour if the slot had none (or a sentinel the clock
+        // never reaches, e.g. the unused slot-4 hour 99 on day one).
+        if (
+            !(activeSlotDraft.hour >= MIN_DOOR_HOUR && activeSlotDraft.hour <= MAX_DOOR_HOUR) ||
+            activeSlotDraft.hour === 0
+        ) {
+            activeSlotDraft.hour = defaultHourForSlot(activeSlotDraft.slot);
+        }
+    }
+
+    // Persist a draft to its slot's vars (or clear the slot). Returns a result
+    // with the Friendly-mode conflict flag so the caller can warn. Never sets
+    // switch 24 / vars 50-51-67, and the slot vars are not Freeze-Time frozen,
+    // so no exemption token is needed (unlike the Send-Now path).
+    function commitSlotDraft(draft) {
+        if (!draft || !draft.slot || !hasGameObjects()) {
+            return { success: false, message: 'Game state is not ready yet.' };
+        }
+        const slot = draft.slot;
+        if (!draft.filled || draft.id <= 0) {
+            clearQueuedSlot(slot);
+            CabbyCodes.log(`${logPrefix} Cleared ${slot.name}.`);
+            return { success: true, cleared: true, message: `${slot.name} cleared.` };
+        }
+
+        const useCursed = draft.cursed && hasCursedDoorVariant(draft.id);
+        const indexValue = useCursed ? draft.id + CURSED_TROOP_OFFSET : draft.id;
+        const hour = clampDoorHour(draft.hour > 0 ? draft.hour : defaultHourForSlot(slot));
+
+        $gameVariables.setValue(slot.indexVar, indexValue);
+        $gameVariables.setValue(slot.typeVar, typeof draft.type === 'number' && draft.type >= 0 ? draft.type : 0);
+        $gameVariables.setValue(slot.hourVar, hour);
+
+        CabbyCodes.log(
+            `${logPrefix} Saved ${slot.name}: visitor ${indexValue} type ${draft.type} hour ${hour}.`
+        );
+        const variantSuffix = useCursed ? ' (Cursed)' : '';
+        let message = `${slot.name}: ${getVisitorName(draft.id)}${variantSuffix} scheduled for hour ${hour}.`;
+        if (useCursed && friendlyModeActive()) {
+            message += ' Friendly Door Visitors is ON and clears cursed slots next day.';
+        }
+        return { success: true, cursed: useCursed, message };
+    }
+
+    // Live read of a single slot's current contents for the editor UI.
+    function readSlotState(slot) {
+        const rawIndex = readNumber($gameVariables.value(slot.indexVar));
+        const baseId = normalizeEncounterId(rawIndex);
+        const filled = rawIndex > 0;
+        return {
+            slot,
+            rawIndex,
+            baseId,
+            filled,
+            cursed: filled && rawIndex >= CURSED_TROOP_OFFSET,
+            type: readNumber($gameVariables.value(slot.typeVar)),
+            hour: readNumber($gameVariables.value(slot.hourVar)),
+            name: filled ? getVisitorName(baseId) : '',
+            canBeCursed: filled && hasCursedDoorVariant(baseId),
+            thumbnail: filled ? getVisitorThumbnail(rawIndex) || getVisitorThumbnail(baseId) : null
+        };
+    }
+
     function openDoorbellSelectorScene() {
         if (!hasGameObjects()) {
             CabbyCodes.warn(`${logPrefix} Door visitor selector requested before the game was ready.`);
@@ -706,6 +876,26 @@
         }
 
         SceneManager.push(Scene_CabbyCodesDoorVisitorSelect);
+        return true;
+    }
+
+    function openDoorQueueEditorScene() {
+        if (!hasGameObjects()) {
+            CabbyCodes.warn(`${logPrefix} Visitor queue editor requested before the game was ready.`);
+            return false;
+        }
+        if (typeof SceneManager === 'undefined') {
+            CabbyCodes.warn(`${logPrefix} SceneManager is unavailable; cannot open the visitor queue editor.`);
+            return false;
+        }
+        if (typeof Scene_CabbyCodesDoorQueueEdit === 'undefined') {
+            CabbyCodes.warn(`${logPrefix} Visitor queue editor scene is missing.`);
+            return false;
+        }
+
+        // Never re-enter assignment mode with stale state from a prior visit.
+        pendingSlotAssignment = null;
+        SceneManager.push(Scene_CabbyCodesDoorQueueEdit);
         return true;
     }
 
@@ -729,6 +919,28 @@
         }
     );
 
+    CabbyCodes.registerSetting(
+        editorSettingKey,
+        'Edit Upcoming Visitors',
+        {
+            defaultValue: false,
+            order: 11,
+            formatValue: () => 'Press',
+            onChange: newValue => {
+                if (!newValue) {
+                    return;
+                }
+                // The scene normally opens from the Options processOk hook; this
+                // is a safety net (e.g. toggled via keyboard) so the value never
+                // sticks "on" and we still try to open the editor.
+                if (!openDoorQueueEditorScene()) {
+                    CabbyCodes.warn(`${logPrefix} Unable to open the visitor queue editor.`);
+                }
+                scheduleEditorReset();
+            }
+        }
+    );
+
     function installDoorbellOptionsHook() {
         if (optionsHookInstalled) {
             return true;
@@ -748,6 +960,13 @@
                     if (!fallback && typeof SoundManager !== 'undefined' && typeof SoundManager.playBuzzer === 'function') {
                         SoundManager.playBuzzer();
                     }
+                }
+                return;
+            }
+
+            if (symbol === editorSettingSymbol) {
+                if (!openDoorQueueEditorScene() && typeof SoundManager !== 'undefined' && typeof SoundManager.playBuzzer === 'function') {
+                    SoundManager.playBuzzer();
                 }
                 return;
             }
@@ -794,8 +1013,13 @@
 
     Scene_CabbyCodesDoorVisitorSelect.prototype.create = function() {
         Scene_MenuBase.prototype.create.call(this);
+        // Queue-edit assignment mode shows every unassigned NPC under a single
+        // list, so the Available/Unavailable picker is meaningless — skip it.
+        this._assignmentMode = !!(pendingSlotAssignment && pendingSlotAssignment.slot);
         this.createHelpWindow();
-        this.createCategoryWindow();
+        if (!this._assignmentMode) {
+            this.createCategoryWindow();
+        }
         this.createSubtypeWindow();
         this.createListWindow();
         this.refreshVisitorData();
@@ -810,6 +1034,9 @@
     };
 
     Scene_CabbyCodesDoorVisitorSelect.prototype.categoryWindowHeight = function() {
+        if (this._assignmentMode) {
+            return 0;
+        }
         return this.calcWindowHeight(1, false) + 4;
     };
 
@@ -849,6 +1076,8 @@
         const rect = this.subtypeWindowRect();
         this._subtypeWindow = new Window_CabbyCodesDoorVisitorSubtype(rect);
         this._subtypeWindow.deactivate();
+        // Must precede setCategory(): it drives whether the "Queue" tab is built.
+        this._subtypeWindow.setAssignmentMode(this._assignmentMode);
         this._subtypeWindow.setCategory(
             this._currentCategory,
             this._currentSubtype[this._currentCategory]
@@ -869,8 +1098,11 @@
         this._listWindow = new Window_CabbyCodesDoorVisitorList(rect);
         this._listWindow.setHandler('ok', this.onVisitorOk.bind(this));
         this._listWindow.setHandler('cancel', this.onListCancel.bind(this));
-        this._listWindow.setHandler('pageup', this.onListCategoryCycle.bind(this, -1));
-        this._listWindow.setHandler('pagedown', this.onListCategoryCycle.bind(this, 1));
+        // No category cycling in assignment mode — there's only one category.
+        if (!this._assignmentMode) {
+            this._listWindow.setHandler('pageup', this.onListCategoryCycle.bind(this, -1));
+            this._listWindow.setHandler('pagedown', this.onListCategoryCycle.bind(this, 1));
+        }
         this.addWindow(this._listWindow);
     };
 
@@ -880,9 +1112,11 @@
         this._listWindow.setSubtypeFilter('available', this._currentSubtype.available);
         this._listWindow.setSubtypeFilter('unavailable', this._currentSubtype.unavailable);
         this._listWindow.setCategory(this._currentCategory);
-        this._categoryWindow.setCounts(this._catalog);
+        if (this._categoryWindow) {
+            this._categoryWindow.setCounts(this._catalog);
+            this._categoryWindow.selectSymbolByKey(this._currentCategory);
+        }
         this._subtypeWindow.setCounts(computeSubtypeCounts(this._catalog));
-        this._categoryWindow.selectSymbolByKey(this._currentCategory);
         this._subtypeWindow.setCategory(
             this._currentCategory,
             this._currentSubtype[this._currentCategory]
@@ -928,9 +1162,16 @@
     };
 
     Scene_CabbyCodesDoorVisitorSelect.prototype.updateHelpSummary = function() {
-        if (this._helpWindow) {
-            this._helpWindow.setText('Choose who knocks next and summon them immediately.');
+        if (!this._helpWindow) {
+            return;
         }
+        if (pendingSlotAssignment && pendingSlotAssignment.slot) {
+            this._helpWindow.setText(
+                `Pick who to schedule for ${pendingSlotAssignment.slot.name} (they knock at its hour, not now).`
+            );
+            return;
+        }
+        this._helpWindow.setText('Choose who knocks next and summon them immediately.');
     };
 
     Scene_CabbyCodesDoorVisitorSelect.prototype.setCurrentCategory = function(symbol) {
@@ -980,6 +1221,15 @@
             return;
         }
 
+        // Assignment mode: fold the picked visitor into the editor's draft (not
+        // the game vars — the editor commits on Accept) and return to it.
+        if (pendingSlotAssignment && pendingSlotAssignment.slot) {
+            applyEntryToDraft(entry);
+            pendingSlotAssignment = null;
+            this.popScene();
+            return;
+        }
+
         const result = sendVisitorFromEntry(entry);
         if (!result.success) {
             this._helpWindow.setText(result.message || 'Unable to send visitor.');
@@ -995,7 +1245,19 @@
     };
 
     Scene_CabbyCodesDoorVisitorSelect.prototype.onListCancel = function() {
+        pendingSlotAssignment = null;
         this.popScene();
+    };
+
+    const baseDoorVisitorTerminate = Scene_CabbyCodesDoorVisitorSelect.prototype.terminate;
+    Scene_CabbyCodesDoorVisitorSelect.prototype.terminate = function() {
+        // Never leak assignment mode into a later Send-Now open of this scene.
+        pendingSlotAssignment = null;
+        if (typeof baseDoorVisitorTerminate === 'function') {
+            baseDoorVisitorTerminate.call(this);
+        } else {
+            Scene_MenuBase.prototype.terminate.call(this);
+        }
     };
 
     Scene_CabbyCodesDoorVisitorSelect.prototype.onCategoryOk = function() {
@@ -1395,6 +1657,15 @@
             this._helpWindow.setText(fallback);
             return;
         }
+        if (pendingSlotAssignment && pendingSlotAssignment.slot) {
+            const variantHint = item.entry.canBeCursed
+                ? ' Use ←/→ or the Friendly/Cursed button to choose, then Assign.'
+                : '';
+            this._helpWindow.setText(
+                `Schedule "${item.entry.name}" for ${pendingSlotAssignment.slot.name}.${variantHint}`
+            );
+            return;
+        }
         this._helpWindow.setText(item.entry.helpText || 'Select a visitor to knock on the door.');
     };
 
@@ -1457,7 +1728,8 @@
                 active: isCursed
             });
         }
-        this.drawListButton(buttons.send, 'Send', { kind: 'send', index });
+        const sendLabel = pendingSlotAssignment ? 'Assign' : 'Send';
+        this.drawListButton(buttons.send, sendLabel, { kind: 'send', index });
     };
 
     Window_CabbyCodesDoorVisitorList.prototype.drawListButton = function(rect, label, opts) {
@@ -1669,14 +1941,24 @@
         this._category = 'available';
         this._selection = 'all';
         this._hoverIndex = -1;
+        this._assignmentMode = false;
     };
 
     Window_CabbyCodesDoorVisitorSubtype.prototype.windowHeight = function() {
         return this.fittingHeight(1);
     };
 
+    // Assignment mode has no scheduled-queue concept, so the "Queue" tab is
+    // dropped from the Available subtypes (6 columns become 5).
+    Window_CabbyCodesDoorVisitorSubtype.prototype.setAssignmentMode = function(flag) {
+        this._assignmentMode = !!flag;
+    };
+
     Window_CabbyCodesDoorVisitorSubtype.prototype.maxCols = function() {
-        return this._category === 'available' ? 6 : 5;
+        if (this._category === 'available') {
+            return this._assignmentMode ? 5 : 6;
+        }
+        return 5;
     };
 
     Window_CabbyCodesDoorVisitorSubtype.prototype.updateArrows = function() {
@@ -1751,7 +2033,7 @@
             this._category === 'available'
                 ? [
                       { name: 'All', symbol: 'all' },
-                      { name: 'Queue', symbol: 'queue' },
+                      ...(this._assignmentMode ? [] : [{ name: 'Queue', symbol: 'queue' }]),
                       { name: 'Traders', symbol: 'trader' },
                       { name: 'General', symbol: 'general' },
                       { name: 'Special', symbol: 'special' },
@@ -1802,6 +2084,613 @@
     };
 
     window.Window_CabbyCodesDoorVisitorSubtype = Window_CabbyCodesDoorVisitorSubtype;
+
+    // -------------------------------------------------------------------------
+    // Upcoming-visitor queue editor (slot-first; reuses the selector above for
+    // the "reassign visitor" step via assignment mode).
+    // -------------------------------------------------------------------------
+
+    function blitDoorThumbnail(win, thumbnail, x, y, size) {
+        if (!win || !thumbnail || !thumbnail.battlerName || typeof ImageManager === 'undefined') {
+            return;
+        }
+        const bitmap = ImageManager.loadEnemy(thumbnail.battlerName, thumbnail.hue || 0);
+        if (!bitmap || bitmap.width <= 0 || bitmap.height <= 0) {
+            if (bitmap && bitmap.addLoadListener) {
+                bitmap.addLoadListener(() => win.refresh());
+            }
+            return;
+        }
+        win.contents.fillRect(x - 1, y - 1, size + 2, size + 2, '#ffffff');
+        const scale = size / Math.max(bitmap.width, bitmap.height);
+        const drawWidth = bitmap.width * scale;
+        const drawHeight = bitmap.height * scale;
+        const offsetX = x + Math.max(0, (size - drawWidth) / 2);
+        const offsetY = y + Math.max(0, (size - drawHeight) / 2);
+        win.contents.blt(bitmap, 0, 0, bitmap.width, bitmap.height, offsetX, offsetY, drawWidth, drawHeight);
+    }
+
+    // The stock Window_Help draws on a single line and clips anything wider than
+    // the window. The queue editor's per-slot help can be long, so wrap it on
+    // word boundaries to fit the (2-line) help area instead of running off the
+    // right edge.
+    function Window_CabbyCodesWrappedHelp() {
+        this.initialize(...arguments);
+    }
+
+    Window_CabbyCodesWrappedHelp.prototype = Object.create(Window_Help.prototype);
+    Window_CabbyCodesWrappedHelp.prototype.constructor = Window_CabbyCodesWrappedHelp;
+
+    Window_CabbyCodesWrappedHelp.prototype.refresh = function() {
+        const rect = this.baseTextRect();
+        this.contents.clear();
+        this.resetFontSettings();
+        this.drawTextEx(this.wrapText(this._text, rect.width), rect.x, rect.y, rect.width);
+    };
+
+    Window_CabbyCodesWrappedHelp.prototype.wrapText = function(text, maxWidth) {
+        if (!text) {
+            return '';
+        }
+        // Honor any explicit breaks the caller inserted, wrapping each segment.
+        return String(text)
+            .split('\n')
+            .map(line => this.wrapLine(line, maxWidth))
+            .join('\n');
+    };
+
+    Window_CabbyCodesWrappedHelp.prototype.wrapLine = function(line, maxWidth) {
+        const words = line.split(' ');
+        const wrapped = [];
+        let current = '';
+        words.forEach(word => {
+            const candidate = current ? `${current} ${word}` : word;
+            if (current && this.textWidth(candidate) > maxWidth) {
+                wrapped.push(current);
+                current = word;
+            } else {
+                current = candidate;
+            }
+        });
+        if (current) {
+            wrapped.push(current);
+        }
+        return wrapped.join('\n');
+    };
+
+    window.Window_CabbyCodesWrappedHelp = Window_CabbyCodesWrappedHelp;
+
+    function Scene_CabbyCodesDoorQueueEdit() {
+        this.initialize(...arguments);
+        this._slots = [];
+        this._activeSlot = null;
+        this._awaitingAssignment = false;
+    }
+
+    Scene_CabbyCodesDoorQueueEdit.prototype = Object.create(Scene_MenuBase.prototype);
+    Scene_CabbyCodesDoorQueueEdit.prototype.constructor = Scene_CabbyCodesDoorQueueEdit;
+
+    Scene_CabbyCodesDoorQueueEdit.prototype.create = function() {
+        Scene_MenuBase.prototype.create.call(this);
+        this.createHelpWindow();
+        this.createSlotWindow();
+        this.createActionWindow();
+        this.createHourWindow();
+        this.refreshSlots();
+        if (activeSlotDraft) {
+            // Returned from the Reassign selector mid-edit (scene was recreated);
+            // resume the same slot's action menu with the in-progress draft.
+            this._activeSlot = activeSlotDraft.slot;
+            this.openActionMenu();
+        } else {
+            this._slotWindow.activate();
+            this._slotWindow.select(0);
+        }
+    };
+
+    Scene_CabbyCodesDoorQueueEdit.prototype.helpAreaHeight = function() {
+        return this.calcWindowHeight(2, false);
+    };
+
+    Scene_CabbyCodesDoorQueueEdit.prototype.helpAreaTop = function() {
+        return 0;
+    };
+
+    Scene_CabbyCodesDoorQueueEdit.prototype.createHelpWindow = function() {
+        const rect = this.helpWindowRect();
+        this._helpWindow = new Window_CabbyCodesWrappedHelp(rect);
+        this.addWindow(this._helpWindow);
+        this._helpWindow.y = 0;
+        this.setSummaryHelp();
+    };
+
+    Scene_CabbyCodesDoorQueueEdit.prototype.setSummaryHelp = function() {
+        if (this._helpWindow) {
+            this._helpWindow.setText(
+                "Edit today's queue — visitors knock at their scheduled hour, not now. The game re-rolls all slots each new day."
+            );
+        }
+    };
+
+    Scene_CabbyCodesDoorQueueEdit.prototype.slotWindowRect = function() {
+        const wy = this.helpAreaHeight();
+        const ww = Graphics.boxWidth;
+        const wh = Graphics.boxHeight - wy;
+        return new Rectangle(0, wy, ww, wh);
+    };
+
+    Scene_CabbyCodesDoorQueueEdit.prototype.createSlotWindow = function() {
+        const rect = this.slotWindowRect();
+        this._slotWindow = new Window_CabbyCodesDoorQueueSlots(rect);
+        this._slotWindow.setHelpWindow(this._helpWindow);
+        this._slotWindow.setHandler('ok', this.onSlotOk.bind(this));
+        this._slotWindow.setHandler('cancel', this.onSlotCancel.bind(this));
+        this.addWindow(this._slotWindow);
+    };
+
+    Scene_CabbyCodesDoorQueueEdit.prototype.actionWindowRect = function() {
+        const ww = Math.min(380, Graphics.boxWidth - 80);
+        const lines = 6;
+        const wh = this.calcWindowHeight(lines, true);
+        const wx = Math.floor((Graphics.boxWidth - ww) / 2);
+        const wy = Math.floor((Graphics.boxHeight - wh) / 2);
+        return new Rectangle(wx, wy, ww, wh);
+    };
+
+    Scene_CabbyCodesDoorQueueEdit.prototype.createActionWindow = function() {
+        const rect = this.actionWindowRect();
+        this._actionWindow = new Window_CabbyCodesDoorSlotActions(rect);
+        this._actionWindow.setHandler('reassign', this.onActionReassign.bind(this));
+        this._actionWindow.setHandler('variant', this.onActionVariant.bind(this));
+        this._actionWindow.setHandler('hour', this.onActionHour.bind(this));
+        this._actionWindow.setHandler('clear', this.onActionClear.bind(this));
+        this._actionWindow.setHandler('accept', this.onActionAccept.bind(this));
+        this._actionWindow.setHandler('cancel', this.onActionCancel.bind(this));
+        this._actionWindow.hide();
+        this._actionWindow.deactivate();
+        this.addWindow(this._actionWindow);
+    };
+
+    Scene_CabbyCodesDoorQueueEdit.prototype.hourWindowRect = function() {
+        const ww = Math.min(380, Graphics.boxWidth - 80);
+        const wh = this.calcWindowHeight(2, false);
+        const wx = Math.floor((Graphics.boxWidth - ww) / 2);
+        const wy = Math.floor((Graphics.boxHeight - wh) / 2);
+        return new Rectangle(wx, wy, ww, wh);
+    };
+
+    Scene_CabbyCodesDoorQueueEdit.prototype.createHourWindow = function() {
+        const rect = this.hourWindowRect();
+        this._hourWindow = new Window_CabbyCodesDoorHourInput(rect);
+        this._hourWindow.setHandler('ok', this.onHourOk.bind(this));
+        this._hourWindow.setHandler('cancel', this.onHourCancel.bind(this));
+        this._hourWindow.hide();
+        this._hourWindow.deactivate();
+        this.addWindow(this._hourWindow);
+    };
+
+    Scene_CabbyCodesDoorQueueEdit.prototype.refreshSlots = function() {
+        this._slots = queueSlots.map(slot => readSlotState(slot));
+        if (this._slotWindow) {
+            this._slotWindow.setSlots(this._slots);
+        }
+    };
+
+    Scene_CabbyCodesDoorQueueEdit.prototype.onSlotOk = function() {
+        const state = this._slotWindow.currentSlotState();
+        if (!state) {
+            this._slotWindow.activate();
+            return;
+        }
+        this._activeSlot = state.slot;
+        activeSlotDraft = makeSlotDraft(state.slot);
+        this.openActionMenu();
+    };
+
+    Scene_CabbyCodesDoorQueueEdit.prototype.onSlotCancel = function() {
+        this.popScene();
+    };
+
+    // One-line preview of the in-progress draft, shown in the help bar while the
+    // action menu is open so unsaved edits are visible before Accept.
+    Scene_CabbyCodesDoorQueueEdit.prototype.draftHelpText = function() {
+        const draft = activeSlotDraft;
+        if (!draft) {
+            return '';
+        }
+        if (!draft.filled || draft.id <= 0) {
+            return `${draft.slot.name}: will be cleared. Accept to save, Cancel to discard.`;
+        }
+        const variant = draft.cursed ? 'Cursed' : 'Friendly';
+        let text = `${draft.slot.name} → ${getVisitorName(draft.id)} • ${getTypeLabel(draft.type)} • ${variant} • hour ${draft.hour} (unsaved).`;
+        if (draft.cursed && friendlyModeActive()) {
+            text += ' Friendly Door Visitors is ON — it clears cursed slots next day.';
+        }
+        return text;
+    };
+
+    Scene_CabbyCodesDoorQueueEdit.prototype.openActionMenu = function() {
+        this._actionWindow.setDraft(activeSlotDraft);
+        this._actionWindow.show();
+        this._actionWindow.open();
+        this._actionWindow.activate();
+        this._actionWindow.select(0);
+        this._slotWindow.deactivate();
+        if (this._helpWindow) {
+            this._helpWindow.setText(this.draftHelpText());
+        }
+    };
+
+    Scene_CabbyCodesDoorQueueEdit.prototype.closeActionMenu = function() {
+        if (this._actionWindow) {
+            this._actionWindow.deactivate();
+            this._actionWindow.hide();
+        }
+    };
+
+    Scene_CabbyCodesDoorQueueEdit.prototype.returnToSlots = function() {
+        this.closeActionMenu();
+        this.closeHourWindow();
+        this.refreshSlots();
+        this._slotWindow.activate();
+        this._slotWindow.callUpdateHelp();
+    };
+
+    Scene_CabbyCodesDoorQueueEdit.prototype.onActionReassign = function() {
+        if (!this._activeSlot || !activeSlotDraft) {
+            this.returnToSlots();
+            return;
+        }
+        // Hand off to the shared selector in assignment mode. Pushing here
+        // terminates this scene; when the selector pops it has folded the pick
+        // into activeSlotDraft (module-level, so it survives), and SceneManager
+        // builds a FRESH editor whose create() resumes this draft's action menu.
+        // _awaitingAssignment keeps terminate() from wiping the draft/handoff.
+        pendingSlotAssignment = { slot: this._activeSlot };
+        this._awaitingAssignment = true;
+        this.closeActionMenu();
+        this._slotWindow.deactivate();
+        SceneManager.push(Scene_CabbyCodesDoorVisitorSelect);
+    };
+
+    Scene_CabbyCodesDoorQueueEdit.prototype.onActionVariant = function() {
+        if (!draftCanBeCursed(activeSlotDraft)) {
+            if (typeof SoundManager !== 'undefined' && typeof SoundManager.playBuzzer === 'function') {
+                SoundManager.playBuzzer();
+            }
+            this._actionWindow.activate();
+            return;
+        }
+        activeSlotDraft.cursed = !activeSlotDraft.cursed;
+        // Stage only — rebuild the menu for the new label and refresh the preview.
+        this._actionWindow.setDraft(activeSlotDraft);
+        this._actionWindow.activate();
+        if (this._helpWindow) {
+            this._helpWindow.setText(this.draftHelpText());
+        }
+    };
+
+    Scene_CabbyCodesDoorQueueEdit.prototype.onActionHour = function() {
+        const seed = activeSlotDraft.hour > 0 ? activeSlotDraft.hour : defaultHourForSlot(this._activeSlot);
+        this._hourWindow.setHour(seed);
+        this._hourWindow.show();
+        this._hourWindow.open();
+        this._hourWindow.activate();
+        this.closeActionMenu();
+        if (this._helpWindow) {
+            this._helpWindow.setText(
+                'Use ←/→ to set the knock hour (0–23; 7–22 is the natural visiting window). OK to confirm.'
+            );
+        }
+    };
+
+    Scene_CabbyCodesDoorQueueEdit.prototype.closeHourWindow = function() {
+        if (this._hourWindow) {
+            this._hourWindow.deactivate();
+            this._hourWindow.hide();
+        }
+    };
+
+    Scene_CabbyCodesDoorQueueEdit.prototype.onHourOk = function() {
+        if (activeSlotDraft) {
+            activeSlotDraft.hour = clampDoorHour(this._hourWindow.hour());
+        }
+        this.closeHourWindow();
+        this.openActionMenu();
+    };
+
+    Scene_CabbyCodesDoorQueueEdit.prototype.onHourCancel = function() {
+        this.closeHourWindow();
+        this.openActionMenu();
+    };
+
+    Scene_CabbyCodesDoorQueueEdit.prototype.onActionClear = function() {
+        if (!activeSlotDraft || !activeSlotDraft.filled) {
+            if (typeof SoundManager !== 'undefined' && typeof SoundManager.playBuzzer === 'function') {
+                SoundManager.playBuzzer();
+            }
+            this._actionWindow.activate();
+            return;
+        }
+        // Stage the clear; user still has to Accept. Stay in the menu so it can
+        // be undone with Cancel or replaced via Fill Slot.
+        activeSlotDraft.filled = false;
+        activeSlotDraft.id = 0;
+        this._actionWindow.setDraft(activeSlotDraft);
+        this._actionWindow.activate();
+        if (this._helpWindow) {
+            this._helpWindow.setText(this.draftHelpText());
+        }
+    };
+
+    Scene_CabbyCodesDoorQueueEdit.prototype.onActionAccept = function() {
+        const result = commitSlotDraft(activeSlotDraft);
+        activeSlotDraft = null;
+        this.returnToSlots();
+        if (result && result.message && this._helpWindow) {
+            this._helpWindow.setText(result.message);
+        }
+    };
+
+    Scene_CabbyCodesDoorQueueEdit.prototype.onActionCancel = function() {
+        // Discard the draft; the slot vars were never touched, so refreshing
+        // shows the original values.
+        activeSlotDraft = null;
+        this.returnToSlots();
+    };
+
+    Scene_CabbyCodesDoorQueueEdit.prototype.terminate = function() {
+        // Clear leftover edit state on a normal exit, but NOT when handing off to
+        // the selector (terminate fires before the selector reads the draft).
+        if (!this._awaitingAssignment) {
+            pendingSlotAssignment = null;
+            activeSlotDraft = null;
+        }
+        Scene_MenuBase.prototype.terminate.call(this);
+    };
+
+    window.Scene_CabbyCodesDoorQueueEdit = Scene_CabbyCodesDoorQueueEdit;
+
+    function Window_CabbyCodesDoorQueueSlots() {
+        this.initialize(...arguments);
+    }
+
+    Window_CabbyCodesDoorQueueSlots.prototype = Object.create(Window_Selectable.prototype);
+    Window_CabbyCodesDoorQueueSlots.prototype.constructor = Window_CabbyCodesDoorQueueSlots;
+
+    Window_CabbyCodesDoorQueueSlots.prototype.initialize = function(rect) {
+        Window_Selectable.prototype.initialize.call(this, rect);
+        this._slots = [];
+        this.refresh();
+    };
+
+    Window_CabbyCodesDoorQueueSlots.prototype.maxCols = function() {
+        return 1;
+    };
+
+    Window_CabbyCodesDoorQueueSlots.prototype.maxItems = function() {
+        return this._slots.length || queueSlots.length;
+    };
+
+    Window_CabbyCodesDoorQueueSlots.prototype.itemHeight = function() {
+        const titleHeight = this.lineHeight();
+        const detailHeight = Math.floor(this.lineHeight() * 0.7);
+        return titleHeight + detailHeight + 6;
+    };
+
+    Window_CabbyCodesDoorQueueSlots.prototype.setSlots = function(slots) {
+        this._slots = Array.isArray(slots) ? slots : [];
+        const previous = this.index();
+        this.refresh();
+        this.select(previous >= 0 && previous < this.maxItems() ? previous : 0);
+        this.updateHelp();
+    };
+
+    Window_CabbyCodesDoorQueueSlots.prototype.currentSlotState = function() {
+        return this._slots[this.index()] || null;
+    };
+
+    Window_CabbyCodesDoorQueueSlots.prototype.thumbnailSize = function() {
+        return Math.max(20, Math.min(36, this.itemHeight() - 6));
+    };
+
+    Window_CabbyCodesDoorQueueSlots.prototype.updateHelp = function() {
+        if (!this._helpWindow) {
+            return;
+        }
+        const state = this.currentSlotState();
+        if (!state) {
+            return;
+        }
+        if (!state.filled) {
+            this._helpWindow.setText(`${state.slot.name} is empty — press to add a visitor.`);
+            return;
+        }
+        const variant = state.cursed ? 'Cursed' : 'Friendly';
+        this._helpWindow.setText(
+            `${state.slot.name}: ${state.name} • ${getTypeLabel(state.type)} • ${variant} • hour ${state.hour}. Press to edit.`
+        );
+    };
+
+    Window_CabbyCodesDoorQueueSlots.prototype.drawItem = function(index) {
+        const state = this._slots[index];
+        if (!state) {
+            return;
+        }
+        const rect = this.itemRectWithPadding(index);
+        const padding = 4;
+        const gap = 8;
+        const slotName = state.slot.name;
+
+        // Always reserve the thumbnail column (even for empty slots) so every
+        // row's text starts at the same x, and leave a gap after the image so
+        // the text never butts up against it.
+        const thumbnailSize = this.thumbnailSize();
+        if (state.thumbnail) {
+            const thumbY = rect.y + Math.max(0, Math.floor((rect.height - thumbnailSize) / 2));
+            blitDoorThumbnail(this, state.thumbnail, rect.x + padding, thumbY, thumbnailSize);
+        }
+        const textOffset = padding + thumbnailSize + gap;
+        const textX = rect.x + textOffset;
+        const textWidth = rect.width - textOffset;
+        const secondLineY = Math.min(
+            rect.y + this.lineHeight() - 2,
+            rect.y + rect.height - Math.floor(this.lineHeight() * 0.7)
+        );
+
+        if (!state.filled) {
+            const dimColor =
+                typeof ColorManager !== 'undefined' && typeof ColorManager.textColor === 'function'
+                    ? ColorManager.textColor(8)
+                    : '#9fa0a4';
+            this.resetTextColor();
+            this.drawText(`${slotName}: Empty`, textX, rect.y, textWidth);
+            this.changeTextColor(dimColor);
+            this.drawText('Press to add a visitor', textX, secondLineY, textWidth);
+            this.resetTextColor();
+            return;
+        }
+
+        this.resetTextColor();
+        this.drawText(`${slotName}: ${state.name}`, textX, rect.y, textWidth);
+        this.changeTextColor(
+            typeof ColorManager !== 'undefined' && typeof ColorManager.textColor === 'function'
+                ? ColorManager.textColor(6)
+                : this.normalColor()
+        );
+        this.drawText(`Hour ${state.hour}`, textX, rect.y, textWidth, 'right');
+        this.resetTextColor();
+
+        const variant = state.cursed ? 'Cursed' : 'Friendly';
+        if (state.cursed) {
+            this.changeTextColor('#ffb0b0');
+        }
+        this.drawText(`${getTypeLabel(state.type)} • ${variant}`, textX, secondLineY, textWidth);
+        this.resetTextColor();
+    };
+
+    window.Window_CabbyCodesDoorQueueSlots = Window_CabbyCodesDoorQueueSlots;
+
+    function Window_CabbyCodesDoorSlotActions() {
+        this.initialize(...arguments);
+    }
+
+    Window_CabbyCodesDoorSlotActions.prototype = Object.create(Window_Command.prototype);
+    Window_CabbyCodesDoorSlotActions.prototype.constructor = Window_CabbyCodesDoorSlotActions;
+
+    Window_CabbyCodesDoorSlotActions.prototype.initialize = function(rect) {
+        this._draft = null;
+        Window_Command.prototype.initialize.call(this, rect);
+    };
+
+    // Keep the same draft object the scene mutates; rebuild keeps the selected
+    // command index stable so toggling a label doesn't jump the cursor away.
+    Window_CabbyCodesDoorSlotActions.prototype.setDraft = function(draft) {
+        this._draft = draft || null;
+        const previous = this.index();
+        this.clearCommandList();
+        this.makeCommandList();
+        this.refresh();
+        const max = this.maxItems();
+        this.select(previous >= 0 && previous < max ? previous : 0);
+    };
+
+    Window_CabbyCodesDoorSlotActions.prototype.makeCommandList = function() {
+        const draft = this._draft;
+        if (!draft) {
+            return;
+        }
+        if (!draft.filled || draft.id <= 0) {
+            this.addCommand('Fill Slot', 'reassign');
+            this.addCommand('Accept', 'accept');
+            this.addCommand('Cancel', 'cancel');
+            return;
+        }
+        this.addCommand('Reassign Visitor', 'reassign');
+        if (draftCanBeCursed(draft)) {
+            this.addCommand(draft.cursed ? 'Make Friendly' : 'Make Cursed', 'variant');
+        }
+        this.addCommand('Set Hour', 'hour');
+        this.addCommand('Clear Slot', 'clear');
+        this.addCommand('Accept', 'accept');
+        this.addCommand('Cancel', 'cancel');
+    };
+
+    window.Window_CabbyCodesDoorSlotActions = Window_CabbyCodesDoorSlotActions;
+
+    function Window_CabbyCodesDoorHourInput() {
+        this.initialize(...arguments);
+    }
+
+    Window_CabbyCodesDoorHourInput.prototype = Object.create(Window_Selectable.prototype);
+    Window_CabbyCodesDoorHourInput.prototype.constructor = Window_CabbyCodesDoorHourInput;
+
+    Window_CabbyCodesDoorHourInput.prototype.initialize = function(rect) {
+        Window_Selectable.prototype.initialize.call(this, rect);
+        this._hour = 12;
+        this.refresh();
+        this.select(0);
+    };
+
+    Window_CabbyCodesDoorHourInput.prototype.maxCols = function() {
+        return 1;
+    };
+
+    Window_CabbyCodesDoorHourInput.prototype.maxItems = function() {
+        return 1;
+    };
+
+    Window_CabbyCodesDoorHourInput.prototype.setHour = function(hour) {
+        this._hour = clampDoorHour(hour);
+        this.refresh();
+    };
+
+    Window_CabbyCodesDoorHourInput.prototype.hour = function() {
+        return this._hour;
+    };
+
+    Window_CabbyCodesDoorHourInput.prototype.cursorRight = function() {
+        const next = clampDoorHour(this._hour + 1);
+        if (next !== this._hour) {
+            this._hour = next;
+            this.refresh();
+            if (typeof SoundManager !== 'undefined' && typeof SoundManager.playCursor === 'function') {
+                SoundManager.playCursor();
+            }
+        }
+    };
+
+    Window_CabbyCodesDoorHourInput.prototype.cursorLeft = function() {
+        const next = clampDoorHour(this._hour - 1);
+        if (next !== this._hour) {
+            this._hour = next;
+            this.refresh();
+            if (typeof SoundManager !== 'undefined' && typeof SoundManager.playCursor === 'function') {
+                SoundManager.playCursor();
+            }
+        }
+    };
+
+    Window_CabbyCodesDoorHourInput.prototype.cursorDown = function() {};
+    Window_CabbyCodesDoorHourInput.prototype.cursorUp = function() {};
+
+    Window_CabbyCodesDoorHourInput.prototype.drawAllItems = function() {
+        const rect = this.itemRectWithPadding(0);
+        this.resetTextColor();
+        this.drawText(`Knock hour:  ${this._hour}`, rect.x, rect.y, rect.width, 'center');
+        this.changeTextColor(
+            typeof ColorManager !== 'undefined' && typeof ColorManager.textColor === 'function'
+                ? ColorManager.textColor(6)
+                : this.normalColor()
+        );
+        const fontSize = this.contents.fontSize;
+        this.contents.fontSize = Math.max(18, fontSize - 6);
+        this.drawText('← / →  adjust   •   OK confirm', rect.x, rect.y + this.lineHeight(), rect.width, 'center');
+        this.contents.fontSize = fontSize;
+        this.resetTextColor();
+    };
+
+    window.Window_CabbyCodesDoorHourInput = Window_CabbyCodesDoorHourInput;
 
     if (typeof Game_Switches !== 'undefined' && Game_Switches.prototype) {
         CabbyCodes.override(

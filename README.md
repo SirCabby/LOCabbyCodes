@@ -200,6 +200,7 @@ The in-game main menu shows two CabbyCodes entries — **QoL** (quality-of-life)
 - **Infinite Ammo:** Keeps every ranged weapon fully loaded and blocks all ammo item costs (magazines, marbles, gas cans, batteries, etc.) so you never have to reload or spend ammunition while the toggle is active.
 - **Friendly Door Visitors:** Removes the pool of cursed/hostile door-knock visitors so answering the door never triggers those surprise fights.
 - **Send Next Door Visitor:** Choose from the possible visitors pool and send them immediately knocking at the door. Each visitor is a single row; for the ones that have a cursed encounter (such as the Trickster) you can toggle Friendly/Cursed before hitting Send.
+- **Edit Upcoming Visitors:** Rewrite the door-visitor *queue* without summoning anyone. For each of the four queue slots you can reassign which visitor is scheduled, toggle Friendly/Cursed, change the scheduled hour, clear a slot, or fill an empty one — then the edited visitor knocks naturally at their scheduled hour instead of right away. Edits apply to the current day (the game re-rolls the queue each new day); if Friendly Door Visitors is on, cursed slots get cleared at the next day rollover.
 - **Free Merchants:** Forces every shop menu entry to show a cost of zero, including vending machines.
 - **Floor 4 Always Available:** Keeps the apartment elevator's hidden Floor 4 choice permanently available.
 - **Money Editor Button:** Adds a pencil icon button to the gold display on the main menu to edit current gold.
