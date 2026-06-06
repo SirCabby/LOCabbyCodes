@@ -83,9 +83,9 @@
                 'cabbycodes-cookbook.js',
                 'cabbycodes-recipe-book.js',
                 'cabbycodes-no-unfocus-pause.js',
+                'cabbycodes-time-advance-logger.js',
             ],
             mainTail: [
-                'cabbycodes-time-advance-logger.js',
             ],
         };
 
