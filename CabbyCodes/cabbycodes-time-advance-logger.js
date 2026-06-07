@@ -12,6 +12,10 @@
  * trace unexpected hour jumps when returning home. Lines go through
  * CabbyCodes.log (INFO level), so they only persist to disk when
  * CabbyCodes.debugLoggingEnabled is true.
+ *
+ * This module observes Game_Variables.setValue directly through the patch
+ * chain and does not depend on the Freeze Time module; the two can be loaded
+ * independently.
  */
 
 (() => {
@@ -38,17 +42,6 @@
         [112, { label: 'DoorDangerBonus' }],
         [122, { label: 'TimeBucket' }]
     ]);
-
-    const freezeTimeApi = CabbyCodes.freezeTime;
-    if (
-        !freezeTimeApi ||
-        typeof freezeTimeApi.registerVariableWriteInterceptor !== 'function'
-    ) {
-        CabbyCodes.warn(
-            `${MODULE_TAG} Freeze Time module not found; time logging disabled.`
-        );
-        return;
-    }
 
     const interpreterStack = [];
     const listToCommonEventId = new WeakMap();
@@ -410,11 +403,27 @@
         CabbyCodes.log(segments.join(' | '));
     }
 
-    freezeTimeApi.registerVariableWriteInterceptor(
-        (varId, previousValue, pendingValue, context) => {
-            logVariableChange(Number(varId), previousValue, pendingValue, context);
+    // Observe writes to the tracked time/stat variables directly through the
+    // patch chain, independent of the Freeze Time module. The logger only reads
+    // — it logs the pending value (matching the old interceptor semantics) and
+    // then delegates straight down the chain, so any freeze-time / freeze-
+    // hygiene transform or block that sits below us still runs unchanged. Reading
+    // the previous value via the public `value` accessor (as freeze-hygiene does)
+    // avoids the callOriginal-from-a-different-method ambiguity.
+    CabbyCodes.override(Game_Variables.prototype, 'setValue', function(variableId, value) {
+        const numericId = Number(variableId);
+        if (trackedVariables.has(numericId)) {
+            const previousValue =
+                typeof this.value === 'function' ? this.value(numericId) : undefined;
+            logVariableChange(numericId, previousValue, value, { source: 'setValue' });
         }
-    );
+        return CabbyCodes.callOriginal(
+            Game_Variables.prototype,
+            'setValue',
+            this,
+            [variableId, value]
+        );
+    });
 
     CabbyCodes.log(`${MODULE_TAG} initialized`);
 })();

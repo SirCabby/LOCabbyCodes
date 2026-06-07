@@ -63,7 +63,7 @@
     const SAFETY_NET_INTERVAL_MS = 500;
     const DEFERRED_CAPTURE_RETRY_MS = 250;
 
-    // ----- Public API surface (used by freeze-hygiene + time-advance-logger) -----
+    // ----- Public API surface (used by freeze-hygiene + floor4-elevator) -----
     const freezeTimeApi = (CabbyCodes.freezeTime = CabbyCodes.freezeTime || {});
     const variableWriteInterceptors =
         freezeTimeApi.variableWriteInterceptors || [];
